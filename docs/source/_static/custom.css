@@ -65,3 +65,11 @@
     padding: 0;
     background: transparent;
 }
+
+/* Make links blue inside code blocks to make it clear they are links. */
+.rst-content a > code.literal {
+    color: unset;
+}
+.rst-content a > code.xref {
+    color: unset;
+}

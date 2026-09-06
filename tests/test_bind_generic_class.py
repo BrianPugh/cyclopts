@@ -225,7 +225,7 @@ def test_bind_generic_class_keyword_with_positional_only_subkeys(app, console, a
         Usage: test_bind_generic_class foo --user USER
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  --user  [required]                                              │
+        │ *  --user USER  [required]                                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

@@ -298,7 +298,6 @@ def _create_section_nodes(lines: list[str], state: Any) -> list["nodes.Node"]:
                 if lines[i].strip() == "::":
                     break
 
-                # Check if this is a blank line
                 if not lines[i].strip():
                     # Include the blank line and continue to see if there's more content
                     content_lines.append(lines[i])

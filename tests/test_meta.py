@@ -277,7 +277,7 @@ def test_meta_app_help_inconsistency_with_argument_order(app, console):
         │ *  LOOPS --loops  [required]                                       │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Global options ───────────────────────────────────────────────────╮
-        │ *  --user  [required]                                              │
+        │ *  --user STR  [required]                                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

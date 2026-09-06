@@ -70,19 +70,16 @@ class MarkdownFormatter:
         if not panel.entries:
             return
 
-        # Write panel title as heading
         if panel.title:
             title_text = extract_text(panel.title, console)
             heading = "#" * self.heading_level
             self._output.write(f"{heading} {title_text}\n\n")
 
-        # Write panel description if present
         if panel.description:
             desc_text = extract_text(panel.description, console)
             if desc_text:
                 self._output.write(f"{desc_text}\n\n")
 
-        # Format entries based on panel type
         if panel.format == "command":
             self._format_command_panel(panel.entries, console)
         elif panel.format == "parameter":
@@ -130,31 +127,8 @@ class MarkdownFormatter:
         """
         # Always use list style for Typer-like output
         for entry in entries:
-            if names := entry.all_options:
-                # Separate positional names from option names
-                positional_names = [n for n in names if not n.startswith("-")]
-                short_opts = [n for n in names if n.startswith("-") and not n.startswith("--")]
-                long_opts = [n for n in names if n.startswith("--")]
-
-                # Determine if this is a positional argument (required, no default)
-                is_positional = entry.required and entry.default is None
-
-                if is_positional and positional_names:
-                    # Show uppercase positional name first, then any option names
-                    parts = [positional_names[0].upper()]
-                    parts.extend(long_opts)
-                    name_str = ", ".join(parts)
-                else:
-                    # For options, show long opts first, then short opts
-                    if short_opts:
-                        name_str = ", ".join(long_opts + short_opts)
-                    elif positional_names:
-                        # Has positional name but not required - show all
-                        parts = [positional_names[0].upper()]
-                        parts.extend(long_opts)
-                        name_str = ", ".join(parts)
-                    else:
-                        name_str = ", ".join(long_opts)
+            if entry.display_labels:
+                name_str = ", ".join(entry.display_labels_with_metavar)
 
                 # Start the entry (no type display). No trailing space after the
                 # colon; each following piece (description/metadata) supplies its
@@ -175,7 +149,7 @@ class MarkdownFormatter:
                     in_numbered_list = False
 
                     for line in lines[1:]:
-                        if not line.strip():  # Blank line
+                        if not line.strip():
                             self._output.write("\n")
                         else:
                             stripped = line.lstrip()
@@ -202,14 +176,6 @@ class MarkdownFormatter:
 
                 # Add metadata in brackets
                 # Handle required separately for bold formatting
-                is_required = False
-                if entry.required and not is_positional:
-                    # Only show required for options, arguments show it differently
-                    is_required = True
-                elif is_positional and entry.required:
-                    # For positional args, add [required] at the end
-                    is_required = True
-
                 metadata = []
                 if entry.choices:
                     choices_str = ", ".join(entry.choices)
@@ -224,7 +190,7 @@ class MarkdownFormatter:
                     metadata.append(f"default: {default_str}")
 
                 # Write required in bold and separate brackets first
-                if is_required:
+                if entry.required:
                     self._output.write(" **[required]**")
 
                 # Write each metadata item in its own brackets with italics

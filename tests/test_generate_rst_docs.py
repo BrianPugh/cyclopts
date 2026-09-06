@@ -498,3 +498,164 @@ def test_generate_rst_docs_usage_name_none_is_default_behavior():
         pass
 
     assert app.generate_docs(output_format="rst") == app.generate_docs(output_format="rst", usage_name=None)
+
+
+def test_generate_rst_docs_no_root_title_renders_default_command_params():
+    """Regression for #923.
+
+    The Sphinx directive always renders with ``no_root_title=True``. When the
+    root app has a ``default_command`` (registered via ``@app.default``), that
+    command's own arguments live in the *root* parameter panel and its
+    invocation is the *root* Usage: line -- neither of which is documented
+    anywhere else. A title-less root previously suppressed the entire panel body
+    and the Usage: line, so a ``@app.default`` app's parameters vanished
+    entirely from Sphinx output.
+    """
+    from cyclopts.docs.rst import generate_rst_docs
+
+    app = App(name="myapp", help="My awesome CLI application")
+
+    @app.default
+    def init(path: str = ".", template: str = "default"):
+        """Initialize a new project.
+
+        Parameters
+        ----------
+        path : str
+            Directory where the project will be created
+        template : str
+            Project template to use
+        """
+
+    docs = generate_rst_docs(app, no_root_title=True)
+
+    # The root default_command's parameters must be present.
+    assert "**Parameters:**" in docs
+    assert "``PATH, --path``" in docs
+    assert "Directory where the project will be created" in docs
+    assert "``TEMPLATE, --template``" in docs
+    assert "Project template to use" in docs
+
+    # The root Usage: line (the default command's invocation) must be present.
+    assert "myapp [ARGS]" in docs
+
+    # The root title/heading must still be suppressed by no_root_title.
+    assert "myapp\n-----" not in docs
+    assert "=====\nmyapp\n=====" not in docs
+
+
+def test_generate_rst_docs_no_root_title_meta_default_renders_params():
+    """A root with only a ``meta.default`` (no ``default_command``) still documents its global options.
+
+    The meta app's parameters live in the root parameter panel and are documented
+    nowhere else, so they render even though there is no root Usage: line.
+    """
+    from cyclopts.docs.rst import generate_rst_docs
+
+    app = App(name="myapp", help="Meta root")
+
+    @app.meta.default
+    def meta_main(*tokens: str, verbose: bool = False):
+        """Meta."""
+
+    @app.command
+    def build(source: str):
+        """Build the project."""
+
+    docs = generate_rst_docs(app, no_root_title=True)
+
+    assert "``--verbose, --no-verbose``" in docs
+    assert "myapp [ARGS]" not in docs
+    assert "myapp COMMAND" not in docs
+    assert "myapp build" in docs
+
+
+def test_generate_rst_docs_no_root_title_skip_preamble_hides_root_params():
+    """``skip_preamble`` with a command filter must not leak the root default's parameters.
+
+    This is the "one subcommand per page" pattern: only the filtered command's
+    content should appear.
+    """
+    from cyclopts.docs.rst import generate_rst_docs
+
+    app = App(name="myapp", help="My app")
+
+    @app.default
+    def init(path: str = "."):
+        """Initialize."""
+
+    @app.command
+    def build(source: str):
+        """Build the project."""
+
+    docs = generate_rst_docs(app, no_root_title=True, commands_filter=["build"], skip_preamble=True)
+
+    assert "``PATH, --path``" not in docs
+    assert "My app" not in docs
+    assert "``SOURCE, --source``" in docs
+
+
+def test_generate_rst_docs_no_root_title_command_group_unchanged():
+    """A pure command-group root (no default_command) stays title/usage-less.
+
+    Companion to :func:`test_generate_rst_docs_no_root_title_renders_default_command_params`:
+    the #923 fix must only add back the *default command's* root panel/usage, not
+    introduce a spurious root Usage: line or parameter panel for command groups.
+    """
+    from cyclopts.docs.rst import generate_rst_docs
+
+    app = App(name="myapp", help="A command group")
+
+    @app.command
+    def build(source: str):
+        """Build the project."""
+
+    docs = generate_rst_docs(app, no_root_title=True)
+
+    # No root-level parameter panel and no root Usage: line for a command group.
+    assert "myapp COMMAND" not in docs
+    assert "myapp [ARGS]" not in docs
+    # The subcommand is still documented recursively.
+    assert "build" in docs
+    assert "myapp build" in docs
+
+
+def test_generate_rst_docs_no_root_title_shared_group_command_not_leaked():
+    """Regression for #924.
+
+    ``_assemble_help_panels`` merges command entries into a same-named parameter
+    panel and upgrades its format to ``"parameter"``. At a title-less root the
+    #923 fix renders root parameter panels, so those merged command entries would
+    leak in: rendered as bogus parameters, duplicated by the recursive sections
+    below, and bypassing ``exclude_commands``/``commands_filter``. The root
+    default's real parameters must still render.
+    """
+    from typing import Annotated
+
+    from cyclopts import Group, Parameter
+    from cyclopts.docs.rst import generate_rst_docs
+
+    shared = Group("Shared")
+    app = App(name="myapp")
+
+    @app.default
+    def main(alpha: Annotated[str, Parameter(group=shared)] = "x"):
+        """Root default."""
+
+    @app.command(group=shared)
+    def sub(beta: int = 3):
+        """A subcommand."""
+
+    docs = generate_rst_docs(app, no_root_title=True)
+
+    # The root default's own parameter still renders (the #923 fix).
+    assert "``ALPHA, --alpha``" in docs
+    # The command is documented once, as its own recursive section...
+    assert docs.count("``sub``") == 0  # not rendered as a definition-list entry
+    assert "\nsub\n" in docs  # rendered as a recursive section header
+    assert "myapp sub" in docs
+
+    # ...and ``exclude_commands`` must be honored: no leak through the merged panel.
+    excluded = generate_rst_docs(app, no_root_title=True, exclude_commands=["sub"])
+    assert "``ALPHA, --alpha``" in excluded
+    assert "sub" not in excluded

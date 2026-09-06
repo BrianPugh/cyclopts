@@ -107,14 +107,13 @@ class PlainFormatter:
         if panel.title:
             self._print_plain(console, f"{panel.title}:")
 
-        # Print each entry in the panel
         for entry in panel.entries:
             desc = _to_plain_text(entry.description, console)
 
             # Format the entry line
-            if entry.all_options:
+            if entry.display_labels:
                 if panel.format == "parameter":
-                    self._format_parameter_entry(entry.all_options, desc, console, entry)
+                    self._format_parameter_entry(entry.display_labels_with_metavar, desc, console, entry)
                 else:
                     # Command formatter needs separate longs/shorts for its specific layout
                     self._format_command_entry(entry.positive_names, entry.positive_shorts, desc, console)
@@ -264,7 +263,6 @@ class PlainFormatter:
                     # Additional names on separate lines
                     self._print_plain(console, textwrap.indent(name, self.indent))
         elif shorts:
-            # Only short names
             shorts_str = " ".join(shorts)
             if desc:
                 text = f"{shorts_str}: {desc}"

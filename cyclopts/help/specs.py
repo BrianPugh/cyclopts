@@ -124,22 +124,43 @@ class NameRenderer:
         -------
         ~rich.console.RenderableType
             Combined names and shorts, optionally wrapped.
-            Order: positive_names, positive_shorts, negative_names, negative_shorts
+            Order: positional_label (positional only), positive_names, positive_shorts,
+            metavar (keyword-only), negative_names, negative_shorts
         """
-        text = " ".join(entry.all_options)
-
+        text = " ".join(entry.display_labels_with_metavar)
         if self.max_width is None:
             return text
+        return "\n".join(_wrap_labels(text, self.max_width))
 
-        wrapped = textwrap.wrap(
-            text,
-            self.max_width,
-            subsequent_indent="  ",
-            break_on_hyphens=False,
-            tabsize=4,
-        )
 
-        return "\n".join(wrapped)
+def _wrap_labels(text: str, width: int) -> list[str]:
+    """Greedy word-wrap with a two-space continuation indent.
+
+    Unlike :func:`textwrap.wrap`, a label too long for one line is broken before a ``.``
+    (``--models.{NAME}`` / ``.empty-items``) rather than mid-token, and never on hyphens.
+    """
+    lines: list[str] = []
+    line = ""
+    for word in text.split():
+        candidate = f"{line} {word}" if line.strip() else line + word
+        if len(candidate) <= width:
+            line = candidate
+            continue
+        if line.strip():
+            lines.append(line)
+            line = "  "
+        while len(line) + len(word) > width:
+            available = width - len(line)
+            cut = word.rfind(".", 1, available + 1)
+            if cut <= 0:
+                # At least one character must move per pass, or a width that the
+                # continuation indent alone fills would never make progress.
+                cut = max(available, 1)
+            lines.append(line + word[:cut])
+            line, word = "  ", word[cut:]
+        line += word
+    lines.append(line)
+    return lines
 
 
 class CommandNameRenderer:
@@ -242,17 +263,14 @@ class DescriptionRenderer:
         if description is None:
             description = InlineText(Text())
         elif not isinstance(description, InlineText):
-            # Convert to InlineText if it isn't already
             if hasattr(entry.description, "__rich_console__"):
                 # It's already a Rich renderable, wrap it
                 description = InlineText(description)
             else:
-                # Convert to Text first, then wrap in InlineText
                 from rich.text import Text
 
                 description = InlineText(Text(str(description)))
 
-        # Collect metadata items
         metadata_items = []
 
         if entry.choices:
@@ -275,18 +293,14 @@ class DescriptionRenderer:
             from rich.console import Group as RichGroup
             from rich.text import Text
 
-            # Create a list of renderables to group
             renderables = []
 
-            # Add the original description first
             if description.primary_renderable:
                 renderables.append(description.primary_renderable)
 
-            # Add each metadata item without indentation
             for item in metadata_items:
                 renderables.append(item)
 
-            # Return a Rich Group that stacks these vertically
             return RichGroup(*renderables) if renderables else Text()
         else:
             # Original inline behavior
@@ -349,9 +363,11 @@ class ColumnSpec:
         # String renderer - get attribute directly
         ColumnSpec(renderer="description")
 
-        # Callable renderer - custom formatting
+        # Callable renderer - custom formatting.
+        # ``display_labels`` includes the ``positional_label`` for positional parameters;
+        # use ``all_options`` for option names only (see HelpEntry).
         def format_names(entry: HelpEntry) -> str:
-            return ", ".join(entry.names) if entry.names else ""
+            return ", ".join(entry.display_labels)
         ColumnSpec(renderer=format_names)
     """
 
@@ -743,7 +759,6 @@ class TableSpec:
 
         table = Table(**opts)
 
-        # Add columns
         for column in columns:
             col_opts = {
                 "header": column.header,
@@ -764,7 +779,6 @@ class TableSpec:
                 col_opts["highlight"] = column.highlight
             table.add_column(**col_opts)
 
-        # Add entries
         for e in entries:
             cells = [col._render_cell(e) for col in columns]
             table.add_row(*cells)

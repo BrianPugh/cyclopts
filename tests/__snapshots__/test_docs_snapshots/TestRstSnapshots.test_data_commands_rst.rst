@@ -71,31 +71,31 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 
 **Parameters:**
 
-``--batch-size``
+``--batch-size INT``
     Number of items to process per batch. [Default: ``32``]
 
-``--num-workers``
+``--num-workers INT``
     Number of parallel workers. Use "auto" for automatic detection. [Choices: ``auto``, Default: ``auto``]
 
-``--quality-level``
+``--quality-level INT``
     Processing quality level. Higher values mean better quality but slower. [Choices: ``high``, ``medium``, ``low``, Default: ``high``]
 
-``--device``
+``--device INT``
     Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. [Choices: ``cuda``, ``cpu``, ``auto``, Default: ``auto``]
 
 ``--output-formats, --empty-output-formats``
     List of output formats to generate. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``[json]``]
 
-``--input-dir``
+``--input-dir PATH``
     Input data directory. [Default: ``data/input``]
 
-``--output-dir``
+``--output-dir PATH``
     Output results directory. [Default: ``data/output``]
 
-``--cache-dir``
+``--cache-dir PATH``
     Cache directory for intermediate files.
 
-``--log-dir``
+``--log-dir PATH``
     Directory for log files. [Default: ``logs``]
 
 .. _cyclopts-complex-cli-data-pipeline:
@@ -114,31 +114,31 @@ PathConfig and ProcessingConfig).
 
 **Parameters:**
 
-``--name``
+``--name STR``
     Pipeline name for identification. [Default: ``default-pipeline``]
 
-``--input-dir``
+``--input-dir PATH``
     Input data directory. [Default: ``data/input``]
 
-``--output-dir``
+``--output-dir PATH``
     Output results directory. [Default: ``data/output``]
 
-``--cache-dir``
+``--cache-dir PATH``
     Cache directory for intermediate files.
 
-``--log-dir``
+``--log-dir PATH``
     Directory for log files. [Default: ``logs``]
 
-``--batch-size``
+``--batch-size INT``
     Number of items to process per batch. [Default: ``32``]
 
-``--num-workers``
+``--num-workers INT``
     Number of parallel workers. Use "auto" for automatic detection. [Choices: ``auto``, Default: ``auto``]
 
-``--quality-level``
+``--quality-level INT``
     Processing quality level. Higher values mean better quality but slower. [Choices: ``high``, ``medium``, ``low``, Default: ``high``]
 
-``--device``
+``--device INT``
     Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. [Choices: ``cuda``, ``cpu``, ``auto``, Default: ``auto``]
 
 ``--output-formats, --empty-output-formats``
@@ -168,8 +168,8 @@ Validate data files against schema.
 ``--strict, --no-strict``
     Enable strict validation mode. [Default: ``False``]
 
-``--schema-file``
+``--schema-file PATH``
     Custom schema file (must exist).
 
-``--ignore-patterns, --empty-ignore-patterns``
+``--ignore-patterns LIST[STR], --empty-ignore-patterns``
     Patterns to ignore during validation.

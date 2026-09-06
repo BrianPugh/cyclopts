@@ -7,7 +7,7 @@ Administrative commands for system management.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -74,7 +74,7 @@ Delete a user.
 
 **Parameters**:
 
-* `--force, --no-force, -f`: Skip confirmation prompt. *[default: False]*
+* `--force, -f, --no-force`: Skip confirmation prompt. *[default: False]*
 * `--backup, --no-backup`: Create backup before deletion. *[default: True]*
 
 #### complex-cli admin users permissions
@@ -96,8 +96,8 @@ Grant permissions to a user.
 
 **Parameters**:
 
-* `--resource`: Specific resource to grant access to.
-* `--expires`: Expiration date (ISO format).
+* `--resource STR`: Specific resource to grant access to.
+* `--expires STR`: Expiration date (ISO format).
 
 ##### complex-cli admin users permissions revoke
 
@@ -166,4 +166,4 @@ Create a new role template.
 * `--permissions.write, --permissions.no-write`: Default permissions for this role. *[default: False]*
 * `--permissions.execute, --permissions.no-execute`: Default permissions for this role. *[default: False]*
 * `--permissions.admin, --permissions.no-admin`: Default permissions for this role. *[default: False]*
-* `--description`: Role description. *[default: ""]*
+* `--description STR`: Role description. *[default: ""]*

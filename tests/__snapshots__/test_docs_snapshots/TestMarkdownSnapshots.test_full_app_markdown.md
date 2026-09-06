@@ -45,7 +45,7 @@ Complex CLI application for comprehensive documentation testing.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -78,7 +78,7 @@ Displays the application version and system information.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -98,7 +98,7 @@ Show application information.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -109,7 +109,7 @@ Administrative commands for system management.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -125,7 +125,7 @@ Show system status.
 
 * `SERVICES, --services`: Specific services to check (all if not specified).
 * `--watch, -w`: Continuously watch status. *[default: False]*
-* `--interval`: Refresh interval in seconds when watching. *[default: 5]*
+* `--interval INT`: Refresh interval in seconds when watching. *[default: 5]*
 
 ### complex-cli admin config-cmd
 
@@ -137,12 +137,12 @@ Configure database settings.
 
 **Parameters**:
 
-* `--host`: Database server hostname. *[default: localhost]*
-* `--port`: Database server port number. *[default: 5432]*
-* `--username`: Authentication username. *[default: admin]*
-* `--password`: Authentication password (optional).
+* `--host STR`: Database server hostname. *[default: localhost]*
+* `--port INT`: Database server port number. *[default: 5432]*
+* `--username STR`: Authentication username. *[default: admin]*
+* `--password STR`: Authentication password (optional).
 * `--ssl-mode`: SSL connection mode. *[choices: disable, prefer, require, verify-full]* *[default: prefer]*
-* `--pool-size`: Connection pool size. *[default: 10]*
+* `--pool-size INT`: Connection pool size. *[default: 10]*
 
 ### complex-cli admin users
 
@@ -207,7 +207,7 @@ Delete a user.
 
 **Parameters**:
 
-* `--force, --no-force, -f`: Skip confirmation prompt. *[default: False]*
+* `--force, -f, --no-force`: Skip confirmation prompt. *[default: False]*
 * `--backup, --no-backup`: Create backup before deletion. *[default: True]*
 
 #### complex-cli admin users permissions
@@ -229,8 +229,8 @@ Grant permissions to a user.
 
 **Parameters**:
 
-* `--resource`: Specific resource to grant access to.
-* `--expires`: Expiration date (ISO format).
+* `--resource STR`: Specific resource to grant access to.
+* `--expires STR`: Expiration date (ISO format).
 
 ##### complex-cli admin users permissions revoke
 
@@ -299,7 +299,7 @@ Create a new role template.
 * `--permissions.write, --permissions.no-write`: Default permissions for this role. *[default: False]*
 * `--permissions.execute, --permissions.no-execute`: Default permissions for this role. *[default: False]*
 * `--permissions.admin, --permissions.no-admin`: Default permissions for this role. *[default: False]*
-* `--description`: Role description. *[default: ""]*
+* `--description STR`: Role description. *[default: ""]*
 
 ## complex-cli data
 
@@ -308,7 +308,7 @@ Data processing commands.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -329,15 +329,15 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 
 **Parameters**:
 
-* `--batch-size`: Number of items to process per batch. *[default: 32]*
-* `--num-workers`: Number of parallel workers. Use "auto" for automatic detection. *[choices: auto]* *[default: auto]*
-* `--quality-level`: Processing quality level. Higher values mean better quality but slower. *[choices: high, medium, low]* *[default: high]*
-* `--device`: Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. *[choices: cuda, cpu, auto]* *[default: auto]*
+* `--batch-size INT`: Number of items to process per batch. *[default: 32]*
+* `--num-workers INT`: Number of parallel workers. Use "auto" for automatic detection. *[choices: auto]* *[default: auto]*
+* `--quality-level INT`: Processing quality level. Higher values mean better quality but slower. *[choices: high, medium, low]* *[default: high]*
+* `--device INT`: Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. *[choices: cuda, cpu, auto]* *[default: auto]*
 * `--output-formats, --empty-output-formats`: List of output formats to generate. *[choices: json, yaml, table, csv]* *[default: [json]]*
-* `--input-dir`: Input data directory. *[default: data/input]*
-* `--output-dir`: Output results directory. *[default: data/output]*
-* `--cache-dir`: Cache directory for intermediate files.
-* `--log-dir`: Directory for log files. *[default: logs]*
+* `--input-dir PATH`: Input data directory. *[default: data/input]*
+* `--output-dir PATH`: Output results directory. *[default: data/output]*
+* `--cache-dir PATH`: Cache directory for intermediate files.
+* `--log-dir PATH`: Directory for log files. *[default: logs]*
 
 ### complex-cli data pipeline
 
@@ -352,15 +352,15 @@ PathConfig and ProcessingConfig).
 
 **Parameters**:
 
-* `--name`: Pipeline name for identification. *[default: default-pipeline]*
-* `--input-dir`: Input data directory. *[default: data/input]*
-* `--output-dir`: Output results directory. *[default: data/output]*
-* `--cache-dir`: Cache directory for intermediate files.
-* `--log-dir`: Directory for log files. *[default: logs]*
-* `--batch-size`: Number of items to process per batch. *[default: 32]*
-* `--num-workers`: Number of parallel workers. Use "auto" for automatic detection. *[choices: auto]* *[default: auto]*
-* `--quality-level`: Processing quality level. Higher values mean better quality but slower. *[choices: high, medium, low]* *[default: high]*
-* `--device`: Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. *[choices: cuda, cpu, auto]* *[default: auto]*
+* `--name STR`: Pipeline name for identification. *[default: default-pipeline]*
+* `--input-dir PATH`: Input data directory. *[default: data/input]*
+* `--output-dir PATH`: Output results directory. *[default: data/output]*
+* `--cache-dir PATH`: Cache directory for intermediate files.
+* `--log-dir PATH`: Directory for log files. *[default: logs]*
+* `--batch-size INT`: Number of items to process per batch. *[default: 32]*
+* `--num-workers INT`: Number of parallel workers. Use "auto" for automatic detection. *[choices: auto]* *[default: auto]*
+* `--quality-level INT`: Processing quality level. Higher values mean better quality but slower. *[choices: high, medium, low]* *[default: high]*
+* `--device INT`: Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. *[choices: cuda, cpu, auto]* *[default: auto]*
 * `--output-formats, --empty-output-formats`: List of output formats to generate. *[choices: json, yaml, table, csv]* *[default: [json]]*
 * `--dry-run, --no-dry-run`: If True, simulate execution without making changes. *[default: False]*
 
@@ -379,8 +379,8 @@ Validate data files against schema.
 **Parameters**:
 
 * `--strict, --no-strict`: Enable strict validation mode. *[default: False]*
-* `--schema-file`: Custom schema file (must exist).
-* `--ignore-patterns, --empty-ignore-patterns`: Patterns to ignore during validation.
+* `--schema-file PATH`: Custom schema file (must exist).
+* `--ignore-patterns LIST[STR], --empty-ignore-patterns`: Patterns to ignore during validation.
 
 ## complex-cli server
 
@@ -389,7 +389,7 @@ Server management commands.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -405,15 +405,15 @@ Demonstrates Pydantic model support for CLI parameters.
 
 **Parameters**:
 
-* `--server.host`: Server bind address. *[default: 0.0.0.0]*
-* `--server.port`: Server port number. *[default: 8000]*
-* `--server.workers`: Number of worker processes. *[default: 4]*
-* `--server.timeout`: Request timeout in seconds. *[default: 30.0]*
+* `--server.host STR`: Server bind address. *[default: 0.0.0.0]*
+* `--server.port INT`: Server port number. *[default: 8000]*
+* `--server.workers INT`: Number of worker processes. *[default: 4]*
+* `--server.timeout FLOAT`: Request timeout in seconds. *[default: 30.0]*
 * `--server.debug, --server.no-debug`: Enable debug mode. *[default: False]*
 * `--auth.provider`: Authentication provider type. *[choices: oauth2, jwt, basic, none]* *[default: jwt]*
-* `--auth.token-expiry`: Token expiration time in seconds. *[default: 3600]*
+* `--auth.token-expiry INT`: Token expiration time in seconds. *[default: 3600]*
 * `--auth.refresh-enabled, --auth.no-refresh-enabled`: Enable token refresh. *[default: True]*
-* `--auth.allowed-origins, --auth.empty-allowed-origins`: List of allowed CORS origins. *[default: ['*']]*
+* `--auth.allowed-origins LIST[STR], --auth.empty-allowed-origins`: List of allowed CORS origins. *[default: ['*']]*
 
 ### complex-cli server stop
 
@@ -426,8 +426,8 @@ Stop the server.
 **Parameters**:
 
 * `--graceful, --no-graceful`: Perform graceful shutdown. *[default: True]*
-* `--timeout`: Shutdown timeout in seconds. *[default: 30]*
-* `--force, --no-force, -f`: Force immediate shutdown. *[default: False]*
+* `--timeout INT`: Shutdown timeout in seconds. *[default: 30]*
+* `--force, -f, --no-force`: Force immediate shutdown. *[default: False]*
 
 ### complex-cli server restart
 
@@ -449,7 +449,7 @@ Cache management commands.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -466,8 +466,8 @@ Demonstrates attrs class support for CLI parameters.
 **Parameters**:
 
 * `--config.backend`: Cache backend type. *[choices: memory, redis, memcached, disk]* *[default: memory]*
-* `--config.ttl`: Time-to-live in seconds. *[default: 300]*
-* `--config.max-size`: Maximum cache size in MB. *[default: 1024]*
+* `--config.ttl INT`: Time-to-live in seconds. *[default: 300]*
+* `--config.max-size INT`: Maximum cache size in MB. *[default: 1024]*
 * `--config.compression, --config.no-compression`: Enable compression. *[default: False]*
 
 ### complex-cli cache clear
@@ -519,7 +519,7 @@ documentation system needs to handle correctly.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -542,7 +542,7 @@ default for cyclopts.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -564,7 +564,7 @@ This command demonstrates Google docstring format.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -586,7 +586,7 @@ This command demonstrates Sphinx/reST docstring format.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
@@ -607,6 +607,6 @@ This command has a hidden parameter.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*

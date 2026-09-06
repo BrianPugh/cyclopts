@@ -69,7 +69,7 @@ Show system status.
 ``--watch, -w``
     Continuously watch status. [Default: ``False``]
 
-``--interval``
+``--interval INT``
     Refresh interval in seconds when watching. [Default: ``5``]
 
 .. _cyclopts-complex-cli-admin-config-cmd:
@@ -85,22 +85,22 @@ Configure database settings.
 
 **Parameters:**
 
-``--host``
+``--host STR``
     Database server hostname. [Default: ``localhost``]
 
-``--port``
+``--port INT``
     Database server port number. [Default: ``5432``]
 
-``--username``
+``--username STR``
     Authentication username. [Default: ``admin``]
 
-``--password``
+``--password STR``
     Authentication password (optional).
 
 ``--ssl-mode``
     SSL connection mode. [Choices: ``disable``, ``prefer``, ``require``, ``verify-full``, Default: ``prefer``]
 
-``--pool-size``
+``--pool-size INT``
     Connection pool size. [Default: ``10``]
 
 .. _cyclopts-complex-cli-admin-users:
@@ -257,10 +257,10 @@ Grant permissions to a user.
 
 **Parameters:**
 
-``--resource``
+``--resource STR``
     Specific resource to grant access to.
 
-``--expires``
+``--expires STR``
     Expiration date (ISO format).
 
 .. _cyclopts-complex-cli-admin-users-permissions-revoke:
@@ -368,5 +368,5 @@ Create a new role template.
 ``--permissions.admin, --permissions.no-admin``
     Default permissions for this role. [Default: ``False``]
 
-``--description``
+``--description STR``
     Role description. [Default: ``""``]
