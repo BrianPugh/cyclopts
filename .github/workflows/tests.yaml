@@ -123,10 +123,22 @@ jobs:
 
       - name: Install zsh and fish (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y zsh fish
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: zsh fish
+          version: 1.0 # bump to invalidate the apt cache
+
+      - name: Cache Homebrew downloads (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew/downloads
+          key: brew-fish-${{ runner.os }}
 
       - name: Install fish (macOS)
         if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1" # skip the slow `brew update` self-refresh
         run: brew install fish
 
       - name: Check out repository
