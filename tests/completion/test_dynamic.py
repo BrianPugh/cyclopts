@@ -405,6 +405,30 @@ def test_meta_launcher_positional_or_keyword_option():
     assert _values(compute_completions(app.meta, ["deploy", ""])) == ["svc"]
 
 
+@pytest.mark.parametrize(
+    "words", [["--env", "prod", "deploy", "--region", ""], ["deploy", "--env", "prod", "--region", ""]]
+)
+def test_meta_launcher_option_value_visible_to_dependent_completer(words):
+    """Launcher options consumed during command resolution still reach ``context[name]``."""
+    app = App(name="myapp")
+    seen = []
+
+    def complete_region(ctx):
+        seen.append((ctx["env"].provided, ctx["env"].value))
+        return ["us-east"]
+
+    @app.command
+    def deploy(*, region: Annotated[str, Parameter(completer=complete_region)] = ""):
+        pass
+
+    @app.meta.default
+    def launcher(*tokens: str, env: str = "dev"):
+        app(tokens)
+
+    assert _values(compute_completions(app.meta, words)) == ["us-east"]
+    assert seen == [(True, "prod")]
+
+
 def test_bare_name_lookup_with_kwargs_catch_all():
     """A bare-name lookup resolves the named sibling, not the ``**kwargs`` catch-all."""
     app = App(name="myapp")

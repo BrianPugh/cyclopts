@@ -299,11 +299,17 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     # the resolved command chain, leaving only option/positional tokens so slot
     # accounting below never miscounts a subcommand name as a positional value.
     try:
-        command_chain, execution_path, unused = app.parse_commands(prior)
+        command_chain, execution_path, unused, command_indices, _ = app._parse_commands(prior)
     except (CycloptsError, ValueError, TypeError) as e:
         debug(f"command resolution failed for {prior!r}: {_exc(e)}")
         return []
     command_app = execution_path[-1]
+    # Command resolution also swallows leading meta-launcher options (``--env
+    # prod deploy ...``). Re-feed them so the merged launcher arguments below
+    # carry the values a dependent completer reads via ``context["env"]``.
+    consumed = len(prior) - len(unused)
+    meta_tokens = [token for i, token in enumerate(prior[:consumed]) if i not in command_indices]
+    unused = [*meta_tokens, *unused]
     debug(f"resolved command={command_chain!r} unused={unused!r}")
 
     # The app_stack context applies stack-resolved configuration — e.g. an
