@@ -1112,7 +1112,8 @@ API
 
       The callback is always invoked as ``completer(context)``, where ``context`` is a
       :class:`~cyclopts.completion.CompletionContext`. It may return a single ``str``,
-      or an iterable of ``str`` values and/or ``(value, description)`` tuples. Return the
+      an iterable of ``str`` values and/or ``(value, description)`` tuples, or a
+      ``{value: description}`` mapping. Return the
       full candidate set; the shell prefix-matches candidates against the word being
       completed, so there is no need to filter by prefix in the callback (and substring
       or fuzzy matching is not possible). Use ``ctx.incomplete`` to narrow expensive
@@ -2283,8 +2284,9 @@ See the :attr:`.Parameter.completer` documentation for usage.
 
 .. py:data:: cyclopts.completion.CompletionResult
 
-   Type alias for what a completer may return: a single :class:`str`, or an
-   iterable of :class:`str` values and/or ``(value, description)`` tuples.
+   Type alias for what a completer may return: a single :class:`str`, an
+   iterable of :class:`str` values and/or ``(value, description)`` tuples, or a
+   ``{value: description}`` mapping.
 
 .. _API Validators:
 

@@ -151,6 +151,24 @@ def test_complete_command_sanitizes_delimiters(capsys):
     assert not any(line.startswith("\x1f") for line in out)
 
 
+def test_complete_command_captures_completer_stdout(capsys):
+    """Anything a completer prints is diverted to stderr so it can't be parsed as a candidate record."""
+    app = App(name="myapp", result_action="return_value")
+
+    def chatty(ctx):
+        print("noise\tforged")
+        return ["real"]
+
+    @app.command
+    def go(thing: Annotated[str, Parameter(completer=chatty)] = ""):
+        pass
+
+    app(["__complete", "go", ""], exit_on_error=False)
+    captured = capsys.readouterr()
+    assert captured.out.strip().splitlines() == ["real"]
+    assert "noise" in captured.err
+
+
 def test_complete_command_via_parse_args(app, capsys):
     """``__complete`` is intercepted inside the shared parse pipeline, so entry points that skip ``__call__`` (e.g. custom scripts using ``parse_args``) still handle it."""
     command, bound, _ = app.parse_args(["__complete", "deploy", "--user", ""])
@@ -608,9 +626,10 @@ def test_normalize_single_string_is_one_candidate():
     assert normalize_completions("alice") == [("alice", "")]
 
 
-def test_normalize_top_level_tuple_is_one_described_candidate():
-    """A bare ``(value, description)`` tuple is one candidate, not two values."""
-    assert normalize_completions(("us-west", "Oregon")) == [("us-west", "Oregon")]
+def test_normalize_top_level_tuple_is_a_collection():
+    """A bare tuple is an iterable of candidates, like a list; a described single must be wrapped."""
+    assert normalize_completions(("dev", "prod")) == [("dev", ""), ("prod", "")]
+    assert normalize_completions([("us-west", "Oregon")]) == [("us-west", "Oregon")]
 
 
 def test_normalize_mixed_iterable():
@@ -623,11 +642,6 @@ def test_normalize_mapping_is_value_to_description():
 
 def test_normalize_none_is_empty():
     assert normalize_completions(None) == []
-
-
-def test_normalize_empty_tuple_is_no_candidate():
-    """A bare ``()`` means no completions, not a malformed record."""
-    assert normalize_completions(()) == []
 
 
 def test_normalize_empty_tuple_item_is_dropped():
@@ -993,8 +1007,9 @@ def test_e2e_dependent_completion(dynamic_completion_tester, shell):
 # Emits RAW wire records from __main__, bypassing App's sanitizing _run_complete,
 # to test the generated script's own parsing of the forward-compat protocol: a
 # normal record, a record with a reserved 3rd tab field, and a reserved \x1f
-# global control line. A real completer can't produce these (they're sanitized),
-# so this is the only way to feed the reader the future protocol shape.
+# global control line. A real completer can't produce these (its return value is
+# sanitized and its stdout is captured), so this is the only way to feed the
+# reader the future protocol shape.
 E2E_RAW_PROTOCOL_SOURCE = """
 import sys
 from typing import Annotated

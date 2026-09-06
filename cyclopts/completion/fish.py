@@ -59,7 +59,7 @@ def _generate_completer_fetch_function(prog_name: str) -> list[str]:
     """
     return [
         f"function __fish_{prog_name}_complete",
-        f"    {prog_name} __complete (commandline -pco)[2..] (commandline -ct)"
+        f"    {prog_name} __complete (commandline -pco)[2..] (commandline -ct) 2>/dev/null"
         r" | string match --invert --regex '^\x1f'"
         r" | string replace --regex '^([^\t]*\t[^\t]*)\t.*$' '$1'",
         "end",

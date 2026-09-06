@@ -4,7 +4,7 @@ import os
 import sys
 import traceback
 from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
-from contextlib import suppress
+from contextlib import redirect_stdout, suppress
 from copy import copy
 from enum import StrEnum
 from functools import lru_cache, partial
@@ -2743,7 +2743,9 @@ class App:
             return text.replace("\t", " ").replace("\n", " ").replace("\r", " ").lstrip("\x1f")
 
         try:
-            completions = compute_completions(self, list(words))
+            # Completers are user code; anything they print must not be parsed as a record.
+            with redirect_stdout(sys.stderr):
+                completions = compute_completions(self, list(words))
         except Exception:
             if completion_debug_enabled():
                 import traceback

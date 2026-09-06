@@ -166,16 +166,15 @@ class CompletionContext:
 def normalize_completions(result: "CompletionResult | None") -> list[tuple[str, str]]:
     """Normalize a completer's return value to ``(value, description)`` pairs.
 
-    A bare :class:`str` or :class:`tuple` is one candidate — ``("us-west",
-    "Oregon")`` is a single described record, not two values. A mapping is
-    ``{value: description}``. Any other iterable is a collection of such items.
-    An empty tuple (bare or as an item) means "no candidate" and is dropped,
-    like ``None`` or ``[]``.
+    A bare :class:`str` is one candidate. A mapping is ``{value: description}``.
+    Any other iterable (including a tuple) is a collection of :class:`str` values
+    and/or ``(value, description)`` tuples, so a single described candidate must
+    be wrapped: ``[("us-west", "Oregon")]``. An empty-tuple item is dropped.
     """
     if result is None:
         return []
     items: Iterable[str | tuple]
-    if isinstance(result, (str, tuple)):
+    if isinstance(result, str):
         items = [result]
     elif isinstance(result, Mapping):
         items = result.items()
