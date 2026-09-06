@@ -202,6 +202,10 @@ Use ``ctx.incomplete`` (the partial word typed so far) to *narrow expensive look
 
    Because the shell prefix-matches candidates, completers can only offer prefix completions; substring and fuzzy matching are not possible, since the shell drops any candidate that does not start with the word being completed.
 
+.. note::
+
+   In fish, a completer on a *positional* parameter of the **root** command (``@app.default`` with no subcommand) is not wired up; fish falls back to its default file completion there. Positional completers on subcommands, and option-value completers everywhere, work in all three shells.
+
 Descriptions
 ------------
 
