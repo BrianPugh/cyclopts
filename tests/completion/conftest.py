@@ -109,11 +109,12 @@ class BashCompletionTester(CompletionTesterBase):
                 "done\n"
                 # Final word: trailing whitespace means there's an empty
                 # "current word" the user is about to type; otherwise the
-                # accumulated word is the current word.
+                # accumulated word is the current word. A trailing break char
+                # (``--user=``) is itself the current word, as in real bash.
                 'if [[ "${COMP_LINE: -1}" == " " || "${COMP_LINE: -1}" == $\'\\t\' ]]; then\n'
                 '  [[ -n "$_word" ]] && COMP_WORDS+=("$_word")\n'
                 '  COMP_WORDS+=("")\n'
-                "else\n"
+                'elif [[ -n "$_word" ]]; then\n'
                 '  COMP_WORDS+=("$_word")\n'
                 "fi\n"
                 "COMP_CWORD=$(( ${#COMP_WORDS[@]} - 1 ))\n"

@@ -198,6 +198,9 @@ def _generate_completion_function_body(
     """
     lines = []
     lines.append('  cur="${COMP_WORDS[COMP_CWORD]}"')
+    # ``=`` is a COMP_WORDBREAK, so ``--opt=<TAB>`` puts a literal ``=`` under the
+    # cursor; the value being completed is empty (bash-completion's ``-s`` fix).
+    lines.append('  [[ "$cur" == "=" ]] && cur=""')
     lines.append('  prev="${COMP_WORDS[COMP_CWORD-1]}"')
     lines.append("")
 
