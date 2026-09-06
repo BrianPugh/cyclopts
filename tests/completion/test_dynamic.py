@@ -318,6 +318,12 @@ def test_eq_and_colon_wordbreak_split_rejoined():
     assert seen == ["localhost:80"]
 
 
+def test_repeated_scalar_option_still_completes(app, users):
+    """``--user bob --user <TAB>`` completes even though the real parse would reject the repeat."""
+    assert _values(compute_completions(app, ["deploy", "--user", "bob", "--user", ""])) == users
+    assert _values(compute_completions(app, ["deploy", "--user", "bob", "--user=c"])) == ["carol"]
+
+
 def test_keyword_supplied_positional_or_keyword_closes_slot(app):
     """``--service x`` fills the positional slot; the free word has no argument."""
     result = compute_completions(app, ["deploy", "--service", "x", ""])

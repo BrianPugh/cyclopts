@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import _parse_configs, _parse_env, _parse_kw_and_flags, _parse_pos
-from cyclopts.exceptions import CycloptsError, MissingArgumentError
+from cyclopts.exceptions import CycloptsError, MissingArgumentError, RepeatArgumentError
 from cyclopts.utils import UNSET, frozen, is_option_like
 
 if TYPE_CHECKING:
@@ -241,6 +241,14 @@ def _resolve_active_argument(
         # input, in which case the real parse would reject the line anyway.
         active = e.argument
         debug(f"active argument resolved from incomplete multi-token argument: {_exc(e)}")
+    except RepeatArgumentError as e:
+        # ``--user bob --user <TAB>``: the real parse rejects the repeat, but the
+        # user is mid-edit and the cursor clearly belongs to that option.
+        if e.token.value != _ACTIVE_SENTINEL or e.token.keyword is None:
+            debug(f"parsing prior tokens {tokens[:-1]!r} failed: {_exc(e)}")
+            return None
+        active, _, _ = arguments.match(e.token.keyword)
+        debug(f"active argument resolved from repeated option {e.token.keyword!r}")
     except Exception as e:
         debug(f"parsing prior tokens {tokens[:-1]!r} failed: {_exc(e)}")
         return None
