@@ -264,8 +264,9 @@ class Parameter:
 
     # Produces dynamic candidate values at shell-completion time that can't be baked
     # into a static script (e.g. names from a database or remote service). Invoked as
-    # ``completer(context)`` (a ``CompletionContext``); may return a ``str`` or an
-    # iterable of ``str`` and/or ``(value, description)`` tuples.
+    # ``completer(context)`` (a ``CompletionContext``); may return a ``str``, an
+    # iterable of ``str`` and/or ``(value, description)`` tuples, or a
+    # ``{value: description}`` mapping.
     completer: "Completer | None" = field(
         default=None,
         kw_only=True,

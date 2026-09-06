@@ -162,7 +162,7 @@ Basic Usage
 
    Only reach for a completer when the candidate values are genuinely unknown until runtime -- git branches, running containers, rows from a database, files on disk. If the values are fixed at definition time, use a :class:`~typing.Literal`, an :class:`~enum.Enum`, or :attr:`.Parameter.choices` instead: those complete entirely in the shell, whereas a completer launches your Python program on every ``<TAB>`` (see the warning above).
 
-A completer is a callable that accepts a single :class:`~cyclopts.completion.CompletionContext` argument and returns the candidate values: a single string, or an iterable of strings and/or ``(value, description)`` tuples. This example completes a git branch name -- values that can't be baked into a static script, since they change as branches come and go:
+A completer is a callable that accepts a single :class:`~cyclopts.completion.CompletionContext` argument and returns the candidate values: a single string, an iterable of strings and/or ``(value, description)`` tuples, or a ``{value: description}`` dictionary. This example completes a git branch name -- values that can't be baked into a static script, since they change as branches come and go:
 
 .. code-block:: python
 
@@ -209,7 +209,7 @@ Use ``ctx.incomplete`` (the partial word typed so far) to *narrow expensive look
 Descriptions
 ------------
 
-To display descriptions alongside completions, return ``(value, description)`` tuples. zsh and fish render these in the completion menu; bash shows the values only. Here each branch is annotated with the subject of its latest commit:
+To display descriptions alongside completions, return ``(value, description)`` tuples or a ``{value: description}`` dictionary. zsh and fish render these in the completion menu; bash shows the values only. Here each branch is annotated with the subject of its latest commit:
 
 .. code-block:: python
 
@@ -219,7 +219,7 @@ To display descriptions alongside completions, return ``(value, description)`` t
            capture_output=True,
            text=True,
        )
-       return [tuple(line.split("\t", 1)) for line in result.stdout.splitlines()]
+       return dict(line.split("\t", 1) for line in result.stdout.splitlines())
 
 Dependent Completions
 ---------------------

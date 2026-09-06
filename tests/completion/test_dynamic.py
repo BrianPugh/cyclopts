@@ -583,6 +583,10 @@ def test_normalize_mixed_iterable():
     assert normalize_completions(["a", ("b", "desc")]) == [("a", ""), ("b", "desc")]
 
 
+def test_normalize_mapping_is_value_to_description():
+    assert normalize_completions({"main": "Mainline", "dev": ""}) == [("main", "Mainline"), ("dev", "")]
+
+
 def test_normalize_none_is_empty():
     assert normalize_completions(None) == []
 

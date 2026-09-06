@@ -9,7 +9,7 @@ its candidate values.
 
 import os
 import sys
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -45,9 +45,10 @@ def debug(message: str) -> None:
         print(f"[cyclopts:completion] {message}", file=sys.stderr)
 
 
-#: What a :attr:`.Parameter.completer` may return: a single value, or an iterable
-#: of values and/or ``(value, description)`` tuples.
-CompletionResult = str | Iterable[str | tuple[str, str]]
+#: What a :attr:`.Parameter.completer` may return: a single value, an iterable
+#: of values and/or ``(value, description)`` tuples, or a ``{value: description}``
+#: mapping.
+CompletionResult = str | Iterable[str | tuple[str, str]] | Mapping[str, str]
 
 #: The signature of a :attr:`.Parameter.completer` callback.
 Completer = Callable[["CompletionContext"], "CompletionResult"]
@@ -150,13 +151,20 @@ def normalize_completions(result: "CompletionResult | None") -> list[tuple[str, 
     """Normalize a completer's return value to ``(value, description)`` pairs.
 
     A bare :class:`str` or :class:`tuple` is one candidate — ``("us-west",
-    "Oregon")`` is a single described record, not two values. Any other iterable
-    is a collection of such items. An empty tuple (bare or as an item) means "no
-    candidate" and is dropped, like ``None`` or ``[]``.
+    "Oregon")`` is a single described record, not two values. A mapping is
+    ``{value: description}``. Any other iterable is a collection of such items.
+    An empty tuple (bare or as an item) means "no candidate" and is dropped,
+    like ``None`` or ``[]``.
     """
     if result is None:
         return []
-    items: Iterable[str | tuple] = [result] if isinstance(result, (str, tuple)) else result
+    items: Iterable[str | tuple]
+    if isinstance(result, (str, tuple)):
+        items = [result]
+    elif isinstance(result, Mapping):
+        items = result.items()
+    else:
+        items = result
     normalized = [_normalize_item(item) for item in items]
     return [pair for pair in normalized if pair is not None]
 
