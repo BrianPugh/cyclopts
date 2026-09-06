@@ -175,17 +175,14 @@ class DescriptionRenderer:
         if description is None:
             description = InlineText(Text())
         elif not isinstance(description, InlineText):
-            # Convert to InlineText if it isn't already
             if hasattr(entry.description, "__rich_console__"):
                 # It's already a Rich renderable, wrap it
                 description = InlineText(description)
             else:
-                # Convert to Text first, then wrap in InlineText
                 from rich.text import Text
 
                 description = InlineText(Text(str(description)))
 
-        # Collect metadata items
         metadata_items = []
 
         if entry.choices:
@@ -208,18 +205,14 @@ class DescriptionRenderer:
             from rich.console import Group as RichGroup
             from rich.text import Text
 
-            # Create a list of renderables to group
             renderables = []
 
-            # Add the original description first
             if description.primary_renderable:
                 renderables.append(description.primary_renderable)
 
-            # Add each metadata item without indentation
             for item in metadata_items:
                 renderables.append(item)
 
-            # Return a Rich Group that stacks these vertically
             return RichGroup(*renderables) if renderables else Text()
         else:
             # Original inline behavior
@@ -676,7 +669,6 @@ class TableSpec:
 
         table = Table(**opts)
 
-        # Add columns
         for column in columns:
             col_opts = {
                 "header": column.header,
@@ -697,7 +689,6 @@ class TableSpec:
                 col_opts["highlight"] = column.highlight
             table.add_column(**col_opts)
 
-        # Add entries
         for e in entries:
             cells = [col._render_cell(e) for col in columns]
             table.add_row(*cells)

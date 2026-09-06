@@ -215,7 +215,6 @@ def process_cyclopts_directives(markdown: str, plugin_config: Any) -> str:
         except Exception as e:
             raise PluginError(f"Error processing ::: cyclopts directive: {e}") from e
 
-    # Replace all directives in the markdown
     processed = DIRECTIVE_PATTERN.sub(replace_directive, markdown)
     return processed
 
