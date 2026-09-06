@@ -66,19 +66,16 @@ class RstFormatter:
         if not panel.entries:
             return
 
-        # Write panel title as heading
         if panel.title:
             title_text = extract_text(panel.title, console)
             header = "\n".join(make_rst_section_header(title_text, self.heading_level))
             self._output.write(f"{header}\n\n")
 
-        # Write panel description if present
         if panel.description:
             desc_text = extract_text(panel.description, console)
             if desc_text:
                 self._output.write(f"{desc_text}\n\n")
 
-        # Format entries based on panel type
         if panel.format == "command":
             self._format_command_panel(panel.entries, console)
         elif panel.format == "parameter":
@@ -150,7 +147,6 @@ class RstFormatter:
                 # Build description with metadata
                 desc_parts = []
 
-                # Add main description
                 # Check if the description has RST markup to preserve
                 preserve_rst_markup = (
                     hasattr(entry.description, "primary_renderable")
@@ -161,7 +157,6 @@ class RstFormatter:
                 if desc:
                     desc_parts.append(desc)
 
-                # Add metadata
                 metadata = []
 
                 if is_positional and entry.required:

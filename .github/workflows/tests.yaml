@@ -61,7 +61,13 @@ jobs:
 
       - name: Set up python ${{ matrix.python-version }}
         id: setup-python
-        run: uv python install ${{ matrix.python-version }}
+        run: |
+          uv python install ${{ matrix.python-version }}
+          # Exact patch version (e.g. 3.11.13) for the pre-commit cache key. pre-commit's
+          # hook environments embed the interpreter path, so the cache must be keyed on the
+          # resolved interpreter, not just the "3.11" matrix value; otherwise a restored
+          # environment fails pre-commit's health check and every hook is reinstalled.
+          echo "version=$("$(uv python find ${{ matrix.python-version }})" -c 'import platform; print(platform.python_version())')" >> "$GITHUB_OUTPUT"
 
       - name: Install library
         run: uv sync --all-extras
@@ -70,7 +76,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit/
-          key: pre-commit-${{ runner.os }}-${{ env.pythonLocation }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          key: pre-commit-${{ runner.os }}-py${{ steps.setup-python.outputs.version }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
       - name: Pre-commit run
         run: uv run pre-commit run --show-diff-on-failure --color=always --all-files

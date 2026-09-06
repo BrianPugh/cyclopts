@@ -74,21 +74,17 @@ class HtmlFormatter:
         if not panel.entries:
             return
 
-        # Write panel as a section
         self._output.write('<section class="help-panel">\n')
 
-        # Write panel title as heading
         if panel.title:
             title_text = escape_html(extract_text(panel.title, console))
             self._output.write(f'<h{self.heading_level} class="panel-title">{title_text}</h{self.heading_level}>\n')
 
-        # Write panel description if present
         if panel.description:
             desc_text = escape_html(extract_text(panel.description, console))
             if desc_text:
                 self._output.write(f'<div class="panel-description">{desc_text}</div>\n')
 
-        # Format entries based on panel type
         if panel.format == "command":
             self._format_command_panel(panel.entries, console)
         elif panel.format == "parameter":
@@ -171,7 +167,6 @@ class HtmlFormatter:
             # Start list item (no type display)
             self._output.write(f"<li><strong>{name_html}</strong>")
 
-            # Add description
             desc = extract_text(entry.description, console)
             if desc:
                 self._output.write(f": {escape_html(desc)}")
@@ -179,7 +174,6 @@ class HtmlFormatter:
             # Add metadata as styled badges
             metadata_items = []
 
-            # Add required marker
             if entry.required:
                 metadata_items.append('<span class="metadata-item metadata-required">Required</span>')
 
@@ -204,7 +198,6 @@ class HtmlFormatter:
                     f'<span class="metadata-item metadata-env"><span class="metadata-label">env:</span> {env_html}</span>'
                 )
 
-            # Write metadata
             if metadata_items:
                 self._output.write(f'<span class="parameter-metadata">{"".join(metadata_items)}</span>')
 

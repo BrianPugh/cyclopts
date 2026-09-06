@@ -391,7 +391,6 @@ def generate_markdown_docs(
     """
     from cyclopts.help.formatters.markdown import MarkdownFormatter
 
-    # Build the main documentation
     lines = []
 
     if command_chain is None:
@@ -451,7 +450,6 @@ def generate_markdown_docs(
         # Build a mapping of command names to App objects for filtering
         command_map = _build_command_map(app, include_hidden=True)
 
-        # Create formatter
         formatter = MarkdownFormatter(
             heading_level=heading_level + 1,
             include_hidden=include_hidden,
@@ -771,7 +769,6 @@ def generate_markdown_docs(
                         lines.append(nested_docs)
                         lines.append("")
 
-    # Join all lines into final document
     doc = "\n".join(lines).rstrip() + "\n"
 
     # Normalize multiple consecutive blank lines to a single blank line

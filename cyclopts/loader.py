@@ -62,7 +62,6 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
     app_name = None
     script_str = str(script)
     if ":" in script_str:
-        # Split on the last colon
         script_path_str, potential_app_name = script_str.rsplit(":", 1)
         # Only treat it as an app name if it looks like a Python identifier
         # (no path separators), otherwise it may be part of a Windows path like C:\path\to\file.py
@@ -113,7 +112,7 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
         # Heuristic: find App objects in the module's global namespace
         app_objects = []
         for name in dir(module):
-            if not name.startswith("_"):  # Skip private/protected names
+            if not name.startswith("_"):
                 obj = getattr(module, name)
                 if isinstance(obj, App):
                     app_objects.append((name, obj))

@@ -402,16 +402,16 @@ def _convert_json(
     """
     from cyclopts.token import Token
 
-    # Validate no extra keys in JSON data
     _validate_json_extra_keys(data, type_)
 
     converted_data = {}
     for field_name, field_info in field_infos.items():
         if field_name in data:
             value = data[field_name]
-            # Convert the value to the proper type
+            # None and str-typed fields pass through unchanged; every other field is
+            # round-tripped through convert() via a Token, re-serializing dict/list back
+            # to JSON so the recursive call receives parseable JSON (scalars are stringified).
             if value is not None and not is_class_and_subclass(field_info.hint, str):
-                # Create a token for the value and convert it
                 token = Token(value=json.dumps(value) if isinstance(value, dict | list) else str(value))
                 # Always attempt conversion, let errors propagate for consistency
                 converted_value = convert(field_info.hint, [token], converter, name_transform)
@@ -419,7 +419,6 @@ def _convert_json(
                 converted_value = value
             converted_data[field_name] = converted_value
 
-    # Create the dataclass with converted values
     return type_(**converted_data)
 
 

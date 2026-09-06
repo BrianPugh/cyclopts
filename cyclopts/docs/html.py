@@ -388,7 +388,6 @@ def generate_html_docs(
     if command_chain is None:
         command_chain = []
 
-    # Build the main documentation
     lines = []
 
     # Only add the outer div for standalone documents or root level
@@ -603,7 +602,6 @@ def generate_html_docs(
     if standalone or not command_chain:
         lines.append("</div>")  # Close cli-documentation div
 
-    # Join all lines into body content
     body_content = "\n".join(lines)
 
     # If standalone, wrap in complete HTML document
