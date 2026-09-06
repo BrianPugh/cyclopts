@@ -760,6 +760,12 @@ def test_zsh_helper_only_emitted_when_completer_present():
     assert "__complete" not in script
 
 
+def test_zsh_helper_accepts_path_form_command(completer_app):
+    """``./prog <TAB>`` must exec the typed path; ``$+commands`` only knows PATH lookups."""
+    script = completer_app.generate_completion(prog_name="myapp", shell="zsh")
+    assert '(( $+commands[$_cyc_cmd] )) || [[ -x "$_cyc_cmd" ]] || _cyc_cmd="myapp"' in script
+
+
 # --- real-shell end-to-end (bash/zsh/fish drive the actual __complete call) ---
 
 # A self-contained app module for the ``dynamic_completion_tester`` fixture: it

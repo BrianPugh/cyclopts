@@ -270,8 +270,10 @@ def _generate_dynamic_helper(prog_name: str) -> list[str]:
         # inside subcommand frames (``*::arg:->args``), so ``words[1]`` is the
         # *subcommand* name there — if that name happens to match a PATH
         # executable (env, git, test, ...), that binary would be exec'd instead.
+        # ``$+commands`` only knows PATH lookups, so also accept a path-form
+        # invocation (``./prog``, ``/abs/prog``) before falling back to the name.
         '  _cyc_cmd="${_cyc_words[1]}"',
-        f'  (( $+commands[$_cyc_cmd] )) || _cyc_cmd="{prog_name}"',
+        f'  (( $+commands[$_cyc_cmd] )) || [[ -x "$_cyc_cmd" ]] || _cyc_cmd="{prog_name}"',
         # Slice ``[2, _cyc_current]`` — the words after the program name up to and
         # including the word under the cursor. Dropping anything past the cursor
         # (a mid-line TAB) means the engine treats the cursor's word as the
