@@ -182,22 +182,22 @@ _ACTIVE_SENTINEL = "\x00cyclopts-active\x00"
 
 
 def _merge_wordbreaks(words: list[str]) -> list[str]:
-    """Rejoin bash ``COMP_WORDBREAKS`` splits (``--user=al`` arrives as ``['--user', '=', 'al']``) into single tokens.
+    """Rejoin bash's ``=`` ``COMP_WORDBREAKS`` split (``--user=al`` arrives as ``['--user', '=', 'al']``) into one token.
 
-    Matches what zsh and fish send. ``=`` is rejoined only for option forms
-    (``--opt=value``); ``:`` always, since a lone break word only comes from
-    splitting a contiguous string.
+    Matches what zsh and fish send. Only the option form (``--opt=value``) is
+    rejoined: a bare ``=`` elsewhere is a real word. ``:`` is deliberately not
+    rejoined -- the bash script does not rejoin it either (its ``cur`` and
+    positional count would disagree with the engine), and zsh/fish never split
+    on it, so a lone ``:`` word is a genuine positional value.
     """
     merged: list[str] = []
     i = 0
     n = len(words)
     while i < n:
         word = words[i]
-        eq_join = word == "=" and merged and merged[-1].startswith("-") and "=" not in merged[-1]
-        colon_join = word == ":" and merged
-        if eq_join or colon_join:
-            # Glue the break char onto the previous word and absorb the following
-            # word too (the char sat between the two halves of one token).
+        if word == "=" and merged and merged[-1].startswith("-") and "=" not in merged[-1]:
+            # Glue ``=`` onto the option and absorb the following word too (it
+            # sat between the two halves of one token).
             merged[-1] += word
             if i + 1 < n:
                 merged[-1] += words[i + 1]

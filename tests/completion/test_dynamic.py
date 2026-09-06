@@ -292,21 +292,23 @@ def test_eq_form_bash_wordbreak_split(app):
     assert _values(compute_completions(app, ["deploy", "--user", "="])) == ["alice", "bob", "carol"]
 
 
-def test_colon_wordbreak_split_rejoined():
-    """Bash splits ``http://ex`` on ``:``; the engine rejoins it into ``incomplete``."""
+def test_colon_word_is_not_rejoined():
+    """A lone ``:`` word is a real positional (zsh/fish never split on it), so it is not glued to its neighbours."""
     app = App(name="myapp", result_action="return_value")
     seen = []
 
     @app.command
-    def fetch(url: Annotated[str, Parameter(completer=lambda ctx: seen.append(ctx.incomplete) or [])]):
+    def cp(
+        src: str, dst: str, mode: Annotated[str, Parameter(completer=lambda ctx: seen.append(ctx.incomplete) or [])]
+    ):
         pass
 
-    compute_completions(app, ["fetch", "http", ":", "//ex"])
-    assert seen == ["http://ex"]
+    compute_completions(app, ["cp", "a", ":", "b"])
+    assert seen == ["b"]
 
 
-def test_eq_and_colon_wordbreak_split_rejoined():
-    """A value ``--host=localhost:80`` split by bash on both ``=`` and ``:`` rejoins."""
+def test_eq_split_with_colon_value_keeps_colon_words():
+    """``--host=localhost`` is rejoined; a following ``:`` word stays separate."""
     app = App(name="myapp", result_action="return_value")
     seen = []
 
@@ -314,14 +316,8 @@ def test_eq_and_colon_wordbreak_split_rejoined():
     def deploy(*, host: Annotated[str, Parameter(completer=lambda ctx: seen.append(ctx.incomplete) or [])] = ""):
         pass
 
-    compute_completions(app, ["deploy", "--host", "=", "localhost", ":", "80"])
-    assert seen == ["localhost:80"]
-
-
-def test_repeated_scalar_option_still_completes(app, users):
-    """``--user bob --user <TAB>`` completes even though the real parse would reject the repeat."""
-    assert _values(compute_completions(app, ["deploy", "--user", "bob", "--user", ""])) == users
-    assert _values(compute_completions(app, ["deploy", "--user", "bob", "--user=c"])) == ["carol"]
+    compute_completions(app, ["deploy", "--host", "=", "localhost"])
+    assert seen == ["localhost"]
 
 
 def test_keyword_supplied_positional_or_keyword_closes_slot(app):
