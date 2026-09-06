@@ -265,7 +265,7 @@ def _generate_dynamic_helper(prog_name: str) -> list[str]:
     return [
         f"{fn}() {{",
         "  local -a _cyc_lines _cyc_vals _cyc_disp",
-        "  local _cyc_line _cyc_cmd _cyc_val",
+        "  local _cyc_line _cyc_cmd _cyc_val _cyc_desc",
         # Use the snapshot, not live ``$words``: ``_arguments`` rebases ``$words``
         # inside subcommand frames (``*::arg:->args``), so ``words[1]`` is the
         # *subcommand* name there — if that name happens to match a PATH
@@ -279,12 +279,19 @@ def _generate_dynamic_helper(prog_name: str) -> list[str]:
         '  _cyc_lines=("${(@f)$($_cyc_cmd __complete "${(@)_cyc_words[2,_cyc_current]}" 2>/dev/null)}")',
         '  for _cyc_line in "${_cyc_lines[@]}"; do',
         '    [[ -z "$_cyc_line" ]] && continue',
-        # Lines starting with \x1f are reserved for future control directives; skip them.
+        # A line beginning with \x1f is a reserved global control directive, not a
+        # candidate; nothing emits one yet, so skip it (forward-compat headroom).
         "    [[ \"$_cyc_line\" == $'\\x1f'* ]] && continue",
+        # Each line is a tab-delimited record: value<TAB>description<TAB>reserved...
+        # Read exactly value + description and ignore any trailing fields, so a
+        # later cyclopts can append per-candidate fields (e.g. no-space, style)
+        # without this script folding them into the description.
         "    _cyc_val=\"${_cyc_line%%$'\\t'*}\"",
         '    _cyc_vals+=("$_cyc_val")',
         "    if [[ \"$_cyc_line\" == *$'\\t'* ]]; then",
-        "      _cyc_disp+=(\"${_cyc_val} -- ${_cyc_line#*$'\\t'}\")",
+        "      _cyc_desc=\"${_cyc_line#*$'\\t'}\"",
+        "      _cyc_desc=\"${_cyc_desc%%$'\\t'*}\"",
+        '      _cyc_disp+=("${_cyc_val} -- ${_cyc_desc}")',
         "    else",
         '      _cyc_disp+=("$_cyc_val")',
         "    fi",

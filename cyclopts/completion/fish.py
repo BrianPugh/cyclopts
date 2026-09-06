@@ -23,17 +23,47 @@ if TYPE_CHECKING:
 
 
 def _completer_substitution(prog_name: str) -> str:
-    r"""Fish command substitution that fetches ``__complete`` candidates.
+    """Return the fish command run inside ``complete -a '(...)'`` to fetch dynamic candidates.
+
+    Delegates to the ``__fish_<prog>_complete`` helper function (emitted once by
+    :func:`_generate_completer_fetch_function`). A function -- not the pipeline
+    inline -- because the fetch uses single-quoted ``string`` regexes, and nesting
+    quotes inside the surrounding single-quoted ``-a`` argument would prematurely
+    close it and corrupt the substitution.
+    """
+    return f"__fish_{prog_name}_complete"
+
+
+def _any_completer(completion_data: dict[tuple[str, ...], CompletionData]) -> bool:
+    """Whether any argument in the tree defines a :attr:`.Parameter.completer`."""
+    return any(
+        argument.parameter.completer is not None for data in completion_data.values() for argument in data.arguments
+    )
+
+
+def _generate_completer_fetch_function(prog_name: str) -> list[str]:
+    r"""Emit the fish helper that fetches and cleans dynamic ``__complete`` candidates.
 
     ``commandline -pco`` already carries the empty cursor slot on a trailing
     space; ``-ct`` appends the mid-token current word (dropped when empty). Fish
-    parses the printed ``value<TAB>description`` lines.
+    parses each printed line as a ``value<TAB>description`` record.
 
-    Lines starting with ``\x1f`` are reserved for future control directives and
-    filtered out here, so a later cyclopts can add that channel without polluting
-    an already-installed script's candidate list.
+    Two filters keep the wire protocol forward-compatible, so a later cyclopts can
+    extend it without an already-installed script garbling the new output:
+
+    * ``string match --invert`` drops lines beginning with ``\x1f`` -- a reserved
+      global control-directive channel (nothing emits one yet).
+    * ``string replace`` collapses each record to its first two fields, so a
+      future per-candidate field (e.g. no-space or style) appended as a third
+      tab-delimited field is ignored rather than leaking into the description.
     """
-    return f"{prog_name} __complete (commandline -pco)[2..] (commandline -ct) | string match --invert --regex '^\\x1f'"
+    return [
+        f"function __fish_{prog_name}_complete",
+        f"    {prog_name} __complete (commandline -pco)[2..] (commandline -ct)"
+        r" | string match --invert --regex '^\x1f'"
+        r" | string replace --regex '^([^\t]*\t[^\t]*)\t.*$' '$1'",
+        "end",
+    ]
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
@@ -74,6 +104,10 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
 
     if _any_nested_positional_choices(completion_data):
         lines.extend(_generate_positional_index_helper(prog_name, completion_data))
+        lines.append("")
+
+    if _any_completer(completion_data):
+        lines.extend(_generate_completer_fetch_function(prog_name))
         lines.append("")
 
     help_flags = tuple(app.help_flags) if app.help_flags else ()

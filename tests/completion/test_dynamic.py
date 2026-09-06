@@ -131,6 +131,26 @@ def test_complete_command_bare_values_have_no_tab(app, capsys):
     assert all("\t" not in line for line in out)
 
 
+def test_complete_command_sanitizes_delimiters(capsys):
+    r"""Completer data can't forge extra fields or a control line: tabs/newlines flatten to spaces and a leading \x1f is stripped."""
+    app = App(name="myapp", result_action="return_value")
+
+    def messy(ctx):
+        return ["nor\tmal", "\x1fforged", ("two\nline", "de\tsc")]
+
+    @app.command
+    def go(thing: Annotated[str, Parameter(completer=messy)] = ""):
+        pass
+
+    app(["__complete", "go", ""], exit_on_error=False)
+    out = capsys.readouterr().out.strip().splitlines()
+    assert out == ["nor mal", "forged", "two line\tde sc"]
+    # Exactly one tab per line at most (the value/description delimiter), and no
+    # line may start with the reserved control marker.
+    assert all(line.count("\t") <= 1 for line in out)
+    assert not any(line.startswith("\x1f") for line in out)
+
+
 def test_complete_command_via_parse_args(app, capsys):
     """``__complete`` is intercepted inside the shared parse pipeline, so entry points that skip ``__call__`` (e.g. custom scripts using ``parse_args``) still handle it."""
     command, bound, _ = app.parse_args(["__complete", "deploy", "--user", ""])
@@ -626,7 +646,11 @@ def test_fish_positional_completer_guarded_against_option_tokens():
         pass
 
     script = app.generate_completion(prog_name="deployer", shell="fish")
-    positional_entries = [line for line in script.splitlines() if "__complete" in line and "positional_index" in line]
+    # The dynamic fetch now runs through the __fish_<prog>_complete helper; the
+    # positional entries delegate to it (rather than calling __complete inline).
+    positional_entries = [
+        line for line in script.splitlines() if "(__fish_deployer_complete)" in line and "positional_index" in line
+    ]
     assert positional_entries
     assert all('not string match -q -- "-*" (commandline -ct)' in line for line in positional_entries)
 
@@ -818,11 +842,13 @@ def test_e2e_dependent_completion(dynamic_completion_tester, shell):
     assert east == ["va-1"]
 
 
-# A completer that emits a normal candidate plus a line beginning with the
-# reserved \x1f control marker. Nothing in cyclopts emits such a line today; this
-# stands in for a future control/directive channel, which generated scripts must
-# already skip so it can be added without corrupting an installed script.
-E2E_DIRECTIVE_GUARD_SOURCE = """
+# Emits RAW wire records from __main__, bypassing App's sanitizing _run_complete,
+# to test the generated script's own parsing of the forward-compat protocol: a
+# normal record, a record with a reserved 3rd tab field, and a reserved \x1f
+# global control line. A real completer can't produce these (they're sanitized),
+# so this is the only way to feed the reader the future protocol shape.
+E2E_RAW_PROTOCOL_SOURCE = """
+import sys
 from typing import Annotated
 
 from cyclopts import App, Parameter
@@ -830,22 +856,31 @@ from cyclopts import App, Parameter
 app = App(name="deployer")
 
 
-def complete_with_reserved(ctx):
-    return ["real", "\\x1freserved"]
+def _c(ctx):
+    return []
 
 
 @app.command
-def deploy(*, thing: Annotated[str, Parameter(completer=complete_with_reserved)] = ""):
+def deploy(thing: Annotated[str, Parameter(completer=_c)] = ""):
     pass
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "__complete":
+        sys.stdout.write("real\\n")
+        sys.stdout.write("val\\tdesc\\tSTYLE\\n")
+        sys.stdout.write("\\x1fglobal-directive\\n")
+        sys.exit(0)
     app()
 """
 
 
-def test_e2e_reserved_directive_line_is_skipped(dynamic_completion_tester, shell):
-    r"""Forward-compat: output lines starting with \x1f are reserved and dropped by the script."""
-    tester = dynamic_completion_tester(E2E_DIRECTIVE_GUARD_SOURCE, prog_name="deployer", shell=shell)
-    result = [_lead(c) for c in tester.get_completions("deployer deploy --thing ")]
-    assert result == ["real"]
+def test_e2e_wire_protocol_forward_compat(dynamic_completion_tester, shell):
+    r"""The generated script keeps value+description, ignores a reserved 3rd field, and skips a \x1f global line."""
+    tester = dynamic_completion_tester(E2E_RAW_PROTOCOL_SOURCE, prog_name="deployer", shell=shell)
+    completions = tester.get_completions("deployer deploy ")
+    # \x1f global-directive line dropped; both real candidates survive by value.
+    assert [_lead(c) for c in completions] == ["real", "val"]
+    # The reserved 3rd field must not leak into any candidate or its description.
+    assert not any("STYLE" in c for c in completions)
+    assert not any("global-directive" in c for c in completions)

@@ -2717,19 +2717,30 @@ class App:
         return tree
 
     def _run_complete(self, words: Iterable[str]) -> None:
-        r"""Handle the reserved ``__complete`` command: print the engine's candidates as ``value<TAB>description`` lines.
+        r"""Handle the reserved ``__complete`` command: print the engine's candidates as tab-delimited records.
 
         Errors are swallowed (a broken completer must never surface a traceback
         into the shell); ``CYCLOPTS_COMPLETION_DEBUG`` reveals them on stderr.
 
-        Wire-protocol note: an output line whose first character is ``\x1f`` (ASCII
-        Unit Separator) is reserved for future control directives (e.g. a
-        Cobra-style "no trailing space" hint). Nothing emits one yet, but the
-        generated ``bash``/``zsh``/``fish`` scripts already skip such lines, so a
-        later cyclopts can add the channel without corrupting the candidate list of
-        an already-installed script. ``\x1f`` can never occur in a real value.
+        Wire protocol (kept forward-compatible so a later cyclopts can extend it
+        without breaking an already-installed completion script):
+
+        * Each candidate is one line: ``value<TAB>description``. Generated scripts
+          read only these two fields and ignore any further ``<TAB>``-delimited
+          fields, which are reserved for future per-candidate metadata (e.g. a
+          no-space hint or a display style), mirroring carapace's tab records.
+        * A line whose first character is ``\x1f`` (ASCII Unit Separator) is a
+          reserved *global* control-directive channel; generated scripts skip it.
+          Nothing emits one yet.
+
+        To keep those field/line delimiters unambiguous, tabs and newlines in the
+        value and description are flattened to spaces, and a leading ``\x1f`` is
+        stripped, so completer-supplied data can never forge a field or directive.
         """
         from cyclopts.completion._engine import completion_debug_enabled, compute_completions
+
+        def sanitize(text: str) -> str:
+            return text.replace("\t", " ").replace("\n", " ").replace("\r", " ").lstrip("\x1f")
 
         try:
             completions = compute_completions(self, list(words))
@@ -2740,10 +2751,12 @@ class App:
                 traceback.print_exc()
             return None
         for completion in completions:
-            if completion.help:
-                print(f"{completion.value}\t{completion.help}")
+            value = sanitize(completion.value)
+            help = sanitize(completion.help)
+            if help:
+                print(f"{value}\t{help}")
             else:
-                print(completion.value)
+                print(value)
         return None
 
     def generate_completion(
