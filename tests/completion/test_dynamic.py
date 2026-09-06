@@ -230,6 +230,31 @@ def test_multi_token_option_completer_fires_for_each_element():
     assert compute_completions(app, ["cmd", "--point", "1", "2", ""]) == []
 
 
+def test_context_index_counts_values_already_typed():
+    """``ctx.index`` is 0 for a scalar and the element position for multi-value parameters."""
+    app = App(name="myapp")
+    seen = []
+
+    def completer(ctx):
+        seen.append(ctx.index)
+        return []
+
+    @app.command
+    def bind(
+        endpoint: Annotated[tuple[str, str], Parameter(completer=completer)],
+        *,
+        tags: Annotated[list[str] | None, Parameter(completer=completer)] = None,
+        name: Annotated[str, Parameter(completer=completer)] = "",
+    ):
+        pass
+
+    compute_completions(app, ["bind", ""])
+    compute_completions(app, ["bind", "localhost", ""])
+    compute_completions(app, ["bind", "a", "b", "--tags", "x", "--tags", ""])
+    compute_completions(app, ["bind", "a", "b", "--name", ""])
+    assert seen == [0, 1, 1, 0]
+
+
 def test_var_positional_completer_fires_for_every_slot():
     app = App(name="myapp")
 

@@ -261,6 +261,20 @@ The following example completes ``--entry`` with the files that actually exist i
 
    app()
 
+Multi-Value Parameters
+----------------------
+
+For a parameter that takes several values (``tuple[str, str]``, ``list[str]``, ``*args``), the completer runs once per value. ``ctx.index`` is the zero-based position of the value being completed, so a completer can offer different candidates per element:
+
+.. code-block:: python
+
+   def complete_endpoint(ctx):
+       return ["localhost", "0.0.0.0"] if ctx.index == 0 else ["80", "443", "8080"]
+
+
+   @app.command
+   def bind(endpoint: Annotated[tuple[str, str], Parameter(completer=complete_endpoint)]): ...
+
 Shared Completers
 -----------------
 

@@ -123,6 +123,16 @@ class CompletionContext:
         """The :class:`.Parameter` of the argument currently being completed."""
         return self.argument.parameter
 
+    @property
+    def index(self) -> int:
+        """Zero-based position of the word being completed among this argument's values.
+
+        ``0`` for a scalar. For a multi-value parameter (``tuple[str, str]``,
+        ``list[str]``, ``*args``) it counts the values already typed for it, so
+        a completer can offer element-specific candidates.
+        """
+        return len(self.argument.tokens)
+
     def _match(self, name: str) -> "Argument":
         # ``_match_explicit`` matches ``name`` against declared options while
         # skipping the ``**kwargs`` catch-all, so a bare name like ``"region"``
