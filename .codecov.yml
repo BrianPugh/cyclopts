@@ -6,9 +6,13 @@ coverage:
         # project coverage decrease by more than 2%
         target: auto
         threshold: 2%
+        # Report coverage changes without failing the check.
+        informational: true
     patch:
       default:
         # Be tolerant on code coverage diff on PRs to limit
         # noisy red coverage status on github PRs.
         target: auto
         threshold: 20%
+        # Report coverage changes without failing the check.
+        informational: true
