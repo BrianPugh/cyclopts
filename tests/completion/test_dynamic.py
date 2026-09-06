@@ -431,6 +431,24 @@ def test_meta_launcher_option_value_visible_to_dependent_completer(words):
     assert seen == [(True, "prod")]
 
 
+@pytest.mark.parametrize("shell", ["bash", "zsh", "fish"])
+def test_generate_completion_from_meta_matches_root(shell):
+    """``app.meta.generate_completion()`` must not drop the root default command's parameters."""
+    app = App(name="myapp")
+
+    @app.default
+    def main(name: Annotated[str, Parameter(completer=lambda ctx: ["root-a"])] = ""):
+        pass
+
+    @app.meta.default
+    def launcher(*tokens: str, verbose: bool = False):
+        app(tokens)
+
+    from_meta = app.meta.generate_completion(prog_name="myapp", shell=shell)
+    assert from_meta == app.generate_completion(prog_name="myapp", shell=shell)
+    assert "name" in from_meta  # fish spells it ``-l name``
+
+
 def test_bare_name_lookup_with_kwargs_catch_all():
     """A bare-name lookup resolves the named sibling, not the ``**kwargs`` catch-all."""
     app = App(name="myapp")

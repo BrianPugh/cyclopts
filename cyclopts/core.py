@@ -2809,18 +2809,25 @@ class App:
 
             shell = detect_shell()
 
+        # A meta app forwards its tokens to the root app, so ``app.meta`` and
+        # ``app`` describe the same command line; always generate from the root
+        # (the runtime ``__complete`` engine resolves from there too).
+        app = self
+        while app._meta_parent is not None:
+            app = app._meta_parent
+
         if shell == "zsh":
             from cyclopts.completion.zsh import generate_completion_script
 
-            return generate_completion_script(self, prog_name)
+            return generate_completion_script(app, prog_name)
         elif shell == "bash":
             from cyclopts.completion.bash import generate_completion_script
 
-            return generate_completion_script(self, prog_name)
+            return generate_completion_script(app, prog_name)
         elif shell == "fish":
             from cyclopts.completion.fish import generate_completion_script
 
-            return generate_completion_script(self, prog_name)
+            return generate_completion_script(app, prog_name)
         else:
             raise ValueError(f"Unsupported shell: {shell}")
 
