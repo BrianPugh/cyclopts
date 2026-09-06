@@ -92,6 +92,7 @@ def _emit_completer_completion(indent: str, prog_name: str) -> list[str]:
     return [
         f"{indent}local -a _c=()",
         f"{indent}local _line",
+        f"{indent}local _q",
         # ``COMP_WORDS[0]`` is how the user typed the command, which isn't always
         # directly executable (a shell function/alias, or completion registered
         # under a different name). Fall back to the installed program name when it
@@ -113,7 +114,7 @@ def _emit_completer_completion(indent: str, prog_name: str) -> list[str]:
         f'{indent}done < <("$_cmd" __complete "${{COMP_WORDS[@]:1:COMP_CWORD}}" 2>/dev/null)',
         f"{indent}COMPREPLY=()",
         f'{indent}for _x in "${{_c[@]}}"; do',
-        f'{indent}  [[ "$_x" == "${{cur}}"* ]] && COMPREPLY+=("$_x")',
+        f'{indent}  [[ "$_x" == "${{cur}}"* ]] && {{ printf -v _q \'%q\' "$_x"; COMPREPLY+=("$_q"); }}',
         f"{indent}done",
     ]
 
@@ -123,7 +124,11 @@ def _emit_choice_completion(choices: list[str], indent: str) -> list[str]:
 
     Avoids ``compgen -W`` whitespace tokenization, which mangles choices
     containing spaces, single quotes, or characters re-parsed by the
-    surrounding ``$(...)`` (e.g. backticks).
+    surrounding ``$(...)`` (e.g. backticks). Matches are ``%q``-escaped on the
+    way into ``COMPREPLY``: readline inserts entries verbatim (no ``-o
+    filenames``), so an unescaped ``release 2.0`` would land on the line as
+    two words. ``$cur`` is compared raw, so a partially-inserted escaped
+    prefix (a backslash-escaped space) does not narrow further -- acceptable for now.
 
     Parameters
     ----------
@@ -141,9 +146,10 @@ def _emit_choice_completion(choices: list[str], indent: str) -> list[str]:
     array_body = " ".join(f'"{c}"' for c in escaped)
     return [
         f"{indent}local -a _c=({array_body})",
+        f"{indent}local _q",
         f"{indent}COMPREPLY=()",
         f'{indent}for _x in "${{_c[@]}}"; do',
-        f'{indent}  [[ "$_x" == "${{cur}}"* ]] && COMPREPLY+=("$_x")',
+        f'{indent}  [[ "$_x" == "${{cur}}"* ]] && {{ printf -v _q \'%q\' "$_x"; COMPREPLY+=("$_q"); }}',
         f"{indent}done",
     ]
 

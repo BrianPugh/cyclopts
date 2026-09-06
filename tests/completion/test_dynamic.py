@@ -897,15 +897,23 @@ if __name__ == "__main__":
 
 
 def test_e2e_bash_candidates_not_shell_expanded(dynamic_completion_tester):
-    """Completer output must reach COMPREPLY verbatim: no word-splitting, no expansion.
+    """Completer output must reach COMPREPLY intact: no word-splitting, no expansion.
 
     Regression test for the ``compgen -W "$(...)"`` path, where a candidate
-    containing ``$(...)`` executed on TAB and whitespace split values.
+    containing ``$(...)`` executed on TAB and whitespace split values. Entries
+    are ``%q``-escaped so readline inserts each as a single literal word.
     """
     tester = dynamic_completion_tester(E2E_INJECTION_APP_SOURCE, prog_name="deployer", shell="bash")
     result = tester.get_completions("deployer deploy --place ")
-    assert sorted(result) == ["$(touch pwned)", "New York"]
+    assert sorted(result) == ["New\\ York", "\\$\\(touch\\ pwned\\)"]
     assert not Path("pwned").exists()
+
+
+def test_e2e_bash_candidate_with_space_is_escaped(dynamic_completion_tester):
+    """A candidate containing a space is ``%q``-escaped so readline inserts it as one word."""
+    source = E2E_APP_SOURCE.replace('USERS = ["alice", "bob", "carol"]', 'USERS = ["alice smith", "bob"]')
+    tester = dynamic_completion_tester(source, prog_name="deployer", shell="bash")
+    assert tester.get_completions("deployer deploy --user al") == ["alice\\ smith"]
 
 
 def test_e2e_eq_form_option_value(dynamic_completion_tester, shell):
