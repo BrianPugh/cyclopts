@@ -570,6 +570,15 @@ def test_debug_reports_resolution_on_stderr(app, capsys, monkeypatch):
     assert "returned 3 candidate(s)" in err
 
 
+def test_debug_reports_parse_failure_message(app, capsys, monkeypatch):
+    """A Cyclopts error's message, not just its class name, reaches the debug line."""
+    monkeypatch.setenv("CYCLOPTS_COMPLETION_DEBUG", "1")
+    compute_completions(app, ["deploy", "--forec", ""])
+    err = capsys.readouterr().err
+    assert "UnknownOptionError: Unknown option: --forec" in err
+    assert "UnknownOptionError: UnknownOptionError" not in err
+
+
 def test_debug_surfaces_broken_completer_traceback(capsys, monkeypatch):
     monkeypatch.setenv("CYCLOPTS_COMPLETION_DEBUG", "1")
     app = App(name="myapp", result_action="return_value")

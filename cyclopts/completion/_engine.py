@@ -29,9 +29,15 @@ def completion_debug_enabled() -> bool:
 
 
 def _exc(e: BaseException) -> str:
-    """Concise one-line exception summary (Cyclopts error reprs are enormous)."""
-    text = str(e).strip().splitlines()
-    summary = text[0] if text else ""
+    """Concise one-line exception summary (Cyclopts error reprs are enormous).
+
+    A :class:`.CycloptsError` renders as a panel whose first line is its own
+    class name, so that line is skipped in favor of the actual message.
+    """
+    lines = [line.strip() for line in str(e).strip().splitlines() if line.strip()]
+    if lines and lines[0] == type(e).__name__:
+        lines = lines[1:]
+    summary = lines[0] if lines else ""
     return f"{type(e).__name__}: {summary}"[:200] if summary else type(e).__name__
 
 
