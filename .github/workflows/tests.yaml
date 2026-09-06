@@ -14,6 +14,12 @@ on:
       - main
   pull_request:
 
+# Cancel a PR's in-progress run when a new commit is pushed to it. Pushes to
+# main are never cancelled, so every landed commit is fully tested.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Lint + type-check, split out of the test matrix so they run in parallel with
   # it rather than serialized as a step inside every test cell (which added
