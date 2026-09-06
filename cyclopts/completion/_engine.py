@@ -13,13 +13,14 @@ from collections.abc import Callable, Iterable
 from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import _parse_configs, _parse_env, _parse_kw_and_flags, _parse_pos
 from cyclopts.exceptions import CycloptsError, MissingArgumentError
 from cyclopts.utils import UNSET, frozen, is_option_like
 
 if TYPE_CHECKING:
     from cyclopts import App
-    from cyclopts.argument import Argument, ArgumentCollection
+    from cyclopts.argument import Argument
 
 
 def completion_debug_enabled() -> bool:
@@ -288,6 +289,12 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
         option, _, incomplete = incomplete.partition("=")
         parse_token = f"{option}={_ACTIVE_SENTINEL}"
 
+    # ``__complete`` may arrive at whichever App the program's entry point is
+    # (``app.meta()`` is common). The launcher forwards its tokens to the root
+    # app, so completion always resolves from the root, exactly like the real run.
+    while app._meta_parent is not None:
+        app = app._meta_parent
+
     # Resolve the active command from the tokens typed so far. ``unused`` strips
     # the resolved command chain, leaving only option/positional tokens so slot
     # accounting below never miscounts a subcommand name as a positional value.
@@ -299,28 +306,34 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     command_app = execution_path[-1]
     debug(f"resolved command={command_chain!r} unused={unused!r}")
 
-    if command_app.default_command is None:
-        debug("resolved command has no default_command; nothing to complete")
-        return []
-
     # The app_stack context applies stack-resolved configuration — e.g. an
     # ``App(default_parameter=Parameter(completer=...))`` — exactly like the
     # real parse (core.py) and the static extractor (_base.py) do.
     with app.app_stack(execution_path):
         try:
-            arguments = command_app.assemble_argument_collection(parse_docstring=False)
-            # Merge keyword parameters contributed by meta launchers on the path
-            # (mirroring the static extractor): a meta option like ``--env`` shares
-            # the command line with the resolved command (``myapp deploy --env
-            # prod``), so its value slot must resolve here too. Positionals stay
-            # command-only — launcher positionals are consumed before the command
-            # name and must not shift the command's own slots.
+            # The resolved command's own parameters, plus the keyword parameters
+            # contributed by meta launchers on the path (mirroring the static
+            # extractor): a meta option like ``--env`` shares the command line
+            # with the resolved command (``myapp deploy --env prod``), so its
+            # value slot must resolve here too — even when the resolved command
+            # is a bare command group with no default_command of its own.
+            # Launcher positionals are consumed before the command name, so they
+            # are dropped (positional-only) or made keyword-only (``index=None``)
+            # so they never shift the command's own positional slots.
             from cyclopts.core import _iter_resolution_argument_collections
 
+            arguments = ArgumentCollection()
+            launcher_arguments = ArgumentCollection()
             for subapp, collection in _iter_resolution_argument_collections(execution_path, parse_docstring=False):
                 if subapp is command_app:
+                    arguments.extend(collection)
                     continue
-                arguments.extend(argument for argument in collection if not argument.field_info.is_positional)
+                for argument in collection:
+                    if argument.field_info.is_positional_only:
+                        continue
+                    argument.index = None
+                    launcher_arguments.append(argument)
+            arguments.extend(launcher_arguments)
         except Exception as e:
             debug(f"assembling arguments failed: {_exc(e)}")
             return []

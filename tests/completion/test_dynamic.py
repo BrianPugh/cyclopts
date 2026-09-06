@@ -353,6 +353,58 @@ def test_meta_launcher_option_completer():
     assert _values(compute_completions(app.meta, ["deploy", ""])) == ["svc"]
 
 
+def test_complete_via_meta_entry_point_reaches_root_default_command():
+    """``app.meta()`` as the program entry point still runs the root default command's completers."""
+    app = App(name="myapp")
+
+    @app.default
+    def main(name: Annotated[str, Parameter(completer=lambda ctx: ["root-a"])] = ""):
+        pass
+
+    @app.meta.default
+    def launcher(*tokens: str, verbose: bool = False):
+        app(tokens)
+
+    assert _values(compute_completions(app.meta, ["--name", ""])) == ["root-a"]
+    assert _values(compute_completions(app.meta, ["--verbose", "--name", ""])) == ["root-a"]
+
+
+def test_meta_launcher_option_at_command_group_path():
+    """``prog grp --env <TAB>`` resolves the launcher option even though ``grp`` has no default command."""
+    app = App(name="myapp")
+    grp = App(name="grp")
+    app.command(grp)
+
+    @grp.command
+    def leaf(service: str):
+        pass
+
+    @app.meta.default
+    def launcher(*tokens: str, env: Annotated[str, Parameter(completer=lambda ctx: ["dev", "prod"])] = ""):
+        app(tokens)
+
+    assert _values(compute_completions(app.meta, ["grp", "--env", ""])) == ["dev", "prod"]
+
+
+def test_meta_launcher_positional_or_keyword_option():
+    """A POSITIONAL_OR_KEYWORD launcher option resolves by keyword without claiming a positional slot."""
+    app = App(name="myapp")
+
+    @app.command
+    def deploy(service: Annotated[str, Parameter(completer=lambda ctx: ["svc"])]):
+        pass
+
+    @app.meta.default
+    def launcher(
+        tokens: Annotated[list[str], Parameter(show=False, allow_leading_hyphen=True)] = [],  # noqa: B006
+        env: Annotated[str, Parameter(completer=lambda ctx: ["dev", "prod"])] = "dev",
+    ):
+        app(tokens)
+
+    assert _values(compute_completions(app.meta, ["deploy", "--env", ""])) == ["dev", "prod"]
+    assert _values(compute_completions(app.meta, ["deploy", ""])) == ["svc"]
+
+
 def test_bare_name_lookup_with_kwargs_catch_all():
     """A bare-name lookup resolves the named sibling, not the ``**kwargs`` catch-all."""
     app = App(name="myapp")
