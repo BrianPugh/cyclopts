@@ -1618,6 +1618,28 @@ class App:
 
         return command, bound, unused_tokens, ignored
 
+    def _resolve_invoked_command(self, tokens: list[str]) -> tuple[tuple[str, ...], "App", list[str]]:
+        """Resolve the invoked command: the deepest executing app, its chain, and the leftover tokens.
+
+        Trailing help/version pseudo-commands are trimmed so the result is the real command the
+        user targeted. This is the canonical "which command am I running" answer; resolve any
+        command-scoped configuration (delimiter, error settings, backend, result_action, ...) from
+        the returned app's ``app_stack`` rather than ``self.app_stack`` (the entry app's per-app
+        stack never contains the subcommand -- see the #933 family).
+        """
+        command_chain, execution_apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
+        # We don't want the command_app to be the version/help handler; we handle those specially.
+        with suppress(IndexError):
+            # When users provide multiple flags (e.g., "myapp cmd --help --help"), the parser may
+            # treat trailing help/version flags as commands in the chain. Remove ALL such trailing
+            # commands and keep command_chain synchronized with execution_apps.
+            while command_chain and command_chain[-1] in set(
+                execution_apps[-2].help_flags + execution_apps[-2].version_flags  # pyright: ignore[reportOperatorIssue]
+            ):
+                execution_apps = execution_apps[:-1]
+                command_chain = command_chain[:-1]
+        return command_chain, execution_apps[-1], unused_tokens
+
     def _parse_known_args(
         self,
         tokens: None | str | Iterable[str] = None,
@@ -1631,29 +1653,10 @@ class App:
 
         meta_parent = self
 
-        # We need both versions of the apps list:
-        # 1. apps_for_context (with parent metas) - for setting up the app_stack context
-        # 2. execution_apps (without parent metas) - for determining the actual execution command
-        # These can differ when parse_commands is called from a meta app, so we must
-        # call parse_commands twice. This is not inefficient since the parsing is fast.
+        # apps_for_context (with parent metas) sets up the app_stack context; it can differ from
+        # the execution chain when parse_commands is called from a meta app.
         _, apps_for_context, _ = self.parse_commands(tokens, include_parent_meta=True)
-        command_chain, execution_apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
-
-        # We don't want the command_app to be the version/help handler; we handle those specially
-        command_app = execution_apps[-1]
-        with suppress(IndexError):
-            # Remove trailing help/version commands from the execution chain.
-            # When users provide multiple flags (e.g., "myapp cmd --help --help"), the parser
-            # may treat trailing help/version flags as commands in the chain. We must remove ALL
-            # such trailing commands and keep command_chain synchronized with execution_apps.
-            while command_chain and command_chain[-1] in set(
-                execution_apps[-2].help_flags + execution_apps[-2].version_flags  # pyright: ignore[reportOperatorIssue]
-            ):
-                execution_apps = execution_apps[:-1]
-                command_chain = command_chain[:-1]
-
-        command_app = execution_apps[-1]
-        del execution_apps  # Always use AppStack from here-on.
+        command_chain, command_app, unused_tokens = self._resolve_invoked_command(tokens)
 
         ignored: dict[str, Any] = {}
 
@@ -1994,10 +1997,16 @@ class App:
                 end_of_options_delimiter=end_of_options_delimiter,
             )
 
-            resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
+            # ``backend``/``result_action`` are command-scoped: resolve them from the invoked
+            # command's app-stack, not ``self`` (the entry app), so a subcommand-level value is
+            # honored (#933 family).
+            command_app = self._resolve_invoked_command(tokens)[1]
+            resolved_backend = cast(
+                Literal["asyncio", "trio"], command_app.app_stack.resolve("backend", fallback="asyncio")
+            )
             try:
                 result = _run_maybe_async_command(command, bound, resolved_backend)
-                return self._handle_result_action(result)
+                return self._handle_result_action(result, command_app=command_app)
             except KeyboardInterrupt:
                 if self.suppress_keyboard_interrupt:
                     sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
@@ -2123,6 +2132,8 @@ class App:
                 console=console,
                 end_of_options_delimiter=end_of_options_delimiter,
             )
+            # ``result_action`` is command-scoped (#933 family); resolve from the invoked command.
+            command_app = self._resolve_invoked_command(tokens)[1]
 
             try:
                 if inspect.iscoroutinefunction(command):
@@ -2130,7 +2141,7 @@ class App:
                 else:
                     result = command(*bound.args, **bound.kwargs)
 
-                return self._handle_result_action(result)
+                return self._handle_result_action(result, command_app=command_app)
             except KeyboardInterrupt:
                 if self.suppress_keyboard_interrupt:
                     sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
@@ -2753,8 +2764,14 @@ class App:
         if isinstance(quit, str):
             quit = [quit]
 
+        # Set to the invoked command each iteration so ``default_dispatcher`` can scope
+        # ``backend`` to it (#933 family). The public ``dispatcher`` signature is fixed, so this
+        # is threaded via closure rather than an argument.
+        invoked_command_app: App | None = None
+
         def default_dispatcher(command, bound, _):
-            resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
+            scope = invoked_command_app or self
+            resolved_backend = cast(Literal["asyncio", "trio"], scope.app_stack.resolve("backend", fallback="asyncio"))
             return _run_maybe_async_command(command, bound, resolved_backend)
 
         if dispatcher is None:
@@ -2807,8 +2824,13 @@ class App:
                 with self.app_stack(tokens):
                     try:
                         command, bound, ignored = self.parse_args(tokens, **kwargs)
+                        invoked_command_app = self._resolve_invoked_command(tokens)[1]
                         result = dispatcher(command, bound, ignored)
-                        self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
+                        self._handle_result_action(
+                            result,
+                            fallback="print_non_int_return_int_as_exit_code",
+                            command_app=invoked_command_app,
+                        )
                     except CycloptsError:
                         # Upstream ``parse_args`` already printed the error
                         pass
@@ -2819,7 +2841,9 @@ class App:
                     except Exception:
                         self.error_console.print(traceback.format_exc(), markup=False, highlight=False, soft_wrap=True)
 
-    def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
+    def _handle_result_action(
+        self, result: Any, fallback: ResultAction = "print_non_int_sys_exit", *, command_app: "App | None" = None
+    ) -> Any:
         """Handle command result based on result_action.
 
         Parameters
@@ -2828,6 +2852,11 @@ class App:
             The command's return value.
         fallback : ResultAction
             The fallback result_action if none is configured. Defaults to "print_non_int_sys_exit".
+        command_app : App | None
+            The invoked command, whose ``app_stack`` scopes ``result_action`` (and the output
+            console). ``result_action`` is command-scoped: the entry app's per-app stack cannot
+            see a subcommand's value (#933 family). Falls back to ``self`` when not provided
+            (e.g. errors raised before a command is resolved).
 
         Returns
         -------
@@ -2836,12 +2865,13 @@ class App:
         """
         from cyclopts._result_action import handle_result_action
 
+        scope = command_app or self
         action = cast(
             ResultAction,
-            self.app_stack.resolve("result_action", fallback=fallback),
+            scope.app_stack.resolve("result_action", fallback=fallback),
         )
 
-        return handle_result_action(result, action, lambda x: self.console.print(x))
+        return handle_result_action(result, action, lambda x: scope.console.print(x))
 
     def update(self, app: "App"):
         """Copy over all commands from another :class:`App`.
