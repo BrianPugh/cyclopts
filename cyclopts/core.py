@@ -1650,7 +1650,11 @@ class App:
         with self.app_stack(apps_for_context):
             config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
             config = tuple(partial(x, command_app, command_chain) for x in config)
-            end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
+            # Resolve from ``command_app.app_stack`` (like ``_config`` above), not
+            # ``self.app_stack``: ``AppStack`` is per-app, and only the resolved
+            # command's stack contains the full command chain. Resolving from the
+            # root app's stack ignores a subcommand-level setting (issue #933).
+            end_of_options_delimiter = command_app.app_stack.resolve("end_of_options_delimiter", fallback="--")
 
             # Special flags (help/version) get intercepted by the root app.
             # Special flags are allows to be **anywhere** in the token stream.
