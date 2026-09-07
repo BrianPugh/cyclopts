@@ -754,6 +754,25 @@ def test_disabled_double_hyphen_end_of_options_delimiter_from_parse_args(app, as
     assert_parse_args_config({"end_of_options_delimiter": ""}, foo, "1 -- 3 4", 1, "--", (3, 4))
 
 
+def test_disabled_double_hyphen_end_of_options_delimiter_on_subcommand(app):
+    """A subcommand's ``end_of_options_delimiter="" `` must disable ``--`` stripping.
+
+    Regression test for issue #933: the delimiter was resolved from the root
+    app's stack instead of the resolved command's, so a subcommand-level
+    ``end_of_options_delimiter=""`` was ignored and ``--`` was still stripped
+    (breaking pass-through commands like ``k exec pod -- sh -c id``).
+    """
+
+    @app.command(help_flags=[], version_flags=[], end_of_options_delimiter="")
+    def k(*args: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+        pass
+
+    _, actual_bind, _ = app.parse_args(
+        ["k", "exec", "pod", "--", "sh", "-c", "id"], print_error=False, exit_on_error=False
+    )
+    assert actual_bind.args == ("exec", "pod", "--", "sh", "-c", "id")
+
+
 def test_end_of_options_delimiter_from_parse_args(app, assert_parse_args):
     app.end_of_options_delimiter = "AND"
 
