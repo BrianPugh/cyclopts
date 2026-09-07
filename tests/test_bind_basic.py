@@ -1044,6 +1044,63 @@ def test_leading_hyphen_value_not_split_when_later_char_matches(app, assert_pars
     )
 
 
+def test_leading_hyphen_value_not_split_when_later_char_is_flag(app, assert_parse_args):
+    """The same protection as #932, but the later matching char is a boolean flag.
+
+    ``-xf`` must reach ``*args`` intact rather than being read as unknown ``-x``
+    plus the ``-f`` flag, because the *first* character ``-x`` is unknown.
+    """
+
+    @app.default
+    def main(
+        *args: Annotated[str, Parameter(allow_leading_hyphen=True)],
+        force: Annotated[bool, Parameter(name=["-f", "--force"])] = False,
+    ):
+        pass
+
+    assert_parse_args(main, ["-xf"], "-xf")
+
+
+def test_combined_short_unknown_first_char_reported_intact(app):
+    """A leading-hyphen token that is not a positional value is reported whole.
+
+    Without a leading-hyphen positional to receive it, ``-ojson`` has nowhere to
+    go, so it surfaces as ``Unknown option: -ojson`` -- the whole intact token --
+    rather than the pre-fix ``-n requires an argument`` from a mid-string match.
+    Regression guard for #932.
+    """
+
+    @app.default
+    def main(
+        pos: str = "",
+        *,
+        namespace: Annotated[str | None, Parameter(name=["-n", "--namespace"])] = None,
+    ):
+        pass
+
+    with pytest.raises(UnknownOptionError, match=r"-ojson"):
+        app.parse_args(["-ojson"], print_error=False, exit_on_error=False)
+
+
+def test_combined_short_known_first_flag_then_unknown_char(app):
+    """An unknown character *after* a known short is still reported individually.
+
+    ``-fx`` matches the ``-f`` flag left-to-right, then hits unknown ``-x``; the
+    ``position > 0`` unknown path is untouched by the #932 fix, so the error names
+    the specific unknown ``-x`` (not the whole token).
+    """
+
+    @app.default
+    def main(
+        *,
+        force: Annotated[bool, Parameter(name=["-f", "--force"])] = False,
+    ):
+        pass
+
+    with pytest.raises(UnknownOptionError, match=r"-x"):
+        app.parse_args(["-fx"], print_error=False, exit_on_error=False)
+
+
 def test_hyphenated_value_attached(app, assert_parse_args):
     """Test that hyphenated values work when attached."""
 
