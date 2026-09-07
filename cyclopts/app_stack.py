@@ -74,6 +74,12 @@ class AppStack:
                 meta_app.app_stack.stack.append(meta_subapps)
                 # Also push the overrides onto the meta app's stack
                 meta_app.app_stack.overrides_stack.append(overrides or {})
+        # Give the entry app (this AppStack's owner) visibility into the full invoked command
+        # chain, so command-scoped settings resolve to the deepest invoked command instead of
+        # only the entry app (#933). Without this, ``self.app_stack.resolve(...)`` at an entry
+        # point sees just ``[entry_app]`` and silently ignores subcommand-level settings.
+        if resolved_apps and resolved_apps[0] is self.stack[0][0]:
+            self.stack[-1] = so_far.copy()
         try:
             yield
         finally:
