@@ -27,6 +27,25 @@ def test_async_handler_with_subcommand_works(app):
     assert app("foo bar", backend="trio") == "Async handler works"
 
 
+def test_backend_defined_on_subcommand(app):
+    """A subcommand's own ``backend="trio"`` is honored without a runtime override (#933 family).
+
+    The root keeps the default asyncio backend; only the subcommand selects trio. Regression test
+    for the #933 family: ``backend`` was resolved from the root app's stack, which never contains
+    the subcommand, so a subcommand-level value was ignored.
+    """
+    sub_app = App(name="foo", backend="trio", result_action="return_value")
+    app.command(sub_app)
+
+    @sub_app.default
+    async def async_handler():
+        assert sniffio.current_async_library() == "trio"
+        await trio.lowlevel.checkpoint()
+        return "ran under trio"
+
+    assert app("foo") == "ran under trio"
+
+
 def test_handler(app):
     @app.command(name="command")
     def sync_handler():
