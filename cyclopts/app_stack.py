@@ -148,8 +148,11 @@ class AppStack:
                 if value is not None:
                     return value
 
+        # Only the current (innermost) frame is consulted; it already holds the full invoked
+        # command chain (root -> ... -> command), so a re-entrant invocation of the same entry
+        # app can't leak an outer sibling's settings sideways through a leftover frame (#933).
         # `reversed` so that "closer" apps have higher priority.
-        for app in reversed(list(chain.from_iterable(self.stack))):
+        for app in reversed(self.current_frame):
             result = getattr(app, attribute)
             if result is not None:
                 return result

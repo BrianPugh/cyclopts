@@ -755,7 +755,7 @@ def test_disabled_double_hyphen_end_of_options_delimiter_from_parse_args(app, as
 
 
 def test_disabled_double_hyphen_end_of_options_delimiter_on_subcommand(app):
-    """A subcommand's ``end_of_options_delimiter="" `` must disable ``--`` stripping.
+    """A subcommand's ``end_of_options_delimiter=""`` must disable ``--`` stripping.
 
     Regression test for issue #933: the delimiter was resolved from the root
     app's stack instead of the resolved command's, so a subcommand-level

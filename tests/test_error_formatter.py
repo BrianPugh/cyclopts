@@ -178,6 +178,40 @@ def test_print_error_defined_on_subcommand():
     assert buf.getvalue() == ""
 
 
+def test_help_on_error_defined_on_subcommand():
+    """A subcommand's ``help_on_error=True`` prints the help page before the error (#933 family)."""
+    buf = StringIO()
+    error_console = Console(
+        file=buf, width=70, force_terminal=True, highlight=False, color_system=None, legacy_windows=False
+    )
+
+    app = cyclopts.App(name="prog", result_action="return_value")
+
+    @app.command(help_on_error=True)
+    def sub(value: int):
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(["sub", "abc"], exit_on_error=False, error_console=error_console)
+
+    # The subcommand help page is emitted ahead of the error (root default is help_on_error=False).
+    assert "Usage: prog sub" in buf.getvalue()
+
+
+def test_verbose_defined_on_subcommand():
+    """A subcommand's ``verbose=True`` propagates to the raised error (#933 family)."""
+    app = cyclopts.App(result_action="return_value")
+
+    @app.command(verbose=True)
+    def sub(value: int):
+        pass
+
+    with pytest.raises(CoercionError) as exc_info:
+        app.parse_args(["sub", "abc"], exit_on_error=False, print_error=False)
+
+    assert exc_info.value.verbose is True
+
+
 def test_error_formatter_call():
     """error_formatter works when using __call__ instead of parse_args."""
     buf = StringIO()
