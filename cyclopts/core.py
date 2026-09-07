@@ -132,6 +132,16 @@ def _get_version_command(app):
         return app.version_print
 
 
+#: Attributes controlling how a parse error is reported. Resolved together so the invoked
+#: command's scope is applied consistently (see ``App._handle_parse_error``).
+_ERROR_REPORT_ATTRIBUTES = ("print_error", "exit_on_error", "help_on_error", "verbose", "error_formatter")
+
+
+def _resolve_error_report_settings(app_stack: AppStack) -> dict[str, Any]:
+    """Resolve the error-reporting settings from ``app_stack`` (unset values stay ``None``)."""
+    return {name: app_stack.resolve(name) for name in _ERROR_REPORT_ATTRIBUTES}
+
+
 def _apply_parent_defaults_to_app(app: "App", parent_app: "App") -> None:
     """Apply parent app's group defaults to app if not already set.
 
@@ -1744,6 +1754,12 @@ class App:
                     e.command_chain = command_chain
                 if e.console is None:
                     e.console = command_app.error_console
+                # Resolve error-reporting settings now, while the invoked command's context
+                # (full command chain + propagated overrides) is live on ``command_app.app_stack``.
+                # ``_handle_parse_error`` runs after this context is torn down, where ``self`` (the
+                # entry app) can no longer see subcommand-level settings (issue #933 family).
+                if e._error_report_settings is None:
+                    e._error_report_settings = _resolve_error_report_settings(command_app.app_stack)
                 raise
 
         return command, bound, unused_tokens, ignored, argument_collection
@@ -1854,10 +1870,15 @@ class App:
 
     def _handle_parse_error(self, e: CycloptsError, tokens: list[str]) -> NoReturn:
         """Print ``e`` according to the resolved error settings, then exit or re-raise it."""
-        print_error = self.app_stack.resolve("print_error")
-        exit_on_error = self.app_stack.resolve("exit_on_error")
-        help_on_error = self.app_stack.resolve("help_on_error")
-        verbose = self.app_stack.resolve("verbose")
+        # ``error_report_settings`` is resolved from the invoked command's app-stack while its
+        # context is live (see ``_parse_known_args``). It is ``None`` only for errors that occur
+        # before a command is resolved (e.g. tokenization), for which ``self`` (the entry app) is
+        # the correct scope.
+        settings = e._error_report_settings or _resolve_error_report_settings(self.app_stack)
+        print_error = settings["print_error"]
+        exit_on_error = settings["exit_on_error"]
+        help_on_error = settings["help_on_error"]
+        verbose = settings["verbose"]
 
         e.verbose = verbose if verbose is not None else False
         e.root_input_tokens = tokens
@@ -1866,7 +1887,7 @@ class App:
         if help_on_error if help_on_error is not None else False:
             self.help_print(tokens, console=e.console)
         if print_error if print_error is not None else True:
-            resolved_error_formatter = self.app_stack.resolve("error_formatter")
+            resolved_error_formatter = settings["error_formatter"]
             if resolved_error_formatter is not None:
                 e.console.print(resolved_error_formatter(e))
             else:

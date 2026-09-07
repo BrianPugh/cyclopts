@@ -146,6 +146,13 @@ class CycloptsError(Exception):
     console: Optional["Console"] = field(default=None, kw_only=True)
     """:class:`~rich.console.Console` to display runtime errors."""
 
+    # Internal: error-reporting settings (``print_error``, ``exit_on_error``, ...) resolved from
+    # the invoked command's app-stack while its context is live. ``App._handle_parse_error``
+    # consumes this so a subcommand-level setting is honored even though the handler runs after the
+    # command context is torn down (per-app ``AppStack`` cannot see the subcommand from the root
+    # app). Underscore-prefixed to stay out of the public API surface.
+    _error_report_settings: dict[str, Any] | None = field(default=None, kw_only=True)
+
     def _resolved_msg(self) -> "Text":
         """Resolve ``self.msg`` (str | Text) into a Rich ``Text`` instance.
 
