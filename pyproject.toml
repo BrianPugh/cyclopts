@@ -53,6 +53,7 @@ dev = [
     "pytest>=8.2.0",
     "pytest-cov>=3.0.0",
     "pytest-mock>=3.7.0",
+    "pytest-timeout>=2.3.0",
     "pydantic>=2.11.2,<3.0.0",
     "syrupy>=4.0.0",
     "toml>=0.10.2,<1.0.0",
@@ -225,6 +226,7 @@ markers = [
     "slow: marks tests as slow (deselected by default, use --run-slow to include)",
 ]
 addopts = "-m 'not slow'"
+timeout = 60
 
 [tool.codespell]
 skip = 'uv.lock,tests/test_help.py'
