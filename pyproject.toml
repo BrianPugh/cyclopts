@@ -226,9 +226,6 @@ markers = [
     "slow: marks tests as slow (deselected by default, use --run-slow to include)",
 ]
 addopts = "-m 'not slow'"
-# Fail a hung test in 60s (~25x the slowest real test) with a traceback, instead
-# of letting it stall the whole CI job for the 45-minute job timeout. Auto-picks
-# SIGALRM on POSIX / thread-dump on Windows, and disables itself under a debugger.
 timeout = 60
 
 [tool.codespell]
