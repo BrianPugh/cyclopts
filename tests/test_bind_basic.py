@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 import pytest
 
-from cyclopts import Parameter
+from cyclopts import App, Parameter
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
@@ -771,6 +771,45 @@ def test_disabled_double_hyphen_end_of_options_delimiter_on_subcommand(app):
         ["k", "exec", "pod", "--", "sh", "-c", "id"], print_error=False, exit_on_error=False
     )
     assert actual_bind.args == ("exec", "pod", "--", "sh", "-c", "id")
+
+
+def test_end_of_options_delimiter_custom_on_subcommand(app, assert_parse_args):
+    """A subcommand may define its own non-default delimiter (issue #933).
+
+    ``AND`` is the delimiter for ``sub``, so ``--2`` after it is forced positional
+    and a literal ``--`` is just an ordinary leading-hyphen value.
+    """
+
+    @app.command(end_of_options_delimiter="AND")
+    def sub(a: int, b: Annotated[str, Parameter(allow_leading_hyphen=True)], c: tuple[int, int]):
+        pass
+
+    assert_parse_args(sub, "sub 1 AND --2 3 4", 1, "--2", (3, 4))
+    assert_parse_args(sub, "sub 1 AND -- 3 4", 1, "--", (3, 4))
+
+
+def test_end_of_options_delimiter_subcommand_overrides_parent(app, assert_parse_args):
+    """A subcommand delimiter takes precedence over the parent app's (issue #933)."""
+    app.end_of_options_delimiter = "PARENT"
+
+    @app.command(end_of_options_delimiter="CHILD")
+    def sub(a: int, b: Annotated[str, Parameter(allow_leading_hyphen=True)], c: tuple[int, int]):
+        pass
+
+    assert_parse_args(sub, "sub 1 CHILD --2 3 4", 1, "--2", (3, 4))
+
+
+def test_end_of_options_delimiter_nested_subcommand(app):
+    """Delimiter resolution walks the full command chain to a grandchild (issue #933)."""
+    mid = App(name="mid", help_flags=[], version_flags=[])
+    app.command(mid)
+
+    @mid.command(help_flags=[], version_flags=[], end_of_options_delimiter="")
+    def leaf(*args: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+        pass
+
+    _, actual_bind, _ = app.parse_args(["mid", "leaf", "x", "--", "-y", "z"], print_error=False, exit_on_error=False)
+    assert actual_bind.args == ("x", "--", "-y", "z")
 
 
 def test_end_of_options_delimiter_from_parse_args(app, assert_parse_args):
