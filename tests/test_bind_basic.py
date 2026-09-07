@@ -1018,6 +1018,32 @@ def test_unknown_short_option_not_split_into_varargs(app, assert_parse_args):
     assert_parse_args(main, ["-xyz"], "-xyz")
 
 
+def test_leading_hyphen_value_not_split_when_later_char_matches(app, assert_parse_args):
+    """A leading-hyphen positional value must not be exploded into combined shorts.
+
+    Regression test for issue #932: ``-ojson`` should reach ``*args`` intact even
+    though its *last* character ``n`` happens to match the ``-n`` option. GNU-style
+    combined shorts are parsed left-to-right and must begin with a known option;
+    ``-o`` is unknown, so the whole token is a value, not ``-o -j -s -o -n``.
+    """
+
+    @app.default
+    def main(
+        *args: Annotated[str, Parameter(allow_leading_hyphen=True)],
+        namespace: Annotated[str | None, Parameter(name=["--namespace", "-n"])] = None,
+    ):
+        pass
+
+    assert_parse_args(
+        main,
+        ["get", "info", "-ojson", "-n", "name"],
+        "get",
+        "info",
+        "-ojson",
+        namespace="name",
+    )
+
+
 def test_hyphenated_value_attached(app, assert_parse_args):
     """Test that hyphenated values work when attached."""
 
