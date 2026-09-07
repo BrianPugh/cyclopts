@@ -1825,9 +1825,13 @@ class App:
             if v is not None
         }
 
-        # overrides isn't being propagated to subcommands because they aren't provided to the context manager here.
         with self.app_stack([], overrides=overrides):
             tokens = self._normalize_tokens(tokens)
+        # Keep the invoked-command chain live across parsing *and* error handling, so
+        # ``_handle_parse_error`` resolves error-reporting settings from the invoked subcommand
+        # rather than the entry app (#933). Normalization runs first, in the entry-app scope, so a
+        # tokenization failure is reported before any command is resolved.
+        with self.app_stack(tokens, overrides=overrides):
             try:
                 command, bound, _, ignored, _ = self._parse_known_args(
                     tokens,
