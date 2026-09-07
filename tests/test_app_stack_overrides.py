@@ -122,3 +122,70 @@ def test_multiple_override_parameters():
     # Check cleanup
     assert len(app.app_stack.overrides_stack) == 1
     assert app.app_stack.overrides_stack[0] == {}
+
+
+def test_reentrant_sibling_does_not_inherit_config():
+    """A subcommand's settings must not leak sideways into a re-entrantly invoked sibling.
+
+    Regression test for the #933 follow-up: resolving a subcommand's configuration was
+    done by exposing the invoked command chain in the entry app's top stack frame, but
+    ``resolve`` scanned *every* frame. When ``outer`` (which sets ``backend``/
+    ``end_of_options_delimiter``) re-entrantly invokes sibling ``inner`` while its own
+    frame is still live, ``inner``'s frame sat above the leftover ``[root, outer]`` frame;
+    ``inner``'s ``None`` values fell through and picked up ``outer``'s settings. Resolution
+    must be scoped to the innermost invocation frame.
+    """
+    seen = {}
+
+    app = App(result_action="return_value")
+
+    @app.command(backend="trio", end_of_options_delimiter="OUTERDELIM")
+    def outer():
+        return app(["inner"])
+
+    @app.command  # sets nothing; must resolve to the root defaults, not outer's
+    def inner():
+        seen["backend"] = app.app_stack.resolve("backend", fallback="asyncio")
+        seen["eood"] = app.app_stack.resolve("end_of_options_delimiter")
+        return "inner-ran"
+
+    assert app(["outer"]) == "inner-ran"
+    assert seen == {"backend": "asyncio", "eood": None}
+
+    # Directly invoking the sibling resolves to the same defaults.
+    seen.clear()
+    assert app(["inner"]) == "inner-ran"
+    assert seen == {"backend": "asyncio", "eood": None}
+
+
+def test_subcommand_config_resolved_via_meta_forwarding():
+    """Subcommand settings resolve when the meta app forwards to the invoked command.
+
+    The ``app.meta`` entry point dispatches subcommands by re-entrantly calling ``app(tokens)``
+    inside ``meta.default``; that inner call runs on the owner app's stack, so a subcommand-level
+    setting the parent does not define (here ``error_formatter``) must still be honored end-to-end
+    (#933). Guards the meta-app stack shape flagged during review.
+    """
+    from io import StringIO
+
+    from rich.console import Console
+
+    from cyclopts import CoercionError
+
+    buf = StringIO()
+    error_console = Console(file=buf, width=70, color_system=None)
+
+    app = App(name="root", result_action="return_value")
+
+    @app.meta.default
+    def meta_main(*tokens: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+        return app(list(tokens), error_console=error_console)
+
+    @app.command(error_formatter=lambda e: f"SUBFMT: {e}")
+    def sub(value: int):
+        return value
+
+    with pytest.raises(CoercionError):
+        app.meta(["sub", "abc"], exit_on_error=False)
+
+    assert buf.getvalue().strip() == 'SUBFMT: Invalid value for VALUE: unable to convert "abc" into int.'

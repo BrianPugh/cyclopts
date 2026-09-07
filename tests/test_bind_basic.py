@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 import pytest
 
-from cyclopts import Parameter
+from cyclopts import App, Parameter
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
@@ -754,6 +754,64 @@ def test_disabled_double_hyphen_end_of_options_delimiter_from_parse_args(app, as
     assert_parse_args_config({"end_of_options_delimiter": ""}, foo, "1 -- 3 4", 1, "--", (3, 4))
 
 
+def test_disabled_double_hyphen_end_of_options_delimiter_on_subcommand(app):
+    """A subcommand's ``end_of_options_delimiter=""`` must disable ``--`` stripping.
+
+    Regression test for issue #933: the delimiter was resolved from the root
+    app's stack instead of the resolved command's, so a subcommand-level
+    ``end_of_options_delimiter=""`` was ignored and ``--`` was still stripped
+    (breaking pass-through commands like ``k exec pod -- sh -c id``).
+    """
+
+    @app.command(help_flags=[], version_flags=[], end_of_options_delimiter="")
+    def k(*args: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+        pass
+
+    _, actual_bind, _ = app.parse_args(
+        ["k", "exec", "pod", "--", "sh", "-c", "id"], print_error=False, exit_on_error=False
+    )
+    assert actual_bind.args == ("exec", "pod", "--", "sh", "-c", "id")
+
+
+def test_end_of_options_delimiter_custom_on_subcommand(app, assert_parse_args):
+    """A subcommand may define its own non-default delimiter (issue #933).
+
+    ``AND`` is the delimiter for ``sub``, so ``--2`` after it is forced positional
+    and a literal ``--`` is just an ordinary leading-hyphen value.
+    """
+
+    @app.command(end_of_options_delimiter="AND")
+    def sub(a: int, b: Annotated[str, Parameter(allow_leading_hyphen=True)], c: tuple[int, int]):
+        pass
+
+    assert_parse_args(sub, "sub 1 AND --2 3 4", 1, "--2", (3, 4))
+    assert_parse_args(sub, "sub 1 AND -- 3 4", 1, "--", (3, 4))
+
+
+def test_end_of_options_delimiter_subcommand_overrides_parent(app, assert_parse_args):
+    """A subcommand delimiter takes precedence over the parent app's (issue #933)."""
+    app.end_of_options_delimiter = "PARENT"
+
+    @app.command(end_of_options_delimiter="CHILD")
+    def sub(a: int, b: Annotated[str, Parameter(allow_leading_hyphen=True)], c: tuple[int, int]):
+        pass
+
+    assert_parse_args(sub, "sub 1 CHILD --2 3 4", 1, "--2", (3, 4))
+
+
+def test_end_of_options_delimiter_nested_subcommand(app):
+    """Delimiter resolution walks the full command chain to a grandchild (issue #933)."""
+    mid = App(name="mid", help_flags=[], version_flags=[])
+    app.command(mid)
+
+    @mid.command(help_flags=[], version_flags=[], end_of_options_delimiter="")
+    def leaf(*args: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+        pass
+
+    _, actual_bind, _ = app.parse_args(["mid", "leaf", "x", "--", "-y", "z"], print_error=False, exit_on_error=False)
+    assert actual_bind.args == ("x", "--", "-y", "z")
+
+
 def test_end_of_options_delimiter_from_parse_args(app, assert_parse_args):
     app.end_of_options_delimiter = "AND"
 
@@ -1016,6 +1074,146 @@ def test_unknown_short_option_not_split_into_varargs(app, assert_parse_args):
 
     assert_parse_args(main, ["-c=blue", "build", "thing"], "-c=blue", "build", "thing")
     assert_parse_args(main, ["-xyz"], "-xyz")
+
+
+def test_leading_hyphen_value_not_split_when_later_char_matches(app, assert_parse_args):
+    """A leading-hyphen positional value must not be exploded into combined shorts.
+
+    Regression test for issue #932: ``-ojson`` should reach ``*args`` intact even
+    though its *last* character ``n`` happens to match the ``-n`` option. GNU-style
+    combined shorts are parsed left-to-right and must begin with a known option;
+    ``-o`` is unknown, so the whole token is a value, not ``-o -j -s -o -n``.
+    """
+
+    @app.default
+    def main(
+        *args: Annotated[str, Parameter(allow_leading_hyphen=True)],
+        namespace: Annotated[str | None, Parameter(name=["--namespace", "-n"])] = None,
+    ):
+        pass
+
+    assert_parse_args(
+        main,
+        ["get", "info", "-ojson", "-n", "name"],
+        "get",
+        "info",
+        "-ojson",
+        namespace="name",
+    )
+
+
+def test_leading_hyphen_value_not_split_when_later_char_is_flag(app, assert_parse_args):
+    """The same protection as #932, but the later matching char is a boolean flag.
+
+    ``-xf`` must reach ``*args`` intact rather than being read as unknown ``-x``
+    plus the ``-f`` flag, because the *first* character ``-x`` is unknown.
+    """
+
+    @app.default
+    def main(
+        *args: Annotated[str, Parameter(allow_leading_hyphen=True)],
+        force: Annotated[bool, Parameter(name=["-f", "--force"])] = False,
+    ):
+        pass
+
+    assert_parse_args(main, ["-xf"], "-xf")
+
+
+def test_combined_short_unknown_first_char_reported_intact(app):
+    """A leading-hyphen token that is not a positional value is reported whole.
+
+    Without a leading-hyphen positional to receive it, ``-ojson`` has nowhere to
+    go, so it surfaces as ``Unknown option: -ojson`` -- the whole intact token --
+    rather than the pre-fix ``-n requires an argument`` from a mid-string match.
+    Regression guard for #932.
+    """
+
+    @app.default
+    def main(
+        pos: str = "",
+        *,
+        namespace: Annotated[str | None, Parameter(name=["-n", "--namespace"])] = None,
+    ):
+        pass
+
+    with pytest.raises(UnknownOptionError, match=r"-ojson"):
+        app.parse_args(["-ojson"], print_error=False, exit_on_error=False)
+
+
+def test_combined_short_known_first_flag_then_unknown_char(app):
+    """An unknown character *after* a known short is still reported individually.
+
+    ``-fx`` matches the ``-f`` flag left-to-right, then hits unknown ``-x``; the
+    ``position > 0`` unknown path is untouched by the #932 fix, so the error names
+    the specific unknown ``-x`` (not the whole token).
+    """
+
+    @app.default
+    def main(
+        *,
+        force: Annotated[bool, Parameter(name=["-f", "--force"])] = False,
+    ):
+        pass
+
+    with pytest.raises(UnknownOptionError, match=r"-x"):
+        app.parse_args(["-fx"], print_error=False, exit_on_error=False)
+
+
+def test_combined_short_typo_first_flag_points_at_leading_char(app):
+    """A typo in the first flag of a combined short (``-xvb``) names the leading ``-x``."""
+
+    @app.command
+    def build(
+        *,
+        all_: Annotated[bool, Parameter(name=["-a", "--all"])] = False,
+        verbose: Annotated[bool, Parameter(name=["-v", "--verbose"])] = False,
+        build_flag: Annotated[bool, Parameter(name=["-b", "--build"])] = False,
+    ):
+        pass
+
+    with pytest.raises(UnknownOptionError) as exc_info:
+        app.parse_args(["build", "-xvb"], print_error=False, exit_on_error=False)
+
+    message = str(exc_info.value)
+    assert message == "Unknown option: -xvb. -x is not a recognized option."
+    assert "Did you mean" not in message
+
+
+def test_combined_short_typo_first_flag_with_value_taking_short(app):
+    """A value-taking short in the tail (``-xojson``) still names ``-x``, never leaking ``json``."""
+
+    @app.command
+    def build(
+        output: Annotated[str, Parameter(name=["-o", "--output"])] = "",
+        *,
+        verbose: Annotated[bool, Parameter(name=["-v", "--verbose"])] = False,
+    ):
+        pass
+
+    with pytest.raises(UnknownOptionError) as exc_info:
+        app.parse_args(["build", "-xojson"], print_error=False, exit_on_error=False)
+
+    message = str(exc_info.value)
+    assert message == "Unknown option: -xojson. -x is not a recognized option."
+
+
+def test_combined_short_typo_mid_flag_reports_isolated_char(app):
+    """A typo after a known short (``-axb``) still reports just ``-x``, not the whole token."""
+
+    @app.command
+    def build(
+        *,
+        all_: Annotated[bool, Parameter(name=["-a", "--all"])] = False,
+        build_flag: Annotated[bool, Parameter(name=["-b", "--build"])] = False,
+    ):
+        pass
+
+    with pytest.raises(UnknownOptionError) as exc_info:
+        app.parse_args(["build", "-axb"], print_error=False, exit_on_error=False)
+
+    message = str(exc_info.value)
+    assert message == "Unknown option: -x."
+    assert "are valid" not in message
 
 
 def test_hyphenated_value_attached(app, assert_parse_args):

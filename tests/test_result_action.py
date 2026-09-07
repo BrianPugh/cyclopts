@@ -1779,3 +1779,57 @@ def test_invalid_result_action_assignment_raises_eagerly():
 def test_result_action_error_lists_valid_actions():
     with pytest.raises(ValueError, match="'return_value'"):
         App(result_action="bogus")  # pyright: ignore[reportArgumentType]
+
+
+# ==============================================================================
+# Subcommand-scoped result_action (#933 family)
+# ==============================================================================
+
+
+def test_result_action_defined_on_subcommand_return_value():
+    """A subcommand's own result_action is honored when that subcommand is invoked.
+
+    The root app keeps the default action; only ``sub`` opts into ``return_value``. Regression
+    test for the #933 family: result_action was resolved from the root app's stack, which never
+    contains the subcommand, so the subcommand-level value was ignored.
+    """
+    app = App()  # root: default action
+
+    @app.command(result_action="return_value")
+    def sub() -> str:
+        return "from-sub"
+
+    assert app(["sub"]) == "from-sub"
+
+
+def test_result_action_subcommand_does_not_leak_to_sibling():
+    """A subcommand's result_action must not affect sibling commands (downward-only)."""
+    app = App()
+
+    @app.command(result_action="return_value")
+    def opts_in() -> str:
+        return "returned"
+
+    @app.command
+    def sibling() -> str:
+        return "printed"
+
+    assert app(["opts-in"]) == "returned"
+    # The sibling keeps the root default action (print + sys.exit), not return_value.
+    buf = StringIO()
+    with redirect_stdout(buf), pytest.raises(SystemExit):
+        app(["sibling"])
+    assert buf.getvalue() == "printed\n"
+
+
+def test_result_action_defined_on_subcommand_run_async():
+    """Subcommand result_action is honored via ``run_async`` too (#933 family)."""
+    import asyncio
+
+    app = App()
+
+    @app.command(result_action="return_value")
+    def sub() -> str:
+        return "async-sub"
+
+    assert asyncio.run(app.run_async(["sub"])) == "async-sub"

@@ -74,6 +74,12 @@ class AppStack:
                 meta_app.app_stack.stack.append(meta_subapps)
                 # Also push the overrides onto the meta app's stack
                 meta_app.app_stack.overrides_stack.append(overrides or {})
+        # Give the entry app (this AppStack's owner) visibility into the full invoked command
+        # chain, so command-scoped settings resolve to the deepest invoked command instead of
+        # only the entry app (#933). Without this, ``self.app_stack.resolve(...)`` at an entry
+        # point sees just ``[entry_app]`` and silently ignores subcommand-level settings.
+        if resolved_apps and resolved_apps[0] is self.stack[0][0]:
+            self.stack[-1] = so_far.copy()
         try:
             yield
         finally:
@@ -102,6 +108,11 @@ class AppStack:
     @property
     def default_parameter(self) -> Parameter:
         """default_parameter has special resolution since it needs to include the command groups in the derivation."""
+        # Unlike ``resolve`` (which scans only ``current_frame``), this must chain *all* frames:
+        # it combines every contribution rather than taking the closest, and it skips meta-parents
+        # with no ``_meta_parent`` walk -- so a root default_parameter reaches a nested-meta command
+        # only by being present in an earlier frame. Narrowing this to ``current_frame`` breaks
+        # ``test_nested_meta_app_inheriting_root_default_parameter``. See #933.
         cparams = []
         for child_app in chain.from_iterable(self.stack):
             if child_app._meta_parent:
@@ -142,8 +153,11 @@ class AppStack:
                 if value is not None:
                     return value
 
+        # Only the current (innermost) frame is consulted; it already holds the full invoked
+        # command chain (root -> ... -> command), so a re-entrant invocation of the same entry
+        # app can't leak an outer sibling's settings sideways through a leftover frame (#933).
         # `reversed` so that "closer" apps have higher priority.
-        for app in reversed(list(chain.from_iterable(self.stack))):
+        for app in reversed(self.current_frame):
             result = getattr(app, attribute)
             if result is not None:
                 return result
