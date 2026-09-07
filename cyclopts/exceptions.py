@@ -300,6 +300,15 @@ class UnknownOptionError(CycloptsError):
             yield ".", ""
 
         if keyword := self.token.keyword or self.token.value:
+            # A short cluster reaches here whole only when its first char is unknown
+            # (a typo'd ``-avb`` -> ``-xvb``, #932): name that char instead of a fuzzy
+            # ``Did you mean`` on a later flag.
+            if is_option_like(keyword) and not keyword.startswith("--") and len(keyword) > 2:
+                yield " ", ""
+                yield keyword[:2], STYLE_OFFENDING_VALUE
+                yield " is not a recognized option.", ""
+                return
+
             import difflib
 
             candidates = list(chain.from_iterable(x.names for x in self.argument_collection if x.parse))

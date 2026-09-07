@@ -202,6 +202,16 @@ def _parse_kw_and_flags(
                         if stop_at_first_unknown:
                             unused_tokens.extend(tokens[i:])
                             return unused_tokens, None
+                        if position == 0:
+                            # The first character isn't a known short option, so this
+                            # isn't a combined-short-option token: GNU-style groups are
+                            # parsed strictly left-to-right and must begin with a known
+                            # option. Bail out (leaving ``matches`` empty) so the token is
+                            # kept intact rather than scanning deeper for a later match --
+                            # e.g. a leading-hyphen positional value like ``-ojson`` must
+                            # not be exploded just because its trailing ``n`` matches
+                            # ``-n``. See issue #932.
+                            break
                         unmatched_flags.append(test_flag)
                         position += 1
 
