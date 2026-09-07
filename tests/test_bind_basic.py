@@ -1102,13 +1102,7 @@ def test_combined_short_known_first_flag_then_unknown_char(app):
 
 
 def test_combined_short_typo_first_flag_points_at_leading_char(app):
-    """A typo in the *first* flag of an intended combined short names the culprit.
-
-    ``-xvb`` (meant as ``-avb`` -> ``-a -v -b``) is kept intact by the #932 fix, so
-    it surfaces as a single unknown token. The error should point at the offending
-    leading ``-x`` rather than a coincidental ``Did you mean -v?`` on one of the
-    other intended flags.
-    """
+    """A typo in the first flag of a combined short (``-xvb``) names the leading ``-x``."""
 
     @app.command
     def build(
@@ -1128,11 +1122,7 @@ def test_combined_short_typo_first_flag_points_at_leading_char(app):
 
 
 def test_combined_short_typo_first_flag_with_value_taking_short(app):
-    """A value-taking short in the tail doesn't change the leading-char message.
-
-    In ``-xojson`` (meant ``-vojson`` -> ``-v -o json``), the message still points
-    at the unknown leading ``-x`` and never leaks the ``json`` attached value.
-    """
+    """A value-taking short in the tail (``-xojson``) still names ``-x``, never leaking ``json``."""
 
     @app.command
     def build(
@@ -1150,12 +1140,7 @@ def test_combined_short_typo_first_flag_with_value_taking_short(app):
 
 
 def test_combined_short_typo_mid_flag_reports_isolated_char(app):
-    """A typo *after* a known short still reports just the offending char.
-
-    ``-axb`` matches ``-a`` left-to-right then hits unknown ``-x``; that ``position
-    > 0`` path is untouched, so the error names ``-x`` alone and does not use the
-    leading-char cluster hint.
-    """
+    """A typo after a known short (``-axb``) still reports just ``-x``, not the whole token."""
 
     @app.command
     def build(
