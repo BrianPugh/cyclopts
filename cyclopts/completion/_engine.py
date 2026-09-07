@@ -9,7 +9,7 @@ its candidate values.
 
 import os
 import sys
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -55,9 +55,6 @@ def debug(message: str) -> None:
 #: of values and/or ``(value, description)`` tuples, or a ``{value: description}``
 #: mapping.
 CompletionResult = str | Iterable[str | tuple[str, str]] | Mapping[str, str]
-
-#: The signature of a :attr:`.Parameter.completer` callback.
-Completer = Callable[["CompletionContext"], "CompletionResult"]
 
 
 class Completion(NamedTuple):

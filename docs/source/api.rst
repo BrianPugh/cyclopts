@@ -2277,17 +2277,6 @@ See the :attr:`.Parameter.completer` documentation for usage.
 .. autoclass:: cyclopts.completion.ArgumentValue
    :members:
 
-.. py:data:: cyclopts.completion.Completer
-
-   Type alias for a :attr:`.Parameter.completer` callback: a callable taking a
-   single :class:`CompletionContext` and returning a :data:`CompletionResult`.
-
-.. py:data:: cyclopts.completion.CompletionResult
-
-   Type alias for what a completer may return: a single :class:`str`, an
-   iterable of :class:`str` values and/or ``(value, description)`` tuples, or a
-   ``{value: description}`` mapping.
-
 .. _API Validators:
 
 ----------

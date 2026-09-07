@@ -42,7 +42,7 @@ from cyclopts.utils import (
 )
 
 if TYPE_CHECKING:
-    from cyclopts.completion._engine import Completer
+    from cyclopts.completion._engine import CompletionContext
 
 ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
     {
@@ -267,7 +267,7 @@ class Parameter:
     # ``completer(context)`` (a ``CompletionContext``); may return a ``str``, an
     # iterable of ``str`` and/or ``(value, description)`` tuples, or a
     # ``{value: description}`` mapping.
-    completer: "Completer | None" = field(
+    completer: "Callable[[CompletionContext], Any] | None" = field(
         default=None,
         kw_only=True,
     )
