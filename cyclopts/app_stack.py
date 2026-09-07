@@ -108,6 +108,11 @@ class AppStack:
     @property
     def default_parameter(self) -> Parameter:
         """default_parameter has special resolution since it needs to include the command groups in the derivation."""
+        # Unlike ``resolve`` (which scans only ``current_frame``), this must chain *all* frames:
+        # it combines every contribution rather than taking the closest, and it skips meta-parents
+        # with no ``_meta_parent`` walk -- so a root default_parameter reaches a nested-meta command
+        # only by being present in an earlier frame. Narrowing this to ``current_frame`` breaks
+        # ``test_nested_meta_app_inheriting_root_default_parameter``. See #933.
         cparams = []
         for child_app in chain.from_iterable(self.stack):
             if child_app._meta_parent:
