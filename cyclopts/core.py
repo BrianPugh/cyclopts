@@ -2928,7 +2928,7 @@ class App:
             Shell prompt. Defaults to ``"$ "``.
         quit: str | Iterable[str]
             String or list of strings that will cause the shell to exit and this method to return.
-            Defaults to ``["q", "quit", "exit"]``.
+            Defaults to ``["q", "quit", "exit"]``. A registered command with the same name takes precedence.
         dispatcher: Dispatcher | None
             Optional function that subsequently invokes the command.
             The ``dispatcher`` function must have signature:
@@ -2954,16 +2954,18 @@ class App:
         error_console: Console | None
             Rich Console to use for error messages and tracebacks. If :obj:`None`, uses :attr:`App.error_console`.
         intro: str | None
-            Banner printed once when the shell starts. :obj:`None` prints nothing.
+            Banner printed once when the shell starts, verbatim (no Rich markup). :obj:`None` prints nothing.
         history_file: str | Path | None
-            File to load ``readline`` history from on entry and save it to on exit.
-            Created (along with parent directories) if it doesn't exist. Defaults to no persistence.
+            File to load ``readline`` history from on entry and save it to on exit. ``~`` is expanded.
+            Created (along with parent directories) if it doesn't exist; read/write errors are ignored.
+            Defaults to no persistence.
         remap_flags: bool
             Treat a bare long-flag word directly after the command chain as that flag, so
             ``help`` and ``foo help`` behave like ``--help`` and ``foo --help`` (likewise for
             ``version``). Short flags are not remapped. The word is left alone if it names a
             registered command or a parameter of the resolved command declares the flag itself.
-            Defaults to :obj:`True`.
+            A positional parameter that should receive the literal value ``help`` must be passed by
+            keyword (``foo --p1 help``), or set this to :obj:`False`. Defaults to :obj:`True`.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
@@ -3001,14 +3003,18 @@ class App:
         # new text is typed, so an interrupted buffer equal to the last seen line means the
         # line was actually empty. GNU readline reports "" directly.
         previous_line = ""
-        history_path = Path(history_file) if readline and history_file else None
-        if history_path:
-            with suppress(FileNotFoundError):
-                readline.read_history_file(history_path)  # pyright: ignore[reportOptionalMemberAccess]
+        history_path = Path(history_file).expanduser() if history_file else None
+        if readline and history_path:
+            # History is process-global; start from the file alone so re-entering the shell
+            # doesn't duplicate entries and unrelated ``input()`` calls don't leak in.
+            readline.clear_history()  # pyright: ignore[reportAttributeAccessIssue]
+            # libedit raises PermissionError (not FileNotFoundError) on its own header-only files.
+            with suppress(OSError):
+                readline.read_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
         try:
             with self.app_stack([], overrides):
                 if intro is not None:
-                    self.console.print(intro)
+                    self.console.print(intro, markup=False, highlight=False)
                 while True:
                     try:
                         user_input = input(prompt)
@@ -3033,7 +3039,7 @@ class App:
                         continue
                     if not tokens:
                         continue
-                    if tokens[0] in quit:
+                    if tokens[0] in quit and tokens[0] not in self:
                         break
 
                     # Keep the exception handlers inside the token ``app_stack`` context so that
@@ -3058,9 +3064,11 @@ class App:
                                 traceback.format_exc(), markup=False, highlight=False, soft_wrap=True
                             )
         finally:
-            if history_path:
-                history_path.parent.mkdir(parents=True, exist_ok=True)
-                readline.write_history_file(history_path)  # pyright: ignore[reportOptionalMemberAccess]
+            if readline and history_path:
+                # An unwritable history location must not turn a clean exit into a traceback.
+                with suppress(OSError):
+                    history_path.parent.mkdir(parents=True, exist_ok=True)
+                    readline.write_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
 
     def _remap_bare_flags(self, tokens: list[str]) -> list[str]:
         """Rewrite a bare long-flag word directly after the command chain into the flag (``help`` -> ``--help``).

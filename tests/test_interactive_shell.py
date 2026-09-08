@@ -1,6 +1,18 @@
+import sys
+from pathlib import Path
+
 import pytest
 
 from cyclopts import App
+from cyclopts.core import DEFAULT_SHELL_INTRO
+
+
+@pytest.fixture
+def readline(mocker):
+    """Stand-in for ``readline``, which does not exist on Windows."""
+    mock = mocker.MagicMock()
+    mocker.patch.dict(sys.modules, {"readline": mock})
+    return mock
 
 
 def test_interactive_shell(app, mocker, console):
@@ -334,10 +346,10 @@ def test_interactive_shell_unbalanced_quote(app, mocker, console):
     )
 
 
-def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
+def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker, readline):
     """Ctrl-C with text on the line should discard the line, not exit the shell."""
     mocker.patch("builtins.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
-    mocker.patch("readline.get_line_buffer", return_value="foo 5")
+    readline.get_line_buffer.return_value = "foo 5"
 
     calls = []
 
@@ -350,9 +362,9 @@ def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
     assert calls == [1]
 
 
-def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker):
+def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker, readline):
     mock_input = mocker.patch("builtins.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
-    mocker.patch("readline.get_line_buffer", return_value="")
+    readline.get_line_buffer.return_value = ""
 
     calls = []
 
@@ -366,10 +378,10 @@ def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker):
     assert mock_input.call_count == 1
 
 
-def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interrupt(app, mocker):
+def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interrupt(app, mocker, readline):
     """Libedit reports the previous line until new text is typed; a repeat means the line was empty."""
     mock_input = mocker.patch("builtins.input", side_effect=["foo 1", KeyboardInterrupt(), KeyboardInterrupt(), "quit"])
-    mocker.patch("readline.get_line_buffer", side_effect=["foo 2", "foo 2"])
+    readline.get_line_buffer.side_effect = ["foo 2", "foo 2"]
 
     calls = []
 
@@ -383,9 +395,9 @@ def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interru
     assert mock_input.call_count == 3
 
 
-def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(app, mocker):
+def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(app, mocker, readline):
     mock_input = mocker.patch("builtins.input", side_effect=["foo 1", KeyboardInterrupt(), "quit"])
-    mocker.patch("readline.get_line_buffer", return_value="foo 1\n")
+    readline.get_line_buffer.return_value = "foo 1\n"
 
     calls = []
 
@@ -479,7 +491,7 @@ def test_interactive_shell_intro_default(app, mocker, console):
     with console.capture() as capture:
         app.interactive_shell(console=console)
 
-    assert capture.get() == "Interactive shell. Press Ctrl-D to exit.\n"
+    assert capture.get() == DEFAULT_SHELL_INTRO + "\n"
 
 
 def test_interactive_shell_intro_custom(app, mocker, console):
@@ -500,34 +512,47 @@ def test_interactive_shell_intro_none(app, mocker, console):
     assert capture.get() == ""
 
 
-def test_interactive_shell_history_file(app, mocker, tmp_path):
+def test_interactive_shell_history_file(app, mocker, tmp_path, readline):
     mocker.patch("builtins.input", side_effect=["quit"])
-    read = mocker.patch("readline.read_history_file")
-    write = mocker.patch("readline.write_history_file")
     history_file = tmp_path / "nested" / "history"
 
     app.interactive_shell(history_file=str(history_file))
 
-    read.assert_called_once_with(history_file)
-    write.assert_called_once_with(history_file)
+    readline.clear_history.assert_called_once_with()
+    readline.read_history_file.assert_called_once_with(history_file)
+    readline.write_history_file.assert_called_once_with(history_file)
     assert history_file.parent.is_dir()
 
 
-def test_interactive_shell_history_file_missing(app, mocker, tmp_path):
-    """A missing history file is normal on first run and must not be an error."""
+def test_interactive_shell_history_file_expands_user(app, mocker, readline):
     mocker.patch("builtins.input", side_effect=["quit"])
-    mocker.patch("readline.read_history_file", side_effect=FileNotFoundError)
-    write = mocker.patch("readline.write_history_file")
+    mocker.patch("pathlib.Path.mkdir")
 
-    app.interactive_shell(history_file=tmp_path / "history")
+    app.interactive_shell(history_file="~/.myapp_history")
 
-    write.assert_called_once()
+    readline.write_history_file.assert_called_once_with(Path.home() / ".myapp_history")
 
 
-def test_interactive_shell_history_file_written_on_exception(mocker, tmp_path):
+@pytest.mark.parametrize("error", [FileNotFoundError, PermissionError])
+def test_interactive_shell_history_file_read_error_ignored(app, mocker, readline, error):
+    """Missing file on first run, or libedit's PermissionError on a header-only file."""
+    mocker.patch("builtins.input", side_effect=["quit"])
+    readline.read_history_file.side_effect = error
+
+    app.interactive_shell(history_file="history")
+
+    readline.write_history_file.assert_called_once()
+
+
+def test_interactive_shell_history_file_write_error_ignored(app, mocker, readline):
+    mocker.patch("builtins.input", side_effect=["quit"])
+    readline.write_history_file.side_effect = PermissionError
+
+    app.interactive_shell(history_file="history")
+
+
+def test_interactive_shell_history_file_written_on_exception(mocker, readline):
     mocker.patch("builtins.input", side_effect=["foo"])
-    mocker.patch("readline.read_history_file")
-    write = mocker.patch("readline.write_history_file")
     app = App(suppress_keyboard_interrupt=False)
 
     @app.command
@@ -535,9 +560,31 @@ def test_interactive_shell_history_file_written_on_exception(mocker, tmp_path):
         raise KeyboardInterrupt
 
     with pytest.raises(KeyboardInterrupt):
-        app.interactive_shell(history_file=tmp_path / "history")
+        app.interactive_shell(history_file="history")
 
-    write.assert_called_once()
+    readline.write_history_file.assert_called_once()
+
+
+def test_interactive_shell_intro_not_markup(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="Type [help] or [q]")
+
+    assert capture.get() == "Type [help] or [q]\n"
+
+
+def test_interactive_shell_quit_word_user_command_wins(app, mocker):
+    mock_input = mocker.patch("builtins.input", side_effect=["exit", "quit"])
+    calls = []
+
+    @app.command
+    def exit():
+        calls.append("exit")
+
+    app.interactive_shell(intro=None)
+    assert calls == ["exit"]
+    assert mock_input.call_count == 2
 
 
 def test_interactive_shell_remap_help_root(app, mocker, console):
