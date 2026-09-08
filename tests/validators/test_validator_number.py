@@ -67,6 +67,39 @@ def test_validator_number_gte():
         validator(int, 4)
 
 
+@pytest.mark.parametrize(
+    "validator, message",
+    [
+        (Number(lt=0), "Must be < 0."),
+        (Number(lte=0), "Must be <= 0."),
+        (Number(gt=0), "Must be > 0."),
+        (Number(gte=0), "Must be >= 0."),
+    ],
+)
+@pytest.mark.parametrize(
+    "value",
+    [float("nan"), [float("nan")], {"value": [float("nan")]}],
+    ids=["scalar", "list", "nested_mapping"],
+)
+def test_validator_number_nan(validator, message, value):
+    with pytest.raises(ValueError) as exc_info:
+        validator(float, value)
+    assert str(exc_info.value) == message
+
+
+@pytest.mark.parametrize(
+    "validator, value",
+    [
+        (Number(lt=0), float("-inf")),
+        (Number(lte=0), float("-inf")),
+        (Number(gt=0), float("inf")),
+        (Number(gte=0), float("inf")),
+    ],
+)
+def test_validator_number_infinity(validator, value):
+    validator(float, value)
+
+
 def test_validator_number_modulo():
     validator = Number(modulo=4)
     validator(int, 8)

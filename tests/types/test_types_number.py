@@ -9,8 +9,12 @@ from cyclopts.types import (
     HexUInt16,
     HexUInt32,
     HexUInt64,
+    NegativeFloat,
+    NonNegativeFloat,
+    NonPositiveFloat,
     NormFloat,
     PercentInt,
+    PositiveFloat,
     SignedNormFloat,
     UInt8,
 )
@@ -132,6 +136,15 @@ def test_signed_norm_float(app, assert_parse_args):
         app.parse_args("-- -1.1", exit_on_error=False)
     with pytest.raises(ValidationError):
         app.parse_args("1.1", exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "type_hint",
+    [PositiveFloat, NonNegativeFloat, NegativeFloat, NonPositiveFloat, NormFloat, SignedNormFloat],
+)
+def test_float_range_rejects_nan(convert, type_hint):
+    with pytest.raises(ValidationError, match="Must be"):
+        convert(type_hint, "nan")
 
 
 def test_percent_int(app, assert_parse_args):

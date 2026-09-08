@@ -69,16 +69,17 @@ class Number:
             if not isinstance(value, int | float):
                 return
 
-            if self.lt is not None and value >= self.lt:
+            # Negate the required comparison so NaN cannot bypass a bound.
+            if self.lt is not None and not value < self.lt:
                 raise ValueError(f"Must be < {self.lt}.")
 
-            if self.lte is not None and value > self.lte:
+            if self.lte is not None and not value <= self.lte:
                 raise ValueError(f"Must be <= {self.lte}.")
 
-            if self.gt is not None and value <= self.gt:
+            if self.gt is not None and not value > self.gt:
                 raise ValueError(f"Must be > {self.gt}.")
 
-            if self.gte is not None and value < self.gte:
+            if self.gte is not None and not value >= self.gte:
                 raise ValueError(f"Must be >= {self.gte}.")
 
             if self.modulo is not None and value % self.modulo:
