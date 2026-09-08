@@ -495,6 +495,15 @@ def test_interactive_shell_intro_default(app, mocker, console):
     assert capture.get() == DEFAULT_SHELL_INTRO + "\n"
 
 
+def test_interactive_shell_intro_empty_prints_nothing(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="")
+
+    assert capture.get() == ""
+
+
 def test_interactive_shell_intro_custom(app, mocker, console):
     mocker.patch("builtins.input", side_effect=["quit"])
 
@@ -508,7 +517,7 @@ def test_interactive_shell_intro_none(app, mocker, console):
     mocker.patch("builtins.input", side_effect=["quit"])
 
     with console.capture() as capture:
-        app.interactive_shell(console=console, intro=None)
+        app.interactive_shell(console=console, intro="")
 
     assert capture.get() == ""
 
@@ -583,7 +592,7 @@ def test_interactive_shell_quit_word_user_command_wins(app, mocker):
     def exit():
         calls.append("exit")
 
-    app.interactive_shell(intro=None)
+    app.interactive_shell(intro="")
     assert calls == ["exit"]
     assert mock_input.call_count == 2
 
@@ -596,7 +605,7 @@ def test_interactive_shell_remap_help_root(app, mocker, console):
         """Foo docstring."""
 
     with console.capture() as capture:
-        app.interactive_shell(console=console, intro=None)
+        app.interactive_shell(console=console, intro="")
 
     actual = capture.get()
     assert "Usage:" in actual
@@ -612,7 +621,7 @@ def test_interactive_shell_remap_subcommand_not_remapped(app, mocker):
     def foo(a: str):
         calls.append(a)
 
-    app.interactive_shell(intro=None)
+    app.interactive_shell(intro="")
     assert calls == ["help"]
 
 
@@ -621,7 +630,7 @@ def test_interactive_shell_remap_version(mocker, console):
     app = App(version="1.2.3")
 
     with console.capture() as capture:
-        app.interactive_shell(console=console, intro=None)
+        app.interactive_shell(console=console, intro="")
 
     assert capture.get() == "1.2.3\n"
 
@@ -634,7 +643,7 @@ def test_interactive_shell_remap_user_command_wins(app, mocker):
     def help():
         calls.append("help")
 
-    app.interactive_shell(intro=None)
+    app.interactive_shell(intro="")
     assert calls == ["help"]
 
 
@@ -647,7 +656,7 @@ def test_interactive_shell_remap_shadowed_by_parameter(app, mocker):
     def main(help: str):
         calls.append(help)
 
-    app.interactive_shell(intro=None)
+    app.interactive_shell(intro="")
     assert calls == ["help"]
 
 
@@ -659,7 +668,7 @@ def test_interactive_shell_remap_only_first_token(app, mocker):
     def main(a: int, b: str):
         calls.append((a, b))
 
-    app.interactive_shell(intro=None)
+    app.interactive_shell(intro="")
     assert calls == [(1, "help")]
 
 
@@ -671,7 +680,7 @@ def test_interactive_shell_remap_short_flag_not_remapped(app, mocker, console):
         pass
 
     with console.capture() as capture:
-        app.interactive_shell(error_console=console, intro=None)
+        app.interactive_shell(error_console=console, intro="")
 
     assert 'Unknown command "h"' in capture.get()
 
@@ -684,7 +693,7 @@ def test_interactive_shell_remap_disabled(app, mocker, console):
         pass
 
     with console.capture() as capture:
-        app.interactive_shell(error_console=console, intro=None, remap_flags=False)
+        app.interactive_shell(error_console=console, intro="", remap_flags=False)
 
     assert 'Unknown command "help"' in capture.get()
 
@@ -703,7 +712,7 @@ def test_interactive_shell_remap_help_panel_lists_bare_words(mocker, console):
         """Bar docstring."""
 
     with console.capture() as capture:
-        app.interactive_shell(console=console, intro=None)
+        app.interactive_shell(console=console, intro="")
 
     assert capture.get() == textwrap.dedent(
         """\
@@ -727,7 +736,7 @@ def test_interactive_shell_remap_help_panel_user_command_not_aliased(app, mocker
         """User help."""
 
     with console.capture() as capture:
-        app.interactive_shell(console=console, intro=None)
+        app.interactive_shell(console=console, intro="")
 
     actual = capture.get()
     assert "User help." in actual
@@ -740,7 +749,7 @@ def test_interactive_shell_remap_disabled_help_panel_unchanged(app, mocker, cons
     mocker.patch("builtins.input", side_effect=["--help", "quit"])
 
     with console.capture() as capture:
-        app.interactive_shell(console=console, intro=None, remap_flags=False)
+        app.interactive_shell(console=console, intro="", remap_flags=False)
 
     actual = capture.get()
     assert "--help (-h)" in actual
@@ -758,7 +767,7 @@ def test_interactive_shell_remap_help_panel_subcommand_unchanged(app, mocker, co
         pass
 
     with console.capture() as capture:
-        app.interactive_shell(console=console, intro=None)
+        app.interactive_shell(console=console, intro="")
 
     actual = capture.get()
     assert "│ bar" in actual
@@ -773,7 +782,7 @@ def test_interactive_shell_meta_command_wins_over_quit(app, mocker):
     def exit():
         calls.append("exit")
 
-    app.interactive_shell(intro=None)
+    app.interactive_shell(intro="")
     assert calls == ["exit"]
 
 
@@ -785,7 +794,7 @@ def test_interactive_shell_remap_meta_command_wins(app, mocker):
     def help():
         calls.append("help")
 
-    app.interactive_shell(intro=None)
+    app.interactive_shell(intro="")
     assert calls == ["help"]
 
 
@@ -794,7 +803,7 @@ def test_interactive_shell_remap_help_panel_all_long_aliases(mocker, console):
     app = App(name="app", help_flags=["--help", "--usage", "-h"])
 
     with console.capture() as capture:
-        app.interactive_shell(console=console, intro=None)
+        app.interactive_shell(console=console, intro="")
 
     actual = capture.get()
     assert "help (usage, --help," in actual

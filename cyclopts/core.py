@@ -2918,7 +2918,7 @@ class App:
         exit_on_error: bool = False,
         result_action: ResultAction | None = None,
         error_console: "Console | None" = None,
-        intro: str | None = DEFAULT_SHELL_INTRO,
+        intro: str | None = None,
         history_file: str | Path | None = None,
         remap_flags: bool = True,
         **kwargs,
@@ -2962,7 +2962,8 @@ class App:
         error_console: Console | None
             Rich Console to use for error messages and tracebacks. If :obj:`None`, uses :attr:`App.error_console`.
         intro: str | None
-            Banner printed once when the shell starts, verbatim (no Rich markup). :obj:`None` prints nothing.
+            Banner printed once when the shell starts, verbatim (no Rich markup).
+            :obj:`None` uses a default banner; an empty string prints nothing.
         history_file: str | Path | None
             File to load ``readline`` history from on entry and save it to on exit. ``~`` is expanded.
             Created (along with parent directories) if it doesn't exist; read/write errors are ignored.
@@ -3020,7 +3021,9 @@ class App:
                 readline.read_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
         try:
             with self.app_stack([], overrides):
-                if intro is not None:
+                if intro is None:
+                    intro = DEFAULT_SHELL_INTRO
+                if intro:
                     self.console.print(intro, markup=False, highlight=False)
                 while True:
                     try:
