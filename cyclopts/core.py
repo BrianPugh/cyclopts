@@ -66,13 +66,6 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
-try:
-    # By importing, makes things like the arrow-keys work.
-    import readline
-except ImportError:  # pragma: no cover
-    # Not available on windows
-    readline = None
-
 if TYPE_CHECKING:
     from rich.console import Console
     from rich.tree import Tree
@@ -2905,6 +2898,7 @@ class App:
     def interactive_shell(
         self,
         prompt: str = "$ ",
+        *,
         quit: None | str | Iterable[str] = None,
         dispatcher: Dispatcher | None = None,
         console: "Console | None" = None,
@@ -2954,6 +2948,15 @@ class App:
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
+        try:
+            # Makes arrow keys and history work. Imported here rather than at module level
+            # because ``readline`` alters ``input()`` process-wide and costs startup time;
+            # programs that never open a shell should not pay for it.
+            import readline
+        except ImportError:  # pragma: no cover
+            # Not available on windows
+            readline = None
+
         if os.name == "posix":  # pragma: no cover
             # Mac/Linux
             print("Interactive shell. Press Ctrl-D to exit.")
