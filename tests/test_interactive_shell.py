@@ -460,3 +460,81 @@ def test_interactive_shell_subcommand_error_console(mocker, console):
         root.interactive_shell()
 
     assert "Error" in capture.get()
+
+
+def test_interactive_shell_exit_word(app, mocker):
+    mock_input = mocker.patch("builtins.input", side_effect=["exit", "foo"])
+
+    @app.command
+    def foo():
+        pass
+
+    app.interactive_shell()
+    assert mock_input.call_count == 1
+
+
+def test_interactive_shell_intro_default(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console)
+
+    assert capture.get() == "Interactive shell. Press Ctrl-D to exit.\n"
+
+
+def test_interactive_shell_intro_custom(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="Welcome!")
+
+    assert capture.get() == "Welcome!\n"
+
+
+def test_interactive_shell_intro_none(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=None)
+
+    assert capture.get() == ""
+
+
+def test_interactive_shell_history_file(app, mocker, tmp_path):
+    mocker.patch("builtins.input", side_effect=["quit"])
+    read = mocker.patch("readline.read_history_file")
+    write = mocker.patch("readline.write_history_file")
+    history_file = tmp_path / "nested" / "history"
+
+    app.interactive_shell(history_file=str(history_file))
+
+    read.assert_called_once_with(history_file)
+    write.assert_called_once_with(history_file)
+    assert history_file.parent.is_dir()
+
+
+def test_interactive_shell_history_file_missing(app, mocker, tmp_path):
+    """A missing history file is normal on first run and must not be an error."""
+    mocker.patch("builtins.input", side_effect=["quit"])
+    mocker.patch("readline.read_history_file", side_effect=FileNotFoundError)
+    write = mocker.patch("readline.write_history_file")
+
+    app.interactive_shell(history_file=tmp_path / "history")
+
+    write.assert_called_once()
+
+
+def test_interactive_shell_history_file_written_on_exception(mocker, tmp_path):
+    mocker.patch("builtins.input", side_effect=["foo"])
+    mocker.patch("readline.read_history_file")
+    write = mocker.patch("readline.write_history_file")
+    app = App(suppress_keyboard_interrupt=False)
+
+    @app.command
+    def foo():
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        app.interactive_shell(history_file=tmp_path / "history")
+
+    write.assert_called_once()

@@ -81,6 +81,11 @@ T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
 DEFAULT_FORMAT = "markdown"
+DEFAULT_SHELL_INTRO = (
+    "Interactive shell. Press Ctrl-D to exit."
+    if os.name == "posix"
+    else "Interactive shell. Press Ctrl-Z followed by Enter to exit."
+)
 
 
 def _result_action_converter(
@@ -2905,6 +2910,8 @@ class App:
         exit_on_error: bool = False,
         result_action: ResultAction | None = None,
         error_console: "Console | None" = None,
+        intro: str | None = DEFAULT_SHELL_INTRO,
+        history_file: str | Path | None = None,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
@@ -2920,7 +2927,7 @@ class App:
             Shell prompt. Defaults to ``"$ "``.
         quit: str | Iterable[str]
             String or list of strings that will cause the shell to exit and this method to return.
-            Defaults to ``["q", "quit"]``.
+            Defaults to ``["q", "quit", "exit"]``.
         dispatcher: Dispatcher | None
             Optional function that subsequently invokes the command.
             The ``dispatcher`` function must have signature:
@@ -2945,6 +2952,11 @@ class App:
             If :obj:`None`, inherits from :attr:`App.result_action`.
         error_console: Console | None
             Rich Console to use for error messages and tracebacks. If :obj:`None`, uses :attr:`App.error_console`.
+        intro: str | None
+            Banner printed once when the shell starts. :obj:`None` prints nothing.
+        history_file: str | Path | None
+            File to load ``readline`` history from on entry and save it to on exit.
+            Created (along with parent directories) if it doesn't exist. Defaults to no persistence.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
@@ -2957,15 +2969,8 @@ class App:
             # Not available on windows
             readline = None
 
-        if os.name == "posix":  # pragma: no cover
-            # Mac/Linux
-            print("Interactive shell. Press Ctrl-D to exit.")
-        else:  # pragma: no cover
-            # Windows
-            print("Interactive shell. Press Ctrl-Z followed by Enter to exit.")
-
         if quit is None:
-            quit = ["q", "quit"]
+            quit = ["q", "quit", "exit"]
         if isinstance(quit, str):
             quit = [quit]
 
@@ -2989,51 +2994,64 @@ class App:
         # new text is typed, so an interrupted buffer equal to the last seen line means the
         # line was actually empty. GNU readline reports "" directly.
         previous_line = ""
-        with self.app_stack([], overrides):
-            while True:
-                try:
-                    user_input = input(prompt)
-                except EOFError:  # pragma: no cover
-                    break
-                except KeyboardInterrupt:
-                    print()
-                    # typeshed guards ``get_line_buffer`` behind ``sys.platform != "win32"``;
-                    # ``readline`` is ``None`` on Windows anyway, so this branch never runs there.
-                    line_buffer = readline.get_line_buffer() if readline else ""  # pyright: ignore[reportAttributeAccessIssue]
-                    if line_buffer in ("", previous_line):
-                        break
-                    previous_line = line_buffer
-                    continue
-                previous_line = user_input + "\n"
-
-                try:
-                    tokens = self._normalize_tokens(user_input)
-                except CycloptsError:
-                    # ``_normalize_tokens`` already reported the error (respecting
-                    # ``exit_on_error``); keep the shell running.
-                    continue
-                if not tokens:
-                    continue
-                if tokens[0] in quit:
-                    break
-
-                # Keep the exception handlers inside the token ``app_stack`` context so that
-                # context-sensitive settings (e.g. ``error_console``) resolve from the invoked
-                # subcommand rather than the root app.
-                with self.app_stack(tokens):
+        history_path = Path(history_file) if readline and history_file else None
+        if history_path:
+            with suppress(FileNotFoundError):
+                readline.read_history_file(history_path)  # pyright: ignore[reportOptionalMemberAccess]
+        try:
+            with self.app_stack([], overrides):
+                if intro is not None:
+                    self.console.print(intro)
+                while True:
                     try:
-                        command, bound, ignored = self.parse_args(tokens, **kwargs)
-                        result = dispatcher(command, bound, ignored)
-                        self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
-                    except CycloptsError:
-                        # Upstream ``parse_args`` already printed the error
-                        pass
+                        user_input = input(prompt)
+                    except EOFError:  # pragma: no cover
+                        break
                     except KeyboardInterrupt:
-                        if not self.suppress_keyboard_interrupt:
-                            raise
                         print()
-                    except Exception:
-                        self.error_console.print(traceback.format_exc(), markup=False, highlight=False, soft_wrap=True)
+                        # typeshed guards ``get_line_buffer`` behind ``sys.platform != "win32"``;
+                        # ``readline`` is ``None`` on Windows anyway, so this branch never runs there.
+                        line_buffer = readline.get_line_buffer() if readline else ""  # pyright: ignore[reportAttributeAccessIssue]
+                        if line_buffer in ("", previous_line):
+                            break
+                        previous_line = line_buffer
+                        continue
+                    previous_line = user_input + "\n"
+
+                    try:
+                        tokens = self._normalize_tokens(user_input)
+                    except CycloptsError:
+                        # ``_normalize_tokens`` already reported the error (respecting
+                        # ``exit_on_error``); keep the shell running.
+                        continue
+                    if not tokens:
+                        continue
+                    if tokens[0] in quit:
+                        break
+
+                    # Keep the exception handlers inside the token ``app_stack`` context so that
+                    # context-sensitive settings (e.g. ``error_console``) resolve from the invoked
+                    # subcommand rather than the root app.
+                    with self.app_stack(tokens):
+                        try:
+                            command, bound, ignored = self.parse_args(tokens, **kwargs)
+                            result = dispatcher(command, bound, ignored)
+                            self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
+                        except CycloptsError:
+                            # Upstream ``parse_args`` already printed the error
+                            pass
+                        except KeyboardInterrupt:
+                            if not self.suppress_keyboard_interrupt:
+                                raise
+                            print()
+                        except Exception:
+                            self.error_console.print(
+                                traceback.format_exc(), markup=False, highlight=False, soft_wrap=True
+                            )
+        finally:
+            if history_path:
+                history_path.parent.mkdir(parents=True, exist_ok=True)
+                readline.write_history_file(history_path)  # pyright: ignore[reportOptionalMemberAccess]
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.
