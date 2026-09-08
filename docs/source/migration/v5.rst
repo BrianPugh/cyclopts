@@ -387,6 +387,24 @@ default. It is now equivalent to ``--no-description``.
    # v5: myapp
    #     └── greet
 
+``App.interactive_shell``: Keyword-Only Options; ``readline`` No Longer Imported Eagerly
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** callers passing :meth:`.App.interactive_shell` options positionally, and
+programs that relied on ``import cyclopts`` loading ``readline`` as a side effect.
+
+Every parameter after ``prompt`` is now keyword-only, matching the other ``App`` methods:
+
+.. code-block:: python
+
+   # v4
+   app.interactive_shell("$ ", ["q", "quit", "exit"])
+   # v5
+   app.interactive_shell("$ ", quit=["q", "quit", "exit"])
+
+``readline`` is now imported when the shell starts rather than when cyclopts is imported.
+This shaves CLI startup time and stops cyclopts from altering :func:`input` in programs that
+never open a shell. If you depended on that side effect, ``import readline`` yourself.
+
 Help Metadata Colors Changed; Colors Are Now Themeable
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 **Affects:** the appearance of the default help page, not behavior.
