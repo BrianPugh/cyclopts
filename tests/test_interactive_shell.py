@@ -538,3 +538,106 @@ def test_interactive_shell_history_file_written_on_exception(mocker, tmp_path):
         app.interactive_shell(history_file=tmp_path / "history")
 
     write.assert_called_once()
+
+
+def test_interactive_shell_remap_help_root(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+
+    @app.command
+    def foo(a: int):
+        """Foo docstring."""
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=None)
+
+    actual = capture.get()
+    assert "Usage:" in actual
+    assert "Foo docstring." in actual
+
+
+def test_interactive_shell_remap_help_subcommand(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["foo help", "quit"])
+
+    @app.command
+    def foo(a: int):
+        """Foo docstring."""
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=None)
+
+    actual = capture.get()
+    assert "Foo docstring." in actual
+    assert "--a" in actual
+
+
+def test_interactive_shell_remap_version(mocker, console):
+    mocker.patch("builtins.input", side_effect=["version", "quit"])
+    app = App(version="1.2.3")
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=None)
+
+    assert capture.get() == "1.2.3\n"
+
+
+def test_interactive_shell_remap_user_command_wins(app, mocker):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+    calls = []
+
+    @app.command
+    def help():
+        calls.append("help")
+
+    app.interactive_shell(intro=None)
+    assert calls == ["help"]
+
+
+def test_interactive_shell_remap_shadowed_by_parameter(app, mocker):
+    """A command whose own parameter claims ``--help`` receives the bare word as data."""
+    mocker.patch("builtins.input", side_effect=["foo help", "quit"])
+    calls = []
+
+    @app.command
+    def foo(help: str):
+        calls.append(help)
+
+    app.interactive_shell(intro=None)
+    assert calls == ["help"]
+
+
+def test_interactive_shell_remap_only_first_leftover_token(app, mocker):
+    mocker.patch("builtins.input", side_effect=["foo 1 help", "quit"])
+    calls = []
+
+    @app.command
+    def foo(a: int, b: str):
+        calls.append((a, b))
+
+    app.interactive_shell(intro=None)
+    assert calls == [(1, "help")]
+
+
+def test_interactive_shell_remap_short_flag_not_remapped(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["h", "quit"])
+
+    @app.command
+    def foo():
+        pass
+
+    with console.capture() as capture:
+        app.interactive_shell(error_console=console, intro=None)
+
+    assert 'Unknown command "h"' in capture.get()
+
+
+def test_interactive_shell_remap_disabled(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+
+    @app.command
+    def foo():
+        pass
+
+    with console.capture() as capture:
+        app.interactive_shell(error_console=console, intro=None, remap_flags=False)
+
+    assert 'Unknown command "help"' in capture.get()

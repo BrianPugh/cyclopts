@@ -46,41 +46,10 @@ To make the application still work as-expected from the CLI, it is more appropri
    if __name__ == "__main__":
        app()  # Don't call ``app.interactive_shell()`` here.
 
-Special flags like ``--help`` and ``--version`` work in the shell, but could be a bit awkward for the root-help:
-
-.. code-block:: console
-
-   $ python interactive-shell-demo.py
-   Interactive shell. Press Ctrl-D to exit.
-   cyclopts> --help
-   Usage: interactive-shell-demo.py COMMAND
-
-   ╭─ Parameters ──────────────────────────────────────────────────╮
-   │ --version      Display application version.                   │
-   │ --help     -h  Display this message and exit.                 │
-   ╰───────────────────────────────────────────────────────────────╯
-   ╭─ Commands ────────────────────────────────────────────────────╮
-   │ bar  Bar Docstring.                                           │
-   │ foo  Foo Docstring.                                           │
-   ╰───────────────────────────────────────────────────────────────╯
-   cyclopts> foo --help
-   Usage: interactive-shell-demo.py foo [ARGS] [OPTIONS]
-
-   Foo Docstring
-
-   ╭─ Parameters ──────────────────────────────────────────────────╮
-   │ *  P1,--p1  Foo's first parameter. [required]                 │
-   ╰───────────────────────────────────────────────────────────────╯
-   cyclopts>
-
-To resolve this, we can explicitly add a ``help`` command:
-
-.. code-block:: python
-
-   @app.command
-   def help():
-       """Display the help screen."""
-       app.help_print()
+Special flags like ``--help`` and ``--version`` work in the shell. Because typing dashes is
+awkward at a prompt, the bare words ``help`` and ``version`` are also accepted when they directly
+follow a command chain (see ``remap_flags`` on :meth:`.App.interactive_shell`). A user-defined
+``help`` command, or a command parameter named ``help``, takes precedence over the remap.
 
 .. code-block:: console
 
@@ -89,12 +58,21 @@ To resolve this, we can explicitly add a ``help`` command:
    cyclopts> help
    Usage: interactive-shell-demo.py COMMAND
 
-   ╭─ Parameters ──────────────────────────────────────────────────╮
-   │ --version      Display application version.                   │
-   │ --help     -h  Display this message and exit.                 │
-   ╰───────────────────────────────────────────────────────────────╯
-   ╭─ Commands ────────────────────────────────────────────────────╮
-   │ bar   Bar Docstring.                                          │
-   │ foo   Foo Docstring.                                          │
-   │ help  Display the help screen.                                │
-   ╰───────────────────────────────────────────────────────────────╯
+   ╭─ Commands ───────────────────────────────────────────────────╮
+   │ bar          Bar Docstring.                                  │
+   │ foo          Foo Docstring.                                  │
+   │ --help (-h)  Display this message and exit.                  │
+   │ --version    Display application version.                    │
+   ╰──────────────────────────────────────────────────────────────╯
+   cyclopts> foo help
+   Usage: interactive-shell-demo.py foo P1
+
+   Foo Docstring.
+
+   ╭─ Parameters ─────────────────────────────────────────────────╮
+   │ *  P1 --p1  Foo's first parameter. [required]                │
+   ╰──────────────────────────────────────────────────────────────╯
+   cyclopts> exit
+
+Type ``q``, ``quit``, or ``exit`` (or press Ctrl-D) to leave the shell. Pass ``history_file`` to
+persist command history between sessions.

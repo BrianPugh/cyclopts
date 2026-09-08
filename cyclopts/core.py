@@ -2912,6 +2912,7 @@ class App:
         error_console: "Console | None" = None,
         intro: str | None = DEFAULT_SHELL_INTRO,
         history_file: str | Path | None = None,
+        remap_flags: bool = True,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
@@ -2957,6 +2958,12 @@ class App:
         history_file: str | Path | None
             File to load ``readline`` history from on entry and save it to on exit.
             Created (along with parent directories) if it doesn't exist. Defaults to no persistence.
+        remap_flags: bool
+            Treat a bare long-flag word directly after the command chain as that flag, so
+            ``help`` and ``foo help`` behave like ``--help`` and ``foo --help`` (likewise for
+            ``version``). Short flags are not remapped. The word is left alone if it names a
+            registered command or a parameter of the resolved command declares the flag itself.
+            Defaults to :obj:`True`.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
@@ -3034,6 +3041,8 @@ class App:
                     # subcommand rather than the root app.
                     with self.app_stack(tokens):
                         try:
+                            if remap_flags:
+                                tokens = self._remap_bare_flags(tokens)
                             command, bound, ignored = self.parse_args(tokens, **kwargs)
                             result = dispatcher(command, bound, ignored)
                             self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
@@ -3052,6 +3061,26 @@ class App:
             if history_path:
                 history_path.parent.mkdir(parents=True, exist_ok=True)
                 readline.write_history_file(history_path)  # pyright: ignore[reportOptionalMemberAccess]
+
+    def _remap_bare_flags(self, tokens: list[str]) -> list[str]:
+        """Rewrite a bare long-flag word directly after the command chain into the flag (``help`` -> ``--help``).
+
+        Short flags never match because only ``"--" + word`` is looked up. A word that resolves to a
+        command is consumed by :meth:`parse_commands` first, so a user-defined ``help`` command wins.
+        """
+        _, apps, unused = self.parse_commands(tokens, include_parent_meta=False)
+        if not unused:
+            return tokens
+        command_app = apps[-1]
+        flag = "--" + unused[0]
+        if flag not in (*command_app.help_flags, *command_app.version_flags):
+            return tokens
+        if command_app.default_command:
+            collection = _safe_assemble_argument_collection(command_app)
+            if collection is not None and collection._match_explicit(flag) is not None:
+                return tokens
+        index = len(tokens) - len(unused)
+        return [*tokens[:index], flag, *tokens[index + 1 :]]
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.
