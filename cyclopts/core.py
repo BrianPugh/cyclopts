@@ -2985,7 +2985,6 @@ class App:
             # programs that never open a shell should not pay for it.
             import readline
         except ImportError:  # pragma: no cover
-            # Not available on windows
             readline = None
 
         if quit is None:
@@ -3082,11 +3081,7 @@ class App:
                     readline.write_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
 
     def _remap_bare_flags(self, tokens: list[str]) -> list[str]:
-        """Rewrite a bare long-flag word directly after the command chain into the flag (``help`` -> ``--help``).
-
-        Short flags never match because only ``"--" + word`` is looked up. A word that resolves to a
-        command is consumed by :meth:`parse_commands` first, so a user-defined ``help`` command wins.
-        """
+        """Rewrite a bare long-flag word directly after the command chain into the flag (``help`` -> ``--help``)."""
         _, apps, unused = self.parse_commands(tokens, include_parent_meta=False)
         if not unused:
             return tokens
