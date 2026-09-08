@@ -5,7 +5,7 @@ from cyclopts import App
 
 def test_interactive_shell(app, mocker, console):
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "foo 1 2 3",
             "bad-command 123",
@@ -47,7 +47,7 @@ def test_interactive_shell_result_action_default_string(mocker, console):
     app = App()
 
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "greet Alice",
             "quit",
@@ -68,7 +68,7 @@ def test_interactive_shell_result_action_default_string(mocker, console):
 def test_interactive_shell_result_action_default_int(app, mocker, console):
     """Test that int returns are not printed in interactive shell (default behavior)."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "get-code 42",
             "quit",
@@ -89,7 +89,7 @@ def test_interactive_shell_result_action_default_int(app, mocker, console):
 def test_interactive_shell_result_action_default_bool_true(app, mocker, console):
     """Test that True returns are not printed in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "check",
             "quit",
@@ -110,7 +110,7 @@ def test_interactive_shell_result_action_default_bool_true(app, mocker, console)
 def test_interactive_shell_result_action_default_bool_false(app, mocker, console):
     """Test that False returns are not printed in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "check",
             "quit",
@@ -131,7 +131,7 @@ def test_interactive_shell_result_action_default_bool_false(app, mocker, console
 def test_interactive_shell_result_action_default_none(app, mocker, console):
     """Test that None returns are not printed in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "do-nothing",
             "quit",
@@ -154,7 +154,7 @@ def test_interactive_shell_result_action_default_list(mocker, console):
     app = App()
 
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "get-list",
             "quit",
@@ -177,7 +177,7 @@ def test_interactive_shell_result_action_custom_app(app, mocker, console):
     custom_app = App(result_action="print_non_none_return_int_as_exit_code")
 
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "get-number",
             "quit",
@@ -198,7 +198,7 @@ def test_interactive_shell_result_action_custom_app(app, mocker, console):
 def test_interactive_shell_result_action_override_parameter(app, mocker, console):
     """Test that result_action parameter overrides App setting."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "greet Bob",
             "quit",
@@ -219,7 +219,7 @@ def test_interactive_shell_result_action_override_parameter(app, mocker, console
 def test_interactive_shell_result_action_callable(app, mocker, console):
     """Test that callable result_action works in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "greet Alice",
             "quit",
@@ -249,7 +249,7 @@ def test_interactive_shell_async_command(mocker, console):
     app = App(backend="asyncio")
 
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "start",
             "quit",
@@ -277,7 +277,7 @@ def test_interactive_shell_async_command(mocker, console):
 def test_interactive_shell_no_sys_exit_on_command(app, mocker, console):
     """Test that commands continue to execute (no sys.exit called) in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "cmd1",
             "cmd2",
@@ -315,7 +315,7 @@ def test_interactive_shell_no_sys_exit_on_command(app, mocker, console):
 
 def test_interactive_shell_unbalanced_quote(app, mocker, console):
     """A tokenization error should be reported and the shell should keep running."""
-    mocker.patch("cyclopts.core.input", side_effect=['foo "1', "foo 2", "quit"])
+    mocker.patch("builtins.input", side_effect=['foo "1', "foo 2", "quit"])
 
     calls = []
 
@@ -336,8 +336,8 @@ def test_interactive_shell_unbalanced_quote(app, mocker, console):
 
 def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
     """Ctrl-C with text on the line should discard the line, not exit the shell."""
-    mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
-    mocker.patch("cyclopts.core.readline").get_line_buffer.return_value = "foo 5"
+    mocker.patch("builtins.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
+    mocker.patch("cyclopts._shell.readline").get_line_buffer.return_value = "foo 5"
 
     calls = []
 
@@ -351,8 +351,8 @@ def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
 
 
 def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker):
-    mock_input = mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
-    mocker.patch("cyclopts.core.readline").get_line_buffer.return_value = ""
+    mock_input = mocker.patch("builtins.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
+    mocker.patch("cyclopts._shell.readline").get_line_buffer.return_value = ""
 
     calls = []
 
@@ -368,10 +368,8 @@ def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker):
 
 def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interrupt(app, mocker):
     """Libedit reports the previous line until new text is typed; a repeat means the line was empty."""
-    mock_input = mocker.patch(
-        "cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), KeyboardInterrupt(), "quit"]
-    )
-    mocker.patch("cyclopts.core.readline").get_line_buffer.side_effect = ["foo 2", "foo 2"]
+    mock_input = mocker.patch("builtins.input", side_effect=["foo 1", KeyboardInterrupt(), KeyboardInterrupt(), "quit"])
+    mocker.patch("cyclopts._shell.readline").get_line_buffer.side_effect = ["foo 2", "foo 2"]
 
     calls = []
 
@@ -386,8 +384,8 @@ def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interru
 
 
 def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(app, mocker):
-    mock_input = mocker.patch("cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), "quit"])
-    mocker.patch("cyclopts.core.readline").get_line_buffer.return_value = "foo 1\n"
+    mock_input = mocker.patch("builtins.input", side_effect=["foo 1", KeyboardInterrupt(), "quit"])
+    mocker.patch("cyclopts._shell.readline").get_line_buffer.return_value = "foo 1\n"
 
     calls = []
 
@@ -403,7 +401,7 @@ def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(ap
 
 def test_interactive_shell_keyboard_interrupt_in_command(app, mocker):
     """Ctrl-C during a command should return to the prompt when suppress_keyboard_interrupt is set."""
-    mocker.patch("cyclopts.core.input", side_effect=["foo", "bar", "quit"])
+    mocker.patch("builtins.input", side_effect=["foo", "bar", "quit"])
 
     calls = []
 
@@ -420,7 +418,7 @@ def test_interactive_shell_keyboard_interrupt_in_command(app, mocker):
 
 
 def test_interactive_shell_keyboard_interrupt_in_command_not_suppressed(mocker):
-    mocker.patch("cyclopts.core.input", side_effect=["foo", "quit"])
+    mocker.patch("builtins.input", side_effect=["foo", "quit"])
     app = App(suppress_keyboard_interrupt=False)
 
     @app.command
@@ -432,7 +430,7 @@ def test_interactive_shell_keyboard_interrupt_in_command_not_suppressed(mocker):
 
 
 def test_interactive_shell_exception_goes_to_error_console(app, mocker, console):
-    mocker.patch("cyclopts.core.input", side_effect=["foo", "quit"])
+    mocker.patch("builtins.input", side_effect=["foo", "quit"])
 
     @app.command
     def foo():
@@ -448,7 +446,7 @@ def test_interactive_shell_exception_goes_to_error_console(app, mocker, console)
 
 def test_interactive_shell_subcommand_error_console(mocker, console):
     """A subcommand's own error_console must not be overridden by the root's."""
-    mocker.patch("cyclopts.core.input", side_effect=["sub foo notanint", "quit"])
+    mocker.patch("builtins.input", side_effect=["sub foo notanint", "quit"])
 
     root = App()
     sub = App(name="sub", error_console=console)

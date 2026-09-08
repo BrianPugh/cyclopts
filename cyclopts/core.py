@@ -2,7 +2,6 @@ import importlib
 import inspect
 import os
 import sys
-import traceback
 from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
 from contextlib import suppress
 from copy import copy
@@ -65,13 +64,6 @@ from cyclopts.utils import (
     to_list_converter,
     to_tuple_converter,
 )
-
-try:
-    # By importing, makes things like the arrow-keys work.
-    import readline
-except ImportError:  # pragma: no cover
-    # Not available on windows
-    readline = None
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -2905,6 +2897,7 @@ class App:
     def interactive_shell(
         self,
         prompt: str = "$ ",
+        *,
         quit: None | str | Iterable[str] = None,
         dispatcher: Dispatcher | None = None,
         console: "Console | None" = None,
@@ -2954,6 +2947,8 @@ class App:
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
+        from cyclopts._shell import run_shell
+
         if os.name == "posix":  # pragma: no cover
             # Mac/Linux
             print("Interactive shell. Press Ctrl-D to exit.")
@@ -2963,8 +2958,10 @@ class App:
 
         if quit is None:
             quit = ["q", "quit"]
-        if isinstance(quit, str):
+        elif isinstance(quit, str):
             quit = [quit]
+        else:
+            quit = list(quit)
 
         def default_dispatcher(command, bound, _):
             resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
@@ -2982,55 +2979,8 @@ class App:
             overrides["_error_console"] = error_console
         overrides["exit_on_error"] = exit_on_error
 
-        # libedit (macOS) keeps reporting the previous line from ``get_line_buffer`` until
-        # new text is typed, so an interrupted buffer equal to the last seen line means the
-        # line was actually empty. GNU readline reports "" directly.
-        previous_line = ""
         with self.app_stack([], overrides):
-            while True:
-                try:
-                    user_input = input(prompt)
-                except EOFError:  # pragma: no cover
-                    break
-                except KeyboardInterrupt:
-                    print()
-                    # typeshed guards ``get_line_buffer`` behind ``sys.platform != "win32"``;
-                    # ``readline`` is ``None`` on Windows anyway, so this branch never runs there.
-                    line_buffer = readline.get_line_buffer() if readline else ""  # pyright: ignore[reportAttributeAccessIssue]
-                    if line_buffer in ("", previous_line):
-                        break
-                    previous_line = line_buffer
-                    continue
-                previous_line = user_input + "\n"
-
-                try:
-                    tokens = self._normalize_tokens(user_input)
-                except CycloptsError:
-                    # ``_normalize_tokens`` already reported the error (respecting
-                    # ``exit_on_error``); keep the shell running.
-                    continue
-                if not tokens:
-                    continue
-                if tokens[0] in quit:
-                    break
-
-                # Keep the exception handlers inside the token ``app_stack`` context so that
-                # context-sensitive settings (e.g. ``error_console``) resolve from the invoked
-                # subcommand rather than the root app.
-                with self.app_stack(tokens):
-                    try:
-                        command, bound, ignored = self.parse_args(tokens, **kwargs)
-                        result = dispatcher(command, bound, ignored)
-                        self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
-                    except CycloptsError:
-                        # Upstream ``parse_args`` already printed the error
-                        pass
-                    except KeyboardInterrupt:
-                        if not self.suppress_keyboard_interrupt:
-                            raise
-                        print()
-                    except Exception:
-                        self.error_console.print(traceback.format_exc(), markup=False, highlight=False, soft_wrap=True)
+            run_shell(self, prompt=prompt, quit_words=quit, dispatcher=dispatcher, parse_kwargs=kwargs)
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.
