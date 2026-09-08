@@ -47,10 +47,10 @@ To make the application still work as-expected from the CLI, it is more appropri
        app()  # Don't call ``app.interactive_shell()`` here.
 
 Special flags like ``--help`` and ``--version`` work in the shell. Because typing dashes is
-awkward at a prompt, the bare words ``help`` and ``version`` are also accepted when they directly
-follow a command chain (see ``remap_flags`` on :meth:`.App.interactive_shell`), and the help
-screen lists them alongside the other commands. A user-defined ``help`` command, or a command
-parameter named ``help``, takes precedence over the remap.
+awkward at a prompt, the bare words ``help`` and ``version`` are also accepted at the root (see
+``remap_flags`` on :meth:`.App.interactive_shell`), and the root help screen lists them alongside
+the other commands. Subcommands use the normal flags (``foo --help``). A user-defined ``help``
+command takes precedence over the remap.
 
 .. code-block:: console
 
@@ -65,7 +65,7 @@ parameter named ``help``, takes precedence over the remap.
    │ help (--help, -h)    Display this message and exit.          │
    │ version (--version)  Display application version.            │
    ╰──────────────────────────────────────────────────────────────╯
-   cyclopts> foo help
+   cyclopts> foo --help
    Usage: interactive-shell-demo.py foo P1
 
    Foo Docstring.

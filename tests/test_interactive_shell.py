@@ -603,19 +603,17 @@ def test_interactive_shell_remap_help_root(app, mocker, console):
     assert "Foo docstring." in actual
 
 
-def test_interactive_shell_remap_help_subcommand(app, mocker, console):
+def test_interactive_shell_remap_subcommand_not_remapped(app, mocker):
+    """Only the root remaps; ``foo help`` passes ``help`` through as data."""
     mocker.patch("builtins.input", side_effect=["foo help", "quit"])
+    calls = []
 
     @app.command
-    def foo(a: int):
-        """Foo docstring."""
+    def foo(a: str):
+        calls.append(a)
 
-    with console.capture() as capture:
-        app.interactive_shell(console=console, intro=None)
-
-    actual = capture.get()
-    assert "Foo docstring." in actual
-    assert "--a" in actual
+    app.interactive_shell(intro=None)
+    assert calls == ["help"]
 
 
 def test_interactive_shell_remap_version(mocker, console):
@@ -641,24 +639,24 @@ def test_interactive_shell_remap_user_command_wins(app, mocker):
 
 
 def test_interactive_shell_remap_shadowed_by_parameter(app, mocker):
-    """A command whose own parameter claims ``--help`` receives the bare word as data."""
-    mocker.patch("builtins.input", side_effect=["foo help", "quit"])
+    """A default command whose own parameter claims ``--help`` receives the bare word as data."""
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
     calls = []
 
-    @app.command
-    def foo(help: str):
+    @app.default
+    def main(help: str):
         calls.append(help)
 
     app.interactive_shell(intro=None)
     assert calls == ["help"]
 
 
-def test_interactive_shell_remap_only_first_leftover_token(app, mocker):
-    mocker.patch("builtins.input", side_effect=["foo 1 help", "quit"])
+def test_interactive_shell_remap_only_first_token(app, mocker):
+    mocker.patch("builtins.input", side_effect=["1 help", "quit"])
     calls = []
 
-    @app.command
-    def foo(a: int, b: str):
+    @app.default
+    def main(a: int, b: str):
         calls.append((a, b))
 
     app.interactive_shell(intro=None)
@@ -746,4 +744,22 @@ def test_interactive_shell_remap_disabled_help_panel_unchanged(app, mocker, cons
 
     actual = capture.get()
     assert "--help (-h)" in actual
+    assert "help (--help" not in actual
+
+
+def test_interactive_shell_remap_help_panel_subcommand_unchanged(app, mocker, console):
+    """A nested app's help page keeps the plain flags; only the root lists ``help``."""
+    mocker.patch("builtins.input", side_effect=["foo --help", "quit"])
+    foo = App(name="foo")
+    app.command(foo)
+
+    @foo.command
+    def bar():
+        pass
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=None)
+
+    actual = capture.get()
+    assert "│ bar" in actual
     assert "help (--help" not in actual

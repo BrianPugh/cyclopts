@@ -2471,9 +2471,9 @@ class App:
                     else:
                         command_panel.description = group_help
 
-                if self.app_stack.overrides.get("remap_flags"):
-                    # ``interactive_shell`` accepts ``help`` for ``--help``; list it that way so it
-                    # sorts alongside the other commands.
+                if command_app is self and self.app_stack.overrides.get("remap_flags"):
+                    # ``interactive_shell`` accepts ``help`` for ``--help`` at the root; list it that
+                    # way so it sorts alongside the other commands.
                     apps_with_names = [
                         evolve(x, names=(flag[2:], *x.names))
                         if (flag := next((n for n in x.names if subapp._is_remappable_flag(n)), None))
@@ -2970,12 +2970,11 @@ class App:
             Created (along with parent directories) if it doesn't exist; read/write errors are ignored.
             Defaults to no persistence.
         remap_flags: bool
-            Treat a bare long-flag word directly after the command chain as that flag, so
-            ``help`` and ``foo help`` behave like ``--help`` and ``foo --help`` (likewise for
-            ``version``). Short flags are not remapped. The word is left alone if it names a
-            registered command or a parameter of the resolved command declares the flag itself.
-            A positional parameter that should receive the literal value ``help`` must be passed by
-            keyword (``foo --p1 help``), or set this to :obj:`False`. Defaults to :obj:`True`.
+            Treat a bare long-flag word typed as the first token as that flag, so ``help`` and
+            ``version`` behave like ``--help`` and ``--version``, and list them that way in the
+            root help screen. Only the root is affected (``foo help`` is not remapped); short
+            flags are not remapped. The word is left alone if it names a registered command or a
+            parameter of the default command declares the flag itself. Defaults to :obj:`True`.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
@@ -3081,15 +3080,9 @@ class App:
                     readline.write_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
 
     def _remap_bare_flags(self, tokens: list[str]) -> list[str]:
-        """Rewrite a bare long-flag word directly after the command chain into the flag (``help`` -> ``--help``)."""
-        _, apps, unused = self.parse_commands(tokens, include_parent_meta=False)
-        if not unused:
-            return tokens
-        flag = "--" + unused[0]
-        if not apps[-1]._is_remappable_flag(flag):
-            return tokens
-        index = len(tokens) - len(unused)
-        return [*tokens[:index], flag, *tokens[index + 1 :]]
+        """Rewrite a leading bare long-flag word into the flag (``help`` -> ``--help``)."""
+        flag = "--" + tokens[0]
+        return [flag, *tokens[1:]] if self._is_remappable_flag(flag) else tokens
 
     def _is_remappable_flag(self, flag: str) -> bool:
         """Whether ``remap_flags`` maps the dashless form of ``flag`` (``help`` for ``--help``) onto it for this app."""
