@@ -763,3 +763,39 @@ def test_interactive_shell_remap_help_panel_subcommand_unchanged(app, mocker, co
     actual = capture.get()
     assert "│ bar" in actual
     assert "help (--help" not in actual
+
+
+def test_interactive_shell_meta_command_wins_over_quit(app, mocker):
+    mocker.patch("builtins.input", side_effect=["exit", "quit"])
+    calls = []
+
+    @app.meta.command
+    def exit():
+        calls.append("exit")
+
+    app.interactive_shell(intro=None)
+    assert calls == ["exit"]
+
+
+def test_interactive_shell_remap_meta_command_wins(app, mocker):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+    calls = []
+
+    @app.meta.command
+    def help():
+        calls.append("help")
+
+    app.interactive_shell(intro=None)
+    assert calls == ["help"]
+
+
+def test_interactive_shell_remap_help_panel_all_long_aliases(mocker, console):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+    app = App(name="app", help_flags=["--help", "--usage", "-h"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=None)
+
+    actual = capture.get()
+    assert "help (usage, --help," in actual
+    assert "--usage, -h)" in actual

@@ -2475,9 +2475,7 @@ class App:
                     # ``interactive_shell`` accepts ``help`` for ``--help`` at the root; list it that
                     # way so it sorts alongside the other commands.
                     apps_with_names = [
-                        evolve(x, names=(flag[2:], *x.names))
-                        if (flag := next((n for n in x.names if subapp._is_remappable_flag(n)), None))
-                        else x
+                        evolve(x, names=(*(n[2:] for n in x.names if subapp._is_remappable_flag(n)), *x.names))
                         for x in apps_with_names
                     ]
 
@@ -3048,7 +3046,7 @@ class App:
                         continue
                     if not tokens:
                         continue
-                    if tokens[0] in quit and tokens[0] not in self:
+                    if tokens[0] in quit and tokens[0] not in _combined_meta_command_mapping(self):
                         break
 
                     # Keep the exception handlers inside the token ``app_stack`` context so that
@@ -3088,7 +3086,7 @@ class App:
         """Whether ``remap_flags`` maps the dashless form of ``flag`` (``help`` for ``--help``) onto it for this app."""
         if not flag.startswith("--") or flag not in (*self.help_flags, *self.version_flags):
             return False
-        if flag[2:] in self:
+        if flag[2:] in _combined_meta_command_mapping(self):
             return False
         if self.default_command:
             collection = _safe_assemble_argument_collection(self)
