@@ -24,7 +24,7 @@ from typing import (
     overload,
 )
 
-from attrs import Factory, define, field
+from attrs import Factory, define, evolve, field
 from attrs import validators as attrs_validators
 
 from cyclopts._convert import _convert
@@ -2471,6 +2471,16 @@ class App:
                     else:
                         command_panel.description = group_help
 
+                if self.app_stack.overrides.get("remap_flags"):
+                    # ``interactive_shell`` accepts ``help`` for ``--help``; list it that way so it
+                    # sorts alongside the other commands.
+                    apps_with_names = [
+                        evolve(x, names=(flag[2:], *x.names))
+                        if (flag := next((n for n in x.names if subapp._is_remappable_flag(n)), None))
+                        else x
+                        for x in apps_with_names
+                    ]
+
                 # Add the command to the group's help panel.
                 command_panel.entries.extend(format_command_entries(apps_with_names, format=help_format))
 
@@ -2998,6 +3008,7 @@ class App:
         if error_console is not None:
             overrides["_error_console"] = error_console
         overrides["exit_on_error"] = exit_on_error
+        overrides["remap_flags"] = remap_flags
 
         # libedit (macOS) keeps reporting the previous line from ``get_line_buffer`` until
         # new text is typed, so an interrupted buffer equal to the last seen line means the
@@ -3079,16 +3090,23 @@ class App:
         _, apps, unused = self.parse_commands(tokens, include_parent_meta=False)
         if not unused:
             return tokens
-        command_app = apps[-1]
         flag = "--" + unused[0]
-        if flag not in (*command_app.help_flags, *command_app.version_flags):
+        if not apps[-1]._is_remappable_flag(flag):
             return tokens
-        if command_app.default_command:
-            collection = _safe_assemble_argument_collection(command_app)
-            if collection is not None and collection._match_explicit(flag) is not None:
-                return tokens
         index = len(tokens) - len(unused)
         return [*tokens[:index], flag, *tokens[index + 1 :]]
+
+    def _is_remappable_flag(self, flag: str) -> bool:
+        """Whether ``remap_flags`` maps the dashless form of ``flag`` (``help`` for ``--help``) onto it for this app."""
+        if not flag.startswith("--") or flag not in (*self.help_flags, *self.version_flags):
+            return False
+        if flag[2:] in self:
+            return False
+        if self.default_command:
+            collection = _safe_assemble_argument_collection(self)
+            if collection is not None and collection._match_explicit(flag) is not None:
+                return False
+        return True
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.

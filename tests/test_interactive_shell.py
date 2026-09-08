@@ -1,4 +1,5 @@
 import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -688,3 +689,61 @@ def test_interactive_shell_remap_disabled(app, mocker, console):
         app.interactive_shell(error_console=console, intro=None, remap_flags=False)
 
     assert 'Unknown command "help"' in capture.get()
+
+
+def test_interactive_shell_remap_help_panel_lists_bare_words(mocker, console):
+    """Remapped ``help``/``version`` are listed by their bare word and sorted like any other command."""
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+    app = App(name="app", version="1.0", result_action="return_value")
+
+    @app.command
+    def zoo():
+        """Zoo docstring."""
+
+    @app.command
+    def bar():
+        """Bar docstring."""
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=None)
+
+    assert capture.get() == textwrap.dedent(
+        """\
+        Usage: app COMMAND
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ bar                  Bar docstring.                                │
+        │ help (--help, -h)    Display this message and exit.                │
+        │ version (--version)  Display application version.                  │
+        │ zoo                  Zoo docstring.                                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+
+def test_interactive_shell_remap_help_panel_user_command_not_aliased(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["--help", "quit"])
+
+    @app.command
+    def help():
+        """User help."""
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=None)
+
+    actual = capture.get()
+    assert "User help." in actual
+    assert "--help (-h)" in actual
+    assert "help (--help" not in actual
+    assert "version (--version)" in actual
+
+
+def test_interactive_shell_remap_disabled_help_panel_unchanged(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["--help", "quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=None, remap_flags=False)
+
+    actual = capture.get()
+    assert "--help (-h)" in actual
+    assert "help (--help" not in actual
