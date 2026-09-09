@@ -9,7 +9,7 @@ its candidate values.
 
 import os
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -280,6 +280,183 @@ def _resolve_active_argument(
     return active
 
 
+def _assemble_arguments(execution_path: "Sequence[App]") -> ArgumentCollection:
+    """Collect every argument that may occupy a slot on the resolved command's line.
+
+    The resolved command's own parameters, plus the keyword parameters
+    contributed by meta launchers on the path (mirroring the static
+    extractor): a meta option like ``--env`` shares the command line
+    with the resolved command (``myapp deploy --env prod``), so its
+    value slot must resolve here too -- even when the resolved command
+    is a bare command group with no default_command of its own.
+    Launcher positionals are consumed before the command name, so they
+    are dropped (positional-only) or made keyword-only (``index=None``)
+    so they never shift the command's own positional slots.
+
+    Must be called inside the ``app_stack(execution_path)`` context.
+    """
+    from cyclopts.core import _iter_resolution_argument_collections
+
+    command_app = execution_path[-1]
+    arguments = ArgumentCollection()
+    launcher_arguments = ArgumentCollection()
+    for subapp, collection in _iter_resolution_argument_collections(execution_path, parse_docstring=False):
+        if subapp is command_app:
+            arguments.extend(collection)
+            continue
+        for argument in collection:
+            if argument.field_info.is_positional_only:
+                continue
+            argument.index = None
+            launcher_arguments.append(argument)
+    arguments.extend(launcher_arguments)
+    return arguments
+
+
+@frozen
+class Slot:
+    """The command-line slot under the cursor, resolved with the real parser.
+
+    ``arguments`` carry the tokens typed so far (from the same parse that found
+    ``active``), so a completer can read sibling values. ``active`` is ``None``
+    when no argument owns the cursor, including while an option *name* is being
+    typed (``option_name``).
+    """
+
+    app: "App"
+    command_app: "App"
+    command_chain: tuple[str, ...]
+    execution_path: tuple["App", ...]
+    prior: list[str]
+    unused: list[str]
+    prefix: str
+    incomplete: str
+    option_name: bool
+    arguments: ArgumentCollection
+    active: "Argument | None"
+
+
+def resolve_slot(app: "App", words: list[str]) -> Slot | None:
+    """Resolve which command and argument own the word being completed.
+
+    Parameters
+    ----------
+    app : App
+        Any app in the program; resolution always starts from the root.
+    words : list[str]
+        Command-line words following the program name; the last is the (possibly
+        empty) word under the cursor.
+
+    Returns
+    -------
+    Slot | None
+        ``None`` when the typed prefix cannot be resolved (malformed prior input).
+        For ``--opt=va`` the slot's ``prefix`` is ``"--opt="`` and ``incomplete`` is ``"va"``.
+    """
+    if not words:
+        words = [""]
+    words = _merge_wordbreaks(words)
+    prior, incomplete = words[:-1], words[-1]
+    debug(f"words={words!r} prior={prior!r} incomplete={incomplete!r}")
+
+    # The sentinel stands in for the word being completed. For an eq-form token
+    # (``--user=al``) the sentinel replaces only the value part so the real
+    # parser routes it to ``--user``; an option name in progress has no value
+    # slot to complete.
+    prefix = ""
+    parse_token = _ACTIVE_SENTINEL
+    option_name = is_option_like(incomplete)
+    if option_name and "=" in incomplete:
+        option, _, incomplete = incomplete.partition("=")
+        prefix, parse_token, option_name = f"{option}=", f"{option}={_ACTIVE_SENTINEL}", False
+
+    # ``__complete`` may arrive at whichever App the program's entry point is
+    # (``app.meta()`` is common). The launcher forwards its tokens to the root
+    # app, so completion always resolves from the root, exactly like the real run.
+    while app._meta_parent is not None:
+        app = app._meta_parent
+
+    # Resolve the active command from the tokens typed so far. ``unused`` strips
+    # the resolved command chain, leaving only option/positional tokens so slot
+    # accounting below never miscounts a subcommand name as a positional value.
+    try:
+        command_chain, execution_path, unused, command_indices, _ = app._parse_commands(prior)
+    except (CycloptsError, ValueError, TypeError) as e:
+        debug(f"command resolution failed for {prior!r}: {_exc(e)}")
+        return None
+    # Command resolution also swallows leading meta-launcher options (``--env
+    # prod deploy ...``). Re-feed them so the merged launcher arguments below
+    # carry the values a dependent completer reads via ``context["env"]``.
+    consumed = len(prior) - len(unused)
+    meta_tokens = [token for i, token in enumerate(prior[:consumed]) if i not in command_indices]
+    unused = [*meta_tokens, *unused]
+    debug(f"resolved command={command_chain!r} unused={unused!r}")
+
+    # The app_stack context applies stack-resolved configuration — e.g. an
+    # ``App(default_parameter=Parameter(completer=...))`` — exactly like the
+    # real parse (core.py) and the static extractor (_base.py) do.
+    with app.app_stack(execution_path):
+        try:
+            arguments = _assemble_arguments(execution_path)
+        except Exception as e:
+            debug(f"assembling arguments failed: {_exc(e)}")
+            return None
+        active = None
+        if option_name:
+            debug("completing an option name; no value slot to resolve")
+        else:
+            end_of_options_delimiter = app.app_stack.resolve("end_of_options_delimiter", fallback="--")
+            active = _resolve_active_argument(arguments, [*unused, parse_token], end_of_options_delimiter)
+            if active is None:
+                debug("no argument occupies this slot")
+
+    return Slot(
+        app=app,
+        command_app=execution_path[-1],
+        command_chain=tuple(command_chain),
+        execution_path=tuple(execution_path),
+        prior=prior,
+        unused=unused,
+        prefix=prefix,
+        incomplete=incomplete,
+        option_name=option_name,
+        arguments=arguments,
+        active=active,
+    )
+
+
+def dynamic_candidates(slot: Slot) -> list[tuple[str, str]]:
+    """Run the active argument's :attr:`.Parameter.completer`; ``[]`` when it has none."""
+    active = slot.active
+    if active is None or active.parameter.completer is None:
+        if active is not None:
+            debug(f"active argument {active.name!r} has no completer")
+        return []
+    debug(
+        f"active argument={active.name!r} completer={getattr(active.parameter.completer, '__name__', active.parameter.completer)!r}"
+    )
+
+    with slot.app.app_stack(slot.execution_path):
+        # The sibling arguments already carry the CLI tokens from the same parse
+        # that resolved the active argument. Layer in env-var and config-sourced
+        # values (like the real binding pass) so a dependent completer sees the
+        # same sibling values the command itself would receive. Best effort — a
+        # broken config source must not kill completion.
+        try:
+            _parse_env(slot.arguments)
+            configs = slot.command_app.app_stack.resolve("_config") or ()
+            _parse_configs(
+                slot.arguments, tuple(partial(x, slot.command_app, list(slot.command_chain)) for x in configs)
+            )
+        except Exception as e:
+            debug(f"applying env/config sources failed (sibling values may be partial): {_exc(e)}")
+
+        context = CompletionContext(incomplete=slot.incomplete, argument=active, arguments=slot.arguments)
+        completions = active.get_completions(context)
+    debug(f"completer returned {len(completions or [])} candidate(s): {completions!r}")
+    return completions or []
+
+
 def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     """Compute dynamic completion candidates for a partial command line.
 
@@ -299,113 +476,8 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
         when it has no completer (the generated script handles static choices,
         command names, and option names).
     """
-    if not words:
-        words = [""]
-    words = _merge_wordbreaks(words)
-    prior, incomplete = words[:-1], words[-1]
-    debug(f"words={words!r} prior={prior!r} incomplete={incomplete!r}")
-
-    # The sentinel stands in for the word being completed. For an eq-form token
-    # (``--user=al``) the sentinel replaces only the value part so the real
-    # parser routes it to ``--user``; a plain option-name-in-progress has no
-    # value slot to complete (that's the static script's job).
-    parse_token = _ACTIVE_SENTINEL
-    if is_option_like(incomplete):
-        if "=" not in incomplete:
-            debug("completing an option name; static completion handles it")
-            return []
-        option, _, incomplete = incomplete.partition("=")
-        parse_token = f"{option}={_ACTIVE_SENTINEL}"
-
-    # ``__complete`` may arrive at whichever App the program's entry point is
-    # (``app.meta()`` is common). The launcher forwards its tokens to the root
-    # app, so completion always resolves from the root, exactly like the real run.
-    while app._meta_parent is not None:
-        app = app._meta_parent
-
-    # Resolve the active command from the tokens typed so far. ``unused`` strips
-    # the resolved command chain, leaving only option/positional tokens so slot
-    # accounting below never miscounts a subcommand name as a positional value.
-    try:
-        command_chain, execution_path, unused, command_indices, _ = app._parse_commands(prior)
-    except (CycloptsError, ValueError, TypeError) as e:
-        debug(f"command resolution failed for {prior!r}: {_exc(e)}")
-        return []
-    command_app = execution_path[-1]
-    # Command resolution also swallows leading meta-launcher options (``--env
-    # prod deploy ...``). Re-feed them so the merged launcher arguments below
-    # carry the values a dependent completer reads via ``context["env"]``.
-    consumed = len(prior) - len(unused)
-    meta_tokens = [token for i, token in enumerate(prior[:consumed]) if i not in command_indices]
-    unused = [*meta_tokens, *unused]
-    debug(f"resolved command={command_chain!r} unused={unused!r}")
-
-    # The app_stack context applies stack-resolved configuration — e.g. an
-    # ``App(default_parameter=Parameter(completer=...))`` — exactly like the
-    # real parse (core.py) and the static extractor (_base.py) do.
-    with app.app_stack(execution_path):
-        try:
-            # The resolved command's own parameters, plus the keyword parameters
-            # contributed by meta launchers on the path (mirroring the static
-            # extractor): a meta option like ``--env`` shares the command line
-            # with the resolved command (``myapp deploy --env prod``), so its
-            # value slot must resolve here too — even when the resolved command
-            # is a bare command group with no default_command of its own.
-            # Launcher positionals are consumed before the command name, so they
-            # are dropped (positional-only) or made keyword-only (``index=None``)
-            # so they never shift the command's own positional slots.
-            from cyclopts.core import _iter_resolution_argument_collections
-
-            arguments = ArgumentCollection()
-            launcher_arguments = ArgumentCollection()
-            for subapp, collection in _iter_resolution_argument_collections(execution_path, parse_docstring=False):
-                if subapp is command_app:
-                    arguments.extend(collection)
-                    continue
-                for argument in collection:
-                    if argument.field_info.is_positional_only:
-                        continue
-                    argument.index = None
-                    launcher_arguments.append(argument)
-            arguments.extend(launcher_arguments)
-        except Exception as e:
-            debug(f"assembling arguments failed: {_exc(e)}")
-            return []
-        end_of_options_delimiter = app.app_stack.resolve("end_of_options_delimiter", fallback="--")
-
-        active = _resolve_active_argument(arguments, [*unused, parse_token], end_of_options_delimiter)
-
-        if active is None:
-            debug("no argument occupies this slot (option name or unmatched slot); no dynamic candidates")
-            return []
-        if active.parameter.completer is None:
-            debug(f"active argument {active.name!r} has no completer; static completion handles it")
-            return []
-        debug(
-            f"active argument={active.name!r} completer={getattr(active.parameter.completer, '__name__', active.parameter.completer)!r}"
-        )
-
-        # The sibling arguments already carry the CLI tokens from the same parse
-        # that resolved the active argument. Layer in env-var and config-sourced
-        # values (like the real binding pass) so a dependent completer sees the
-        # same sibling values the command itself would receive. Best effort — a
-        # broken config source must not kill completion.
-        try:
-            _parse_env(arguments)
-            configs = command_app.app_stack.resolve("_config") or ()
-            _parse_configs(arguments, tuple(partial(x, command_app, command_chain) for x in configs))
-        except Exception as e:
-            debug(f"applying env/config sources failed (sibling values may be partial): {_exc(e)}")
-
-        context = CompletionContext(
-            incomplete=incomplete,
-            argument=active,
-            arguments=arguments,
-        )
-
-        completions = active.get_completions(context)
-    debug(f"completer returned {len(completions or [])} candidate(s): {completions!r}")
-    if not completions:
+    slot = resolve_slot(app, words)
+    if slot is None:
         return []
     # Emitted as-is: the engine never filters. The generated shell script
     # prefix-matches these candidates against the word being completed (bash's
@@ -413,4 +485,4 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     # completer need not prefix-filter itself -- and cannot override that prefix
     # match, which is why substring/fuzzy completion isn't possible. ``incomplete``
     # is for narrowing expensive lookups, not for filtering the result.
-    return [Completion(value, help) for value, help in completions]
+    return [Completion(value, help) for value, help in dynamic_candidates(slot)]

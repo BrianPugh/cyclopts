@@ -4,7 +4,7 @@ import os
 import sys
 import traceback
 from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
-from contextlib import redirect_stdout, suppress
+from contextlib import nullcontext, redirect_stdout, suppress
 from copy import copy
 from enum import StrEnum
 from functools import lru_cache, partial
@@ -3094,8 +3094,14 @@ class App:
             # libedit raises PermissionError (not FileNotFoundError) on its own header-only files.
             with suppress(OSError):
                 readline.read_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
+        if readline:
+            from cyclopts.completion._readline import readline_completion
+
+            completion = readline_completion(self, readline)
+        else:
+            completion = nullcontext()
         try:
-            with self.app_stack([], overrides):
+            with completion, self.app_stack([], overrides):
                 if intro is None:
                     intro = DEFAULT_SHELL_INTRO
                 if intro:

@@ -837,3 +837,25 @@ def test_interactive_shell_remap_help_panel_all_long_aliases(mocker, console):
     actual = capture.get()
     assert "help (usage, --help," in actual
     assert "--usage, -h)" in actual
+
+
+@pytest.mark.parametrize(
+    "doc, binding",
+    [
+        ("GNU readline", "tab: complete"),
+        ("Importing this module enables command line editing using libedit readline.", "bind ^I rl_complete"),
+    ],
+)
+def test_interactive_shell_installs_and_restores_completer(app, mocker, readline, doc, binding):
+    mocker.patch("builtins.input", side_effect=["quit"])
+    readline.__doc__ = doc
+    readline.get_completer.return_value = previous = object()
+    readline.get_completer_delims.return_value = "abc"
+
+    app.interactive_shell()
+
+    assert callable(readline.set_completer.call_args_list[0].args[0])
+    readline.parse_and_bind.assert_called_once_with(binding)
+    readline.set_completer_delims.assert_any_call(" \t\n")
+    assert readline.set_completer.call_args_list[-1].args == (previous,)
+    assert readline.set_completer_delims.call_args_list[-1].args == ("abc",)

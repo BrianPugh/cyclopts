@@ -77,3 +77,6 @@ command takes precedence over the remap.
 
 Type ``q``, ``quit``, or ``exit`` (or press Ctrl-D) to leave the shell. Pass ``history=True`` (or a
 path) to persist command history between sessions.
+
+Tab completes command names, option names, static choices (``Literal``/``Enum``), paths, and any
+:attr:`.Parameter.completer` values, wherever the stdlib ``readline`` module is available (not Windows).
