@@ -75,5 +75,5 @@ command takes precedence over the remap.
    ╰──────────────────────────────────────────────────────────────╯
    cyclopts> exit
 
-Type ``q``, ``quit``, or ``exit`` (or press Ctrl-D) to leave the shell. Pass ``history_file`` to
-persist command history between sessions.
+Type ``q``, ``quit``, or ``exit`` (or press Ctrl-D) to leave the shell. Pass ``history=True`` (or a
+path) to persist command history between sessions.

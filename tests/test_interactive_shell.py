@@ -526,7 +526,7 @@ def test_interactive_shell_history_file(app, mocker, tmp_path, readline):
     mocker.patch("builtins.input", side_effect=["quit"])
     history_file = tmp_path / "nested" / "history"
 
-    app.interactive_shell(history_file=str(history_file))
+    app.interactive_shell(history=str(history_file))
 
     readline.clear_history.assert_called_once_with()
     readline.read_history_file.assert_called_once_with(history_file)
@@ -538,9 +538,29 @@ def test_interactive_shell_history_file_expands_user(app, mocker, readline):
     mocker.patch("builtins.input", side_effect=["quit"])
     mocker.patch("pathlib.Path.mkdir")
 
-    app.interactive_shell(history_file="~/.myapp_history")
+    app.interactive_shell(history="~/.myapp_history")
 
     readline.write_history_file.assert_called_once_with(Path.home() / ".myapp_history")
+
+
+def test_interactive_shell_history_true_default_location(app, mocker, readline):
+    mocker.patch("builtins.input", side_effect=["quit"])
+    mocker.patch("pathlib.Path.mkdir")
+
+    app.interactive_shell(history=True)
+
+    expected = Path.home() / f".{app.name[0]}_history"
+    readline.read_history_file.assert_called_once_with(expected)
+    readline.write_history_file.assert_called_once_with(expected)
+
+
+def test_interactive_shell_history_false_no_persistence(app, mocker, readline):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    app.interactive_shell(history=False)
+
+    readline.read_history_file.assert_not_called()
+    readline.write_history_file.assert_not_called()
 
 
 @pytest.mark.parametrize("error", [FileNotFoundError, PermissionError])
@@ -549,7 +569,7 @@ def test_interactive_shell_history_file_read_error_ignored(app, mocker, readline
     mocker.patch("builtins.input", side_effect=["quit"])
     readline.read_history_file.side_effect = error
 
-    app.interactive_shell(history_file="history")
+    app.interactive_shell(history="history")
 
     readline.write_history_file.assert_called_once()
 
@@ -558,7 +578,7 @@ def test_interactive_shell_history_file_write_error_ignored(app, mocker, readlin
     mocker.patch("builtins.input", side_effect=["quit"])
     readline.write_history_file.side_effect = PermissionError
 
-    app.interactive_shell(history_file="history")
+    app.interactive_shell(history="history")
 
 
 def test_interactive_shell_history_file_written_on_exception(mocker, readline):
@@ -570,7 +590,7 @@ def test_interactive_shell_history_file_written_on_exception(mocker, readline):
         raise KeyboardInterrupt
 
     with pytest.raises(KeyboardInterrupt):
-        app.interactive_shell(history_file="history")
+        app.interactive_shell(history="history")
 
     readline.write_history_file.assert_called_once()
 

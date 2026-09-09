@@ -2919,7 +2919,7 @@ class App:
         result_action: ResultAction | None = None,
         error_console: "Console | None" = None,
         intro: str | None = None,
-        history_file: str | Path | None = None,
+        history: bool | str | Path = False,
         remap_flags: bool = True,
         **kwargs,
     ) -> None:
@@ -2965,10 +2965,11 @@ class App:
             Banner printed once when the shell starts; supports Rich markup
             (e.g. ``"[bold]Welcome[/bold]"``). :obj:`None` uses a default banner;
             an empty string prints nothing.
-        history_file: str | Path | None
-            File to load ``readline`` history from on entry and save it to on exit. ``~`` is expanded.
-            Created (along with parent directories) if it doesn't exist; read/write errors are ignored.
-            Defaults to no persistence.
+        history: bool | str | Path
+            Persist ``readline`` history across sessions. A path (``~`` expanded) loads history
+            from that file on entry and saves it on exit; :obj:`True` uses ``~/.<app_name>_history``.
+            The file (and parent directories) is created if missing; read/write errors are ignored.
+            Defaults to :obj:`False` (no persistence).
         remap_flags: bool
             Treat a bare long-flag word typed as the first token as that flag, so ``help`` and
             ``version`` behave like ``--help`` and ``--version``, and list them that way in the
@@ -3012,7 +3013,12 @@ class App:
         # new text is typed, so an interrupted buffer equal to the last seen line means the
         # line was actually empty. GNU readline reports "" directly.
         previous_line = ""
-        history_path = Path(history_file).expanduser() if history_file else None
+        if history is True:
+            history_path = Path.home() / f".{Path(self.name[0]).name}_history"
+        elif history:
+            history_path = Path(history).expanduser()
+        else:
+            history_path = None
         if readline and history_path:
             # History is process-global; start from the file alone so re-entering the shell
             # doesn't duplicate entries and unrelated ``input()`` calls don't leak in.
