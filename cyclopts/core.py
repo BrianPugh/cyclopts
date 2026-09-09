@@ -24,7 +24,7 @@ from typing import (
     overload,
 )
 
-from attrs import Factory, define, evolve, field
+from attrs import Factory, define, field
 from attrs import validators as attrs_validators
 
 from cyclopts._convert import _convert
@@ -2475,7 +2475,7 @@ class App:
                     # ``interactive_shell`` accepts ``help`` for ``--help`` at the root; list it that
                     # way so it sorts alongside the other commands.
                     apps_with_names = [
-                        evolve(x, names=(*(n[2:] for n in x.names if subapp._is_remappable_flag(n)), *x.names))
+                        x.evolve(names=(*(n[2:] for n in x.names if subapp._is_remappable_flag(n)), *x.names))
                         for x in apps_with_names
                     ]
 
