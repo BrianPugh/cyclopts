@@ -137,3 +137,200 @@ To install without modifying shell RC files, use:
 .. code-block:: python
 
    app.register_install_completion_command(add_to_startup=False)
+
+Custom Completers
+=================
+
+Static completion can only offer values that are known when the completion script is generated.
+Sometimes, valid values are only known at runtime; for these cases, attach a **completer callback** to a parameter.
+The callback is invoked when the user presses ``<TAB>``, enabling **runtime value completion** for bash, zsh, and fish.
+
+.. warning::
+
+   Completing the value of a completer-backed parameter launches your Python program in a fresh process to run the completer. Each such ``<TAB>`` pays interpreter startup plus every import your program performs at module load, *before* the completer callback runs. (Completing command names, option names, and static choices stays entirely in-shell and pays none of this.) Heavy, non-lazy top-level imports (``numpy``, ``pandas``, ``torch``, ...) make those completions noticeably sluggish.
+
+   To keep completion responsive, avoid heavy module-level imports, import expensive dependencies lazily inside the functions that use them, and use :ref:`Lazy Loading` for commands with heavy dependencies.
+
+.. note::
+
+   Runtime value completion, like static completion, only works for installed commands. Shells can only complete executables found in ``$PATH``, so your application must be installed as a command before runtime completion will function.
+
+Basic Usage
+-----------
+
+.. important::
+
+   Only reach for a completer when the candidate values are genuinely unknown until runtime -- git branches, running containers, rows from a database, files on disk. If the values are fixed at definition time, use a :class:`~typing.Literal`, an :class:`~enum.Enum`, or :attr:`.Parameter.choices` instead: those complete entirely in the shell, whereas a completer launches your Python program on every ``<TAB>`` (see the warning above).
+
+A completer is a callable that accepts a single :class:`~cyclopts.completion.CompletionContext` argument and returns the candidate values: a single string, an iterable of strings and/or ``(value, description)`` tuples, or a ``{value: description}`` dictionary. This example completes a git branch name -- values that can't be baked into a static script, since they change as branches come and go:
+
+.. code-block:: python
+
+   import subprocess
+   from typing import Annotated
+
+   from cyclopts import App, Parameter
+
+   app = App(name="gitish")
+
+
+   def complete_branch(ctx):
+       result = subprocess.run(
+           ["git", "branch", "--format=%(refname:short)"],
+           capture_output=True,
+           text=True,
+       )
+       return result.stdout.split()
+
+
+   @app.command
+   def checkout(branch: Annotated[str, Parameter(completer=complete_branch)]): ...
+
+
+   app()
+
+When the user types ``gitish checkout ma<TAB>``, Cyclopts offers ``main``. Notice ``complete_branch`` returns *all* branches rather than filtering them: your shell prefix-matches the returned candidates against the word being completed, so there is no need to filter by prefix yourself. Returning a plain string is also allowed, which is convenient when the completer resolves to exactly one value.
+
+Use ``ctx.incomplete`` (the partial word typed so far) to *narrow expensive lookups*, not to filter the result. For example, pass the prefix into a database query so you fetch only matching rows instead of every possible value:
+
+.. code-block:: python
+
+   def complete_user(ctx):
+       return db.usernames_starting_with(ctx.incomplete)
+
+.. note::
+
+   Because the shell prefix-matches candidates, completers can only offer prefix completions; substring and fuzzy matching are not possible, since the shell drops any candidate that does not start with the word being completed.
+
+.. note::
+
+   In fish, a completer on a *positional* parameter of the **root** command (``@app.default`` with no subcommand) is not wired up; fish falls back to its default file completion there. Positional completers on subcommands, and option-value completers everywhere, work in all three shells.
+
+.. note::
+
+   A value that looks like an option (begins with ``-``, such as a negative number, or any value for a parameter with :attr:`.Parameter.allow_leading_hyphen`) is not completer-dispatched: the shells treat a ``-``-prefixed word as an option name and offer option-name completion instead.
+
+Descriptions
+------------
+
+To display descriptions alongside completions, return ``(value, description)`` tuples or a ``{value: description}`` dictionary. zsh and fish render these in the completion menu; bash shows the values only. Here each branch is annotated with the subject of its latest commit:
+
+.. code-block:: python
+
+   def complete_branch(ctx):
+       result = subprocess.run(
+           ["git", "for-each-ref", "--format=%(refname:short)%09%(subject)", "refs/heads"],
+           capture_output=True,
+           text=True,
+       )
+       return dict(line.split("\t", 1) for line in result.stdout.splitlines())
+
+Dependent Completions
+---------------------
+
+Often the valid values for a parameter depend on another parameter already supplied on the command line. Access those values through the :class:`~cyclopts.completion.CompletionContext` by indexing with the option name (``ctx["--directory"]``), its bare name (``ctx["directory"]``), or the Python field name. The returned object exposes:
+
+- ``.value`` -- the best-effort coerced Python value. Sourced like a real invocation: CLI tokens, then the parameter's ``env_var``, then config sources, then its default (:obj:`~cyclopts.UNSET` if none of those apply or coercion fails).
+- ``.raw`` -- the raw typed string, or :obj:`None` if not provided
+- ``.provided`` -- :obj:`True` if the argument was explicitly given (CLI, env var, or config)
+
+Use ``ctx.get(name, default)`` to return a default instead of raising for an unknown name.
+
+The following example completes ``--entry`` with the files that actually exist in the already-typed ``--directory`` -- a value pair that can only be known at runtime:
+
+.. code-block:: python
+
+   import os
+   from typing import Annotated
+
+   from cyclopts import App, Parameter
+
+   app = App(name="viewer")
+
+
+   def complete_entry(ctx):
+       directory = ctx["--directory"].value
+       if not directory or not os.path.isdir(directory):
+           return []
+       return os.listdir(directory)
+
+
+   @app.command
+   def show(
+       *,
+       directory: str = ".",
+       entry: Annotated[str, Parameter(completer=complete_entry)] = "",
+   ): ...
+
+
+   app()
+
+Multi-Value Parameters
+----------------------
+
+For a parameter that takes several values (``tuple[str, str]``, ``list[str]``, ``*args``), the completer runs once per value. ``ctx.index`` is the zero-based position of the value being completed, so a completer can offer different candidates per element:
+
+.. code-block:: python
+
+   def complete_endpoint(ctx):
+       return ["localhost", "0.0.0.0"] if ctx.index == 0 else ["80", "443", "8080"]
+
+
+   @app.command
+   def bind(endpoint: Annotated[tuple[str, str], Parameter(completer=complete_endpoint)]): ...
+
+.. note::
+
+   Per-value dispatch works for positional multi-value parameters in all three shells, and for the first value of a multi-value *option*. The generated scripts do not yet invoke the completer for the *second and later* values of a multi-value option (e.g. ``--point 1 <TAB>`` on a ``tuple[int, int]``): the engine resolves that slot correctly, but bash/zsh/fish route it as a fresh positional/option position instead. If later elements need completion, prefer a positional multi-value parameter.
+
+Shared Completers
+-----------------
+
+To apply one completer across many parameters, set it on an :class:`~cyclopts.App`'s ``default_parameter`` instead of on each parameter individually. It then acts as the default completer for every parameter of that app (and its subcommands) that doesn't specify its own:
+
+.. code-block:: python
+
+   import subprocess
+
+   from cyclopts import App, Parameter
+
+
+   def complete_branch(ctx):
+       result = subprocess.run(
+           ["git", "branch", "--format=%(refname:short)"],
+           capture_output=True,
+           text=True,
+       )
+       return result.stdout.split()
+
+
+   app = App(name="gitish", default_parameter=Parameter(completer=complete_branch))
+
+
+   @app.command
+   def checkout(branch: str): ...  # both commands complete branch names
+
+
+   @app.command
+   def delete(branch: str): ...
+
+
+   app()
+
+See :attr:`.Parameter.completer` and :class:`~cyclopts.completion.CompletionContext` for full API details.
+
+Troubleshooting
+---------------
+
+Runtime completion swallows all errors so that a broken completer can never corrupt the shell's candidate list, which also means a misbehaving completer silently produces nothing. To see what the engine is doing, set ``CYCLOPTS_COMPLETION_DEBUG`` and invoke the hidden ``__complete`` command by hand the way the shell does -- passing the words after the program name, with an empty final argument for the word being completed:
+
+.. code-block:: console
+
+   $ CYCLOPTS_COMPLETION_DEBUG=1 deployer __complete deploy --region us-east --cluster ""
+   [cyclopts:completion] words=['deploy', '--region', 'us-east', '--cluster', ''] ...
+   [cyclopts:completion] resolved command=('deploy',) unused=['--region', 'us-east', '--cluster']
+   [cyclopts:completion] active argument='--cluster' completer='complete_cluster'
+   [cyclopts:completion] completer returned 1 candidate(s): [('va-1', '')]
+   va-1
+
+The diagnostics print to stderr (the candidates still print to stdout), and a completer that raises has its full traceback surfaced instead of swallowed.

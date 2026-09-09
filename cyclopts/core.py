@@ -4,7 +4,7 @@ import os
 import sys
 import traceback
 from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
-from contextlib import suppress
+from contextlib import nullcontext, suppress
 from copy import copy
 from enum import StrEnum
 from functools import lru_cache, partial
@@ -86,6 +86,11 @@ DEFAULT_SHELL_INTRO = (
     if os.name == "posix"
     else "Interactive shell. Press Ctrl-Z followed by Enter to exit."
 )
+
+#: Reserved first token the generated shell-completion script uses to request
+#: dynamic completions (see :meth:`App._run_complete`). Shared by the sync and
+#: async entrypoints so their interception guards can't drift apart.
+_COMPLETE_COMMAND = "__complete"
 
 
 def _result_action_converter(
@@ -1727,6 +1732,17 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
+        # Reserved command: the generated shell-completion script calls back into
+        # the application as ``<prog> __complete <words...>`` to obtain dynamic
+        # completions from ``Parameter.completer`` callbacks. Intercepted here —
+        # like the help/version pseudo-commands — so every entry point
+        # (``__call__``, ``run_async``, ``parse_args``, ``parse_known_args``)
+        # handles it and it never collides with user commands.
+        if tokens and tokens[0] == _COMPLETE_COMMAND:
+            command = self._run_complete
+            bound = inspect.signature(command).bind(tokens[1:])
+            return command, bound, [], {}, ArgumentCollection()
+
         meta_parent = self
 
         # We need both versions of the apps list:
@@ -2710,6 +2726,55 @@ class App:
         build(tree, self, 1)
         return tree
 
+    def _run_complete(self, words: Iterable[str]) -> None:
+        r"""Handle the reserved ``__complete`` command: print the engine's candidates as tab-delimited records.
+
+        Errors are swallowed (a broken completer must never surface a traceback
+        into the shell); ``CYCLOPTS_COMPLETION_DEBUG`` reveals them on stderr.
+
+        Wire protocol (kept forward-compatible so a later cyclopts can extend it
+        without breaking an already-installed completion script):
+
+        * Each candidate is one line: ``value<TAB>description``. Generated scripts
+          read only these two fields and ignore any further ``<TAB>``-delimited
+          fields, which are reserved for future per-candidate metadata (e.g. a
+          no-space hint or a display style), mirroring carapace's tab records.
+        * A line whose first character is ``\x1f`` (ASCII Unit Separator) is a
+          reserved *global* control-directive channel; generated scripts skip it.
+        * The first directive, ``\x1fbegin``, opens the record stream: readers
+          discard anything before it, so a program that prints during import (a
+          banner, a chatty dependency) can't pollute the candidates.
+
+        To keep those field/line delimiters unambiguous, tabs and newlines in the
+        value and description are flattened to spaces, and a leading ``\x1f`` is
+        stripped, so completer-supplied data can never forge a field or directive.
+        """
+        from cyclopts.completion._engine import completion_debug_enabled, compute_completions, stdout_to_stderr
+
+        def sanitize(text: str) -> str:
+            return text.replace("\t", " ").replace("\n", " ").replace("\r", " ").lstrip("\x1f")
+
+        print("\x1fbegin")
+        try:
+            # Completers are user code; anything they (or their subprocesses) print
+            # must not be parsed as a record.
+            with stdout_to_stderr():
+                completions = compute_completions(self, list(words))
+        except Exception:
+            if completion_debug_enabled():
+                import traceback
+
+                traceback.print_exc()
+            return None
+        for completion in completions:
+            value = sanitize(completion.value)
+            help = sanitize(completion.help)
+            if help:
+                print(f"{value}\t{help}")
+            else:
+                print(value)
+        return None
+
     def generate_completion(
         self,
         *,
@@ -2750,10 +2815,17 @@ class App:
         ShellDetectionError
             If shell is None and auto-detection fails.
         """
+        # A meta app forwards its tokens to the root app, so ``app.meta`` and
+        # ``app`` describe the same command line; always generate from the root
+        # (the runtime ``__complete`` engine resolves from there too).
+        app = self
+        while app._meta_parent is not None:
+            app = app._meta_parent
+
         if prog_name is None:
-            if not self.name:
+            if not app.name:
                 raise ValueError("App must have a name to generate completion script")
-            prog_name = self.name[0] if isinstance(self.name, tuple) else self.name
+            prog_name = app.name[0] if isinstance(app.name, tuple) else app.name
 
         if shell is None:
             from cyclopts.completion import detect_shell
@@ -2763,15 +2835,15 @@ class App:
         if shell == "zsh":
             from cyclopts.completion.zsh import generate_completion_script
 
-            return generate_completion_script(self, prog_name)
+            return generate_completion_script(app, prog_name)
         elif shell == "bash":
             from cyclopts.completion.bash import generate_completion_script
 
-            return generate_completion_script(self, prog_name)
+            return generate_completion_script(app, prog_name)
         elif shell == "fish":
             from cyclopts.completion.fish import generate_completion_script
 
-            return generate_completion_script(self, prog_name)
+            return generate_completion_script(app, prog_name)
         else:
             raise ValueError(f"Unsupported shell: {shell}")
 
@@ -3026,8 +3098,14 @@ class App:
             # libedit raises PermissionError (not FileNotFoundError) on its own header-only files.
             with suppress(OSError):
                 readline.read_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
+        if readline:
+            from cyclopts.completion._readline import readline_completion
+
+            completion = readline_completion(self, readline)
+        else:
+            completion = nullcontext()
         try:
-            with self.app_stack([], overrides):
+            with completion, self.app_stack([], overrides):
                 if intro is None:
                     intro = DEFAULT_SHELL_INTRO
                 if intro:

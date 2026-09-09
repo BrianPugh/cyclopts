@@ -62,6 +62,17 @@ class CompletionData:
     own_arguments: "ArgumentCollection" = field(factory=ArgumentCollection)
 
 
+def visible_commands(app: "App") -> list[RegisteredCommand]:
+    """Shown subcommands of ``app`` (lazy specs resolved), in help-panel order."""
+    commands = []
+    for group, registered_commands in groups_from_app(app, resolve_lazy=True):
+        if group.show:
+            for registered_command in registered_commands:
+                if registered_command.app.show and registered_command not in commands:
+                    commands.append(registered_command)
+    return commands
+
+
 def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]:
     """Recursively extract completion data for app and all subcommands.
 
@@ -121,12 +132,7 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
                 else:
                     own_arguments.extend(app_arguments)  # plain @app.default
 
-        commands = []
-        for group, registered_commands in groups_from_app(command_app, resolve_lazy=True):
-            if group.show:
-                for registered_command in registered_commands:
-                    if registered_command.app.show and registered_command not in commands:
-                        commands.append(registered_command)
+        commands = visible_commands(command_app)
 
         help_format = command_app.app_stack.resolve("help_format", fallback="markdown")
 
