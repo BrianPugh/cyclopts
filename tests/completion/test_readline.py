@@ -70,6 +70,8 @@ def test_complete_line_paths(app, tmp_path, monkeypatch):
     assert complete_line(app, "deploy prod --path da") == ["data/", "data.bak"]
     assert complete_line(app, "deploy prod --path data/") == ["data/a.txt"]
     assert complete_line(app, "deploy prod --path ./da") == ["./data/", "./data.bak"]
+    (tmp_path / ".hidden").touch()
+    assert complete_line(app, "deploy prod --path .") == [".hidden"]
 
 
 def test_complete_line_remapped_bare_flags(app):

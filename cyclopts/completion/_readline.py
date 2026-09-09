@@ -67,7 +67,7 @@ def _static_candidates(slot: Slot) -> list[str]:
     if get_completion_action(slot.active.hint) is CompletionAction.FILES:
         # ponytail: no ``~`` expansion; readline inserts the literal path.
         incomplete = slot.incomplete
-        stem = "" if incomplete.endswith("/") else Path(incomplete).name
+        stem = incomplete.rpartition("/")[2]
         directory = incomplete[: len(incomplete) - len(stem)]
         for path in sorted(Path(directory or ".").glob(glob.escape(stem) + "*")):
             candidates.append(directory + path.name + ("/" if path.is_dir() else ""))
