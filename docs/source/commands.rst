@@ -349,6 +349,78 @@ There are a few ways to add a help string to a command:
       │ --version  Display application version.                               │
       ╰───────────────────────────────────────────────────────────────────────╯
 
+.. _Deprecating a Command:
+
+---------------------
+Deprecating a Command
+---------------------
+Mark a command as deprecated via the :attr:`deprecated <cyclopts.App.deprecated>` field, either on
+:meth:`@app.command <cyclopts.App.command>` or directly on a sub-app.
+It accepts either a plain message, or a ``(version, message)`` tuple:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App(name="my-script")
+
+   @app.command
+   def foo():
+       """Help string for foo."""
+
+   @app.command(deprecated="Use foo instead.")
+   def bar():
+       """Help string for bar."""
+
+   app()
+
+.. code-block:: console
+
+   $ my-script --help
+   Usage: my-script COMMAND
+
+   ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+   │ bar          [⚠ Deprecated] Help string for bar.                             │
+   │ foo          Help string for foo.                                            │
+   │ --help (-h)  Display this message and exit.                                  │
+   │ --version    Display application version.                                    │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+
+   $ my-script bar --help
+   Usage: my-script bar
+
+   Help string for bar.
+
+   [⚠ Deprecated] Use foo instead.
+
+This only changes what's *displayed*; ``bar`` still runs normally when invoked.
+To also get notified at runtime whenever ``bar`` is actually invoked (e.g. to log a warning),
+set :attr:`App.deprecated_handler <cyclopts.App.deprecated_handler>`.
+It's called as ``(kind, name, version, message)``, where ``kind`` is ``"command"`` or ``"parameter"``:
+
+.. code-block:: python
+
+   import logging
+   from cyclopts import App
+
+   logger = logging.getLogger(__name__)
+
+
+   def log_deprecation(kind, name, version, message):
+       logger.warning("%s %r is deprecated: %s", kind, name, message)
+
+
+   app = App(name="my-script", deprecated_handler=log_deprecation)
+
+   @app.command(deprecated="Use foo instead.")
+   def bar():
+       pass
+
+Set on the root :class:`.App`, ``deprecated_handler`` is inherited by every sub-app unless overridden.
+If left unset entirely, Cyclopts falls back to emitting a standard :class:`DeprecationWarning`.
+The same mechanism applies to :attr:`Parameter.deprecated <cyclopts.Parameter.deprecated>`, firing
+only when that specific parameter is explicitly supplied on the CLI -- see :ref:`Parameters`.
+
 -----
 Async
 -----
