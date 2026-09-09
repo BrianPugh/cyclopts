@@ -90,8 +90,18 @@ def test_readline_completer_states(app, mocker):
     readline.get_endidx.return_value = len("deploy p")
     completer = make_readline_completer(app, readline)
 
-    assert completer("p", 0) == "prod"
+    assert completer("p", 0) == "prod "
     assert completer("p", 1) is None
+
+
+def test_readline_completer_no_space_after_directory(app, mocker, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+    readline = mocker.MagicMock()
+    readline.get_line_buffer.return_value = "deploy prod --path da"
+    readline.get_endidx.return_value = len("deploy prod --path da")
+
+    assert make_readline_completer(app, readline)("da", 0) == "data/"
 
 
 def test_readline_completer_swallows_errors(app, mocker):

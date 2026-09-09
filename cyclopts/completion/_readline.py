@@ -91,13 +91,22 @@ def complete_line(app: "App", line: str) -> list[str]:
 
 
 def make_readline_completer(app: "App", readline) -> Callable[[str, int], str | None]:
-    """Build a ``readline.set_completer``-compatible callback for ``app``."""
+    """Build a ``readline.set_completer``-compatible callback for ``app``.
+
+    CPython's readline module clears ``rl_completion_append_character`` (so
+    ``rlcompleter`` can offer ``obj.`` continuations) and exposes no way to set
+    it, so the space after a completed word is appended here. Directories get
+    none so the user can keep typing into them.
+    """
     matches: list[str] = []
 
     def completer(text: str, state: int) -> str | None:
         if state == 0:
             try:
-                matches[:] = complete_line(app, readline.get_line_buffer()[: readline.get_endidx()])
+                matches[:] = [
+                    m if m.endswith("/") else m + " "
+                    for m in complete_line(app, readline.get_line_buffer()[: readline.get_endidx()])
+                ]
             except Exception as e:  # readline discards exceptions silently; keep them visible in debug mode.
                 debug(f"readline completion failed: {_exc(e)}")
                 matches.clear()
