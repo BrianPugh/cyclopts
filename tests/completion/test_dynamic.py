@@ -4,6 +4,8 @@ These exercise the shell-agnostic engine (``compute_completions``) and the
 reserved ``__complete`` command routing, without spawning a real shell.
 """
 
+import subprocess
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -151,12 +153,13 @@ def test_complete_command_sanitizes_delimiters(capsys):
     assert not any(line.startswith("\x1f") for line in out)
 
 
-def test_complete_command_captures_completer_stdout(capsys):
-    """Anything a completer prints is diverted to stderr so it can't be parsed as a candidate record."""
+def test_complete_command_captures_completer_stdout(capfd):
+    """Anything a completer prints, via ``sys.stdout`` or a subprocess inheriting fd 1, is diverted to stderr so it can't be parsed as a candidate record."""
     app = App(name="myapp", result_action="return_value")
 
     def chatty(ctx):
         print("noise\tforged")
+        subprocess.run([sys.executable, "-c", "print('fd-noise\\tforged')"], check=True)
         return ["real"]
 
     @app.command
@@ -164,9 +167,10 @@ def test_complete_command_captures_completer_stdout(capsys):
         pass
 
     app(["__complete", "go", ""], exit_on_error=False)
-    captured = capsys.readouterr()
+    captured = capfd.readouterr()
     assert captured.out.strip().splitlines() == ["real"]
     assert "noise" in captured.err
+    assert "fd-noise" in captured.err
 
 
 def test_complete_command_via_parse_args(app, capsys):
@@ -489,6 +493,7 @@ def test_generate_completion_from_meta_matches_root(shell):
 
     from_meta = app.meta.generate_completion(prog_name="myapp", shell=shell)
     assert from_meta == app.generate_completion(prog_name="myapp", shell=shell)
+    assert app.meta.generate_completion(shell=shell) == from_meta
     assert "name" in from_meta  # fish spells it ``-l name``
 
 
@@ -532,6 +537,25 @@ def test_sibling_value_from_env_var(monkeypatch):
     monkeypatch.setenv("MYAPP_REGION", "us-west")
     compute_completions(app, ["d", "--cluster", ""])
     assert seen == {"provided": True, "value": "us-west"}
+
+
+def test_env_var_does_not_populate_active_argument(monkeypatch):
+    """An env value for the argument being completed must not inflate ``ctx.index`` or mark it provided."""
+    app = App(name="myapp")
+    seen = {}
+
+    def complete_cluster(ctx):
+        seen["index"] = ctx.index
+        seen["provided"] = ctx.argument.tokens != []
+        return ["c"]
+
+    @app.command
+    def d(*, cluster: Annotated[tuple[str, ...], Parameter(env_var="MYAPP_CLUSTER", completer=complete_cluster)] = ()):
+        pass
+
+    monkeypatch.setenv("MYAPP_CLUSTER", "a b c")
+    compute_completions(app, ["d", "--cluster", ""])
+    assert seen == {"index": 0, "provided": False}
 
 
 def test_sibling_value_falls_back_to_default():

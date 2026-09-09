@@ -4,7 +4,7 @@ import os
 import sys
 import traceback
 from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
-from contextlib import nullcontext, redirect_stdout, suppress
+from contextlib import nullcontext, suppress
 from copy import copy
 from enum import StrEnum
 from functools import lru_cache, partial
@@ -2747,14 +2747,15 @@ class App:
         value and description are flattened to spaces, and a leading ``\x1f`` is
         stripped, so completer-supplied data can never forge a field or directive.
         """
-        from cyclopts.completion._engine import completion_debug_enabled, compute_completions
+        from cyclopts.completion._engine import completion_debug_enabled, compute_completions, stdout_to_stderr
 
         def sanitize(text: str) -> str:
             return text.replace("\t", " ").replace("\n", " ").replace("\r", " ").lstrip("\x1f")
 
         try:
-            # Completers are user code; anything they print must not be parsed as a record.
-            with redirect_stdout(sys.stderr):
+            # Completers are user code; anything they (or their subprocesses) print
+            # must not be parsed as a record.
+            with stdout_to_stderr():
                 completions = compute_completions(self, list(words))
         except Exception:
             if completion_debug_enabled():
@@ -2811,22 +2812,22 @@ class App:
         ShellDetectionError
             If shell is None and auto-detection fails.
         """
-        if prog_name is None:
-            if not self.name:
-                raise ValueError("App must have a name to generate completion script")
-            prog_name = self.name[0] if isinstance(self.name, tuple) else self.name
-
-        if shell is None:
-            from cyclopts.completion import detect_shell
-
-            shell = detect_shell()
-
         # A meta app forwards its tokens to the root app, so ``app.meta`` and
         # ``app`` describe the same command line; always generate from the root
         # (the runtime ``__complete`` engine resolves from there too).
         app = self
         while app._meta_parent is not None:
             app = app._meta_parent
+
+        if prog_name is None:
+            if not app.name:
+                raise ValueError("App must have a name to generate completion script")
+            prog_name = app.name[0] if isinstance(app.name, tuple) else app.name
+
+        if shell is None:
+            from cyclopts.completion import detect_shell
+
+            shell = detect_shell()
 
         if shell == "zsh":
             from cyclopts.completion.zsh import generate_completion_script

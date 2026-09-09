@@ -95,10 +95,11 @@ def _emit_completer_completion(indent: str, prog_name: str) -> list[str]:
         f"{indent}local _q",
         # ``COMP_WORDS[0]`` is how the user typed the command, which isn't always
         # directly executable (a shell function/alias, or completion registered
-        # under a different name). Fall back to the installed program name when it
-        # isn't on ``PATH`` -- mirrors the zsh helper's ``$+commands`` guard.
+        # under a different name). ``command -v`` accepts aliases, which don't
+        # expand from a variable, so use a PATH-only lookup plus a path-form check
+        # (``./prog``) -- mirrors the zsh helper's ``$+commands`` guard.
         f'{indent}local _cmd="${{COMP_WORDS[0]}}"',
-        f'{indent}command -v "$_cmd" >/dev/null 2>&1 || _cmd="{prog_name}"',
+        f'{indent}type -P "$_cmd" >/dev/null 2>&1 || [[ -x "$_cmd" ]] || _cmd="{prog_name}"',
         f"{indent}while IFS= read -r _line; do",
         # A line beginning with \x1f is a reserved global control directive, not a
         # candidate; nothing emits one yet, so skip it (forward-compat headroom).

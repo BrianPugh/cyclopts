@@ -1155,9 +1155,10 @@ API
               cluster: Annotated[str, Parameter(completer=complete_cluster)] = "",
           ): ...
 
-      Completing a completer-backed value launches your Python program in a fresh process
-      to run the completer, paying interpreter startup plus every module-load import before
-      the callback runs (other completions stay in-shell). Keep the callback and your
+      From a generated bash/zsh/fish script, completing a completer-backed value launches
+      your Python program in a fresh process to run the completer, paying interpreter startup
+      plus every module-load import before the callback runs (other completions stay
+      in-shell; :meth:`App.interactive_shell` runs completers in-process). Keep the callback and your
       top-level imports fast, importing heavy dependencies lazily, and see
       :ref:`Lazy Loading` for commands with heavy dependencies.
 
