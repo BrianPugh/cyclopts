@@ -2,7 +2,7 @@
 name = "complex-demo"
 version = "1.0.0"
 description = "Complex demo application for cyclopts documentation testing"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "cyclopts",
 ]

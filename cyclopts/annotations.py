@@ -16,7 +16,6 @@ if sys.version_info >= (3, 12):  # pragma: no cover
 else:  # pragma: no cover
     TypeAliasType = None
 
-# from types import NoneType is available >=3.10
 NoneType = type(None)
 AnnotatedType = type(Annotated[int, 0])
 

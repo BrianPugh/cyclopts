@@ -385,9 +385,8 @@ def signature_parameters(f: Any) -> dict[str, FieldInfo]:
 
     out = {}
     for name, iparam in inspect.signature(f).parameters.items():
-        # Prefer iparam.annotation to preserve union ordering (Python 3.10 issue where
-        # get_type_hints normalizes unions, changing arg order).
-        # Fall back to get_type_hints for forward references (strings) or empty annotations.
+        # Prefer the raw iparam.annotation; fall back to get_type_hints only for forward
+        # references (strings) or empty annotations, which need resolving.
         if iparam.annotation is inspect.Parameter.empty or isinstance(iparam.annotation, str):
             annotation = type_hints.get(name, iparam.annotation)
         else:

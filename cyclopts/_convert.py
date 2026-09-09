@@ -160,9 +160,8 @@ def _datetime(s: str) -> datetime:
     try:
         return datetime.fromisoformat(s)
     except ValueError:
-        # Fallback for space-separated format (not ISO 8601 compliant)
-        # Python 3.11+ fromisoformat() accepts spaces, but 3.10 doesn't
-        # Convert space to 'T' to make it ISO-compliant
+        # fromisoformat() rejects surrounding whitespace; strip it and normalize the
+        # date/time separator to 'T' before retrying.
         return datetime.fromisoformat(s.strip().replace(" ", "T", 1))
 
 
