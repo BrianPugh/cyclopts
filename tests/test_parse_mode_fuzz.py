@@ -357,6 +357,9 @@ def test_fuzz_mixed_accounting(seed):
 
 
 @pytest.mark.slow
+# ~10s locally but well over the global 60s pytest-timeout under coverage on CI runners.
+# A hung parse is still caught by the per-parse ``_run_with_watchdog`` timeout.
+@pytest.mark.timeout(600)
 def test_fuzz_bulk():
     """Large corpus; run with ``pytest --run-slow``."""
     for seed in BULK_SEEDS:

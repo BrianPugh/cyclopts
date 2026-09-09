@@ -66,13 +66,6 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
-try:
-    # By importing, makes things like the arrow-keys work.
-    import readline
-except ImportError:  # pragma: no cover
-    # Not available on windows
-    readline = None
-
 if TYPE_CHECKING:
     from rich.console import Console
     from rich.tree import Tree
@@ -88,6 +81,11 @@ T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
 DEFAULT_FORMAT = "markdown"
+DEFAULT_SHELL_INTRO = (
+    "Interactive shell. Press Ctrl-D to exit."
+    if os.name == "posix"
+    else "Interactive shell. Press Ctrl-Z followed by Enter to exit."
+)
 
 #: Reserved first token the generated shell-completion script uses to request
 #: dynamic completions (see :meth:`App._run_complete`). Shared by the sync and
@@ -2489,6 +2487,14 @@ class App:
                     else:
                         command_panel.description = group_help
 
+                if command_app is self and self.app_stack.overrides.get("remap_flags"):
+                    # ``interactive_shell`` accepts ``help`` for ``--help`` at the root; list it that
+                    # way so it sorts alongside the other commands.
+                    apps_with_names = [
+                        x.evolve(names=(*(n[2:] for n in x.names if subapp._is_remappable_flag(n)), *x.names))
+                        for x in apps_with_names
+                    ]
+
                 # Add the command to the group's help panel.
                 command_panel.entries.extend(format_command_entries(apps_with_names, format=help_format))
 
@@ -2973,12 +2979,16 @@ class App:
     def interactive_shell(
         self,
         prompt: str = "$ ",
+        *,
         quit: None | str | Iterable[str] = None,
         dispatcher: Dispatcher | None = None,
         console: "Console | None" = None,
         exit_on_error: bool = False,
         result_action: ResultAction | None = None,
         error_console: "Console | None" = None,
+        intro: str | None = None,
+        history: bool | str | Path = False,
+        remap_flags: bool = True,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
@@ -2994,7 +3004,7 @@ class App:
             Shell prompt. Defaults to ``"$ "``.
         quit: str | Iterable[str]
             String or list of strings that will cause the shell to exit and this method to return.
-            Defaults to ``["q", "quit"]``.
+            Defaults to ``["q", "quit", "exit"]``. A registered command with the same name takes precedence.
         dispatcher: Dispatcher | None
             Optional function that subsequently invokes the command.
             The ``dispatcher`` function must have signature:
@@ -3019,18 +3029,34 @@ class App:
             If :obj:`None`, inherits from :attr:`App.result_action`.
         error_console: Console | None
             Rich Console to use for error messages and tracebacks. If :obj:`None`, uses :attr:`App.error_console`.
+        intro: str | None
+            Banner printed once when the shell starts; supports Rich markup
+            (e.g. ``"[bold]Welcome[/bold]"``). :obj:`None` uses a default banner;
+            an empty string prints nothing.
+        history: bool | str | Path
+            Persist ``readline`` history across sessions. A path (``~`` expanded) loads history
+            from that file on entry and saves it on exit; :obj:`True` uses ``~/.<app_name>_history``.
+            The file (and parent directories) is created if missing; read/write errors are ignored.
+            Defaults to :obj:`False` (no persistence).
+        remap_flags: bool
+            Treat a bare long-flag word typed as the first token as that flag, so ``help`` and
+            ``version`` behave like ``--help`` and ``--version``, and list them that way in the
+            root help screen. Only the root is affected (``foo help`` is not remapped); short
+            flags are not remapped. The word is left alone if it names a registered command or a
+            parameter of the default command declares the flag itself. Defaults to :obj:`True`.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
-        if os.name == "posix":  # pragma: no cover
-            # Mac/Linux
-            print("Interactive shell. Press Ctrl-D to exit.")
-        else:  # pragma: no cover
-            # Windows
-            print("Interactive shell. Press Ctrl-Z followed by Enter to exit.")
+        try:
+            # Makes arrow keys and history work. Imported here rather than at module level
+            # because ``readline`` alters ``input()`` process-wide and costs startup time;
+            # programs that never open a shell should not pay for it.
+            import readline
+        except ImportError:  # pragma: no cover
+            readline = None
 
         if quit is None:
-            quit = ["q", "quit"]
+            quit = ["q", "quit", "exit"]
         if isinstance(quit, str):
             quit = [quit]
 
@@ -3049,56 +3075,102 @@ class App:
         if error_console is not None:
             overrides["_error_console"] = error_console
         overrides["exit_on_error"] = exit_on_error
+        overrides["remap_flags"] = remap_flags
 
         # libedit (macOS) keeps reporting the previous line from ``get_line_buffer`` until
         # new text is typed, so an interrupted buffer equal to the last seen line means the
         # line was actually empty. GNU readline reports "" directly.
         previous_line = ""
-        with self.app_stack([], overrides):
-            while True:
-                try:
-                    user_input = input(prompt)
-                except EOFError:  # pragma: no cover
-                    break
-                except KeyboardInterrupt:
-                    print()
-                    # typeshed guards ``get_line_buffer`` behind ``sys.platform != "win32"``;
-                    # ``readline`` is ``None`` on Windows anyway, so this branch never runs there.
-                    line_buffer = readline.get_line_buffer() if readline else ""  # pyright: ignore[reportAttributeAccessIssue]
-                    if line_buffer in ("", previous_line):
-                        break
-                    previous_line = line_buffer
-                    continue
-                previous_line = user_input + "\n"
-
-                try:
-                    tokens = self._normalize_tokens(user_input)
-                except CycloptsError:
-                    # ``_normalize_tokens`` already reported the error (respecting
-                    # ``exit_on_error``); keep the shell running.
-                    continue
-                if not tokens:
-                    continue
-                if tokens[0] in quit:
-                    break
-
-                # Keep the exception handlers inside the token ``app_stack`` context so that
-                # context-sensitive settings (e.g. ``error_console``) resolve from the invoked
-                # subcommand rather than the root app.
-                with self.app_stack(tokens):
+        if history is True:
+            history_path = Path.home() / f".{Path(self.name[0]).name}_history"
+        elif history:
+            history_path = Path(history).expanduser()
+        else:
+            history_path = None
+        if readline and history_path:
+            # History is process-global; start from the file alone so re-entering the shell
+            # doesn't duplicate entries and unrelated ``input()`` calls don't leak in.
+            readline.clear_history()  # pyright: ignore[reportAttributeAccessIssue]
+            # libedit raises PermissionError (not FileNotFoundError) on its own header-only files.
+            with suppress(OSError):
+                readline.read_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
+        try:
+            with self.app_stack([], overrides):
+                if intro is None:
+                    intro = DEFAULT_SHELL_INTRO
+                if intro:
+                    self.console.print(intro, highlight=False)
+                while True:
                     try:
-                        command, bound, ignored = self.parse_args(tokens, **kwargs)
-                        result = dispatcher(command, bound, ignored)
-                        self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
-                    except CycloptsError:
-                        # Upstream ``parse_args`` already printed the error
-                        pass
+                        user_input = input(prompt)
+                    except EOFError:  # pragma: no cover
+                        break
                     except KeyboardInterrupt:
-                        if not self.suppress_keyboard_interrupt:
-                            raise
                         print()
-                    except Exception:
-                        self.error_console.print(traceback.format_exc(), markup=False, highlight=False, soft_wrap=True)
+                        # typeshed guards ``get_line_buffer`` behind ``sys.platform != "win32"``;
+                        # ``readline`` is ``None`` on Windows anyway, so this branch never runs there.
+                        line_buffer = readline.get_line_buffer() if readline else ""  # pyright: ignore[reportAttributeAccessIssue]
+                        if line_buffer in ("", previous_line):
+                            break
+                        previous_line = line_buffer
+                        continue
+                    previous_line = user_input + "\n"
+
+                    try:
+                        tokens = self._normalize_tokens(user_input)
+                    except CycloptsError:
+                        # ``_normalize_tokens`` already reported the error (respecting
+                        # ``exit_on_error``); keep the shell running.
+                        continue
+                    if not tokens:
+                        continue
+                    if tokens[0] in quit and tokens[0] not in _combined_meta_command_mapping(self):
+                        break
+
+                    # Keep the exception handlers inside the token ``app_stack`` context so that
+                    # context-sensitive settings (e.g. ``error_console``) resolve from the invoked
+                    # subcommand rather than the root app.
+                    with self.app_stack(tokens):
+                        try:
+                            if remap_flags:
+                                tokens = self._remap_bare_flags(tokens)
+                            command, bound, ignored = self.parse_args(tokens, **kwargs)
+                            result = dispatcher(command, bound, ignored)
+                            self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
+                        except CycloptsError:
+                            # Upstream ``parse_args`` already printed the error
+                            pass
+                        except KeyboardInterrupt:
+                            if not self.suppress_keyboard_interrupt:
+                                raise
+                            print()
+                        except Exception:
+                            self.error_console.print(
+                                traceback.format_exc(), markup=False, highlight=False, soft_wrap=True
+                            )
+        finally:
+            if readline and history_path:
+                # An unwritable history location must not turn a clean exit into a traceback.
+                with suppress(OSError):
+                    history_path.parent.mkdir(parents=True, exist_ok=True)
+                    readline.write_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
+
+    def _remap_bare_flags(self, tokens: list[str]) -> list[str]:
+        """Rewrite a leading bare long-flag word into the flag (``help`` -> ``--help``)."""
+        flag = "--" + tokens[0]
+        return [flag, *tokens[1:]] if self._is_remappable_flag(flag) else tokens
+
+    def _is_remappable_flag(self, flag: str) -> bool:
+        """Whether ``remap_flags`` maps the dashless form of ``flag`` (``help`` for ``--help``) onto it for this app."""
+        if not flag.startswith("--") or flag not in (*self.help_flags, *self.version_flags):
+            return False
+        if flag[2:] in _combined_meta_command_mapping(self):
+            return False
+        if self.default_command:
+            collection = _safe_assemble_argument_collection(self)
+            if collection is not None and collection._match_explicit(flag) is not None:
+                return False
+        return True
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.

@@ -1,11 +1,24 @@
+import sys
+import textwrap
+from pathlib import Path
+
 import pytest
 
 from cyclopts import App
+from cyclopts.core import DEFAULT_SHELL_INTRO
+
+
+@pytest.fixture
+def readline(mocker):
+    """Stand-in for ``readline``, which does not exist on Windows."""
+    mock = mocker.MagicMock()
+    mocker.patch.dict(sys.modules, {"readline": mock})
+    return mock
 
 
 def test_interactive_shell(app, mocker, console):
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "foo 1 2 3",
             "bad-command 123",
@@ -47,7 +60,7 @@ def test_interactive_shell_result_action_default_string(mocker, console):
     app = App()
 
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "greet Alice",
             "quit",
@@ -68,7 +81,7 @@ def test_interactive_shell_result_action_default_string(mocker, console):
 def test_interactive_shell_result_action_default_int(app, mocker, console):
     """Test that int returns are not printed in interactive shell (default behavior)."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "get-code 42",
             "quit",
@@ -89,7 +102,7 @@ def test_interactive_shell_result_action_default_int(app, mocker, console):
 def test_interactive_shell_result_action_default_bool_true(app, mocker, console):
     """Test that True returns are not printed in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "check",
             "quit",
@@ -110,7 +123,7 @@ def test_interactive_shell_result_action_default_bool_true(app, mocker, console)
 def test_interactive_shell_result_action_default_bool_false(app, mocker, console):
     """Test that False returns are not printed in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "check",
             "quit",
@@ -131,7 +144,7 @@ def test_interactive_shell_result_action_default_bool_false(app, mocker, console
 def test_interactive_shell_result_action_default_none(app, mocker, console):
     """Test that None returns are not printed in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "do-nothing",
             "quit",
@@ -154,7 +167,7 @@ def test_interactive_shell_result_action_default_list(mocker, console):
     app = App()
 
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "get-list",
             "quit",
@@ -177,7 +190,7 @@ def test_interactive_shell_result_action_custom_app(app, mocker, console):
     custom_app = App(result_action="print_non_none_return_int_as_exit_code")
 
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "get-number",
             "quit",
@@ -198,7 +211,7 @@ def test_interactive_shell_result_action_custom_app(app, mocker, console):
 def test_interactive_shell_result_action_override_parameter(app, mocker, console):
     """Test that result_action parameter overrides App setting."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "greet Bob",
             "quit",
@@ -219,7 +232,7 @@ def test_interactive_shell_result_action_override_parameter(app, mocker, console
 def test_interactive_shell_result_action_callable(app, mocker, console):
     """Test that callable result_action works in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "greet Alice",
             "quit",
@@ -249,7 +262,7 @@ def test_interactive_shell_async_command(mocker, console):
     app = App(backend="asyncio")
 
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "start",
             "quit",
@@ -277,7 +290,7 @@ def test_interactive_shell_async_command(mocker, console):
 def test_interactive_shell_no_sys_exit_on_command(app, mocker, console):
     """Test that commands continue to execute (no sys.exit called) in interactive shell."""
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "cmd1",
             "cmd2",
@@ -315,7 +328,7 @@ def test_interactive_shell_no_sys_exit_on_command(app, mocker, console):
 
 def test_interactive_shell_unbalanced_quote(app, mocker, console):
     """A tokenization error should be reported and the shell should keep running."""
-    mocker.patch("cyclopts.core.input", side_effect=['foo "1', "foo 2", "quit"])
+    mocker.patch("builtins.input", side_effect=['foo "1', "foo 2", "quit"])
 
     calls = []
 
@@ -334,10 +347,10 @@ def test_interactive_shell_unbalanced_quote(app, mocker, console):
     )
 
 
-def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
+def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker, readline):
     """Ctrl-C with text on the line should discard the line, not exit the shell."""
-    mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
-    mocker.patch("cyclopts.core.readline").get_line_buffer.return_value = "foo 5"
+    mocker.patch("builtins.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
+    readline.get_line_buffer.return_value = "foo 5"
 
     calls = []
 
@@ -350,9 +363,9 @@ def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
     assert calls == [1]
 
 
-def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker):
-    mock_input = mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
-    mocker.patch("cyclopts.core.readline").get_line_buffer.return_value = ""
+def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker, readline):
+    mock_input = mocker.patch("builtins.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
+    readline.get_line_buffer.return_value = ""
 
     calls = []
 
@@ -366,12 +379,10 @@ def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker):
     assert mock_input.call_count == 1
 
 
-def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interrupt(app, mocker):
+def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interrupt(app, mocker, readline):
     """Libedit reports the previous line until new text is typed; a repeat means the line was empty."""
-    mock_input = mocker.patch(
-        "cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), KeyboardInterrupt(), "quit"]
-    )
-    mocker.patch("cyclopts.core.readline").get_line_buffer.side_effect = ["foo 2", "foo 2"]
+    mock_input = mocker.patch("builtins.input", side_effect=["foo 1", KeyboardInterrupt(), KeyboardInterrupt(), "quit"])
+    readline.get_line_buffer.side_effect = ["foo 2", "foo 2"]
 
     calls = []
 
@@ -385,9 +396,9 @@ def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interru
     assert mock_input.call_count == 3
 
 
-def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(app, mocker):
-    mock_input = mocker.patch("cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), "quit"])
-    mocker.patch("cyclopts.core.readline").get_line_buffer.return_value = "foo 1\n"
+def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(app, mocker, readline):
+    mock_input = mocker.patch("builtins.input", side_effect=["foo 1", KeyboardInterrupt(), "quit"])
+    readline.get_line_buffer.return_value = "foo 1\n"
 
     calls = []
 
@@ -403,7 +414,7 @@ def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(ap
 
 def test_interactive_shell_keyboard_interrupt_in_command(app, mocker):
     """Ctrl-C during a command should return to the prompt when suppress_keyboard_interrupt is set."""
-    mocker.patch("cyclopts.core.input", side_effect=["foo", "bar", "quit"])
+    mocker.patch("builtins.input", side_effect=["foo", "bar", "quit"])
 
     calls = []
 
@@ -420,7 +431,7 @@ def test_interactive_shell_keyboard_interrupt_in_command(app, mocker):
 
 
 def test_interactive_shell_keyboard_interrupt_in_command_not_suppressed(mocker):
-    mocker.patch("cyclopts.core.input", side_effect=["foo", "quit"])
+    mocker.patch("builtins.input", side_effect=["foo", "quit"])
     app = App(suppress_keyboard_interrupt=False)
 
     @app.command
@@ -432,7 +443,7 @@ def test_interactive_shell_keyboard_interrupt_in_command_not_suppressed(mocker):
 
 
 def test_interactive_shell_exception_goes_to_error_console(app, mocker, console):
-    mocker.patch("cyclopts.core.input", side_effect=["foo", "quit"])
+    mocker.patch("builtins.input", side_effect=["foo", "quit"])
 
     @app.command
     def foo():
@@ -448,7 +459,7 @@ def test_interactive_shell_exception_goes_to_error_console(app, mocker, console)
 
 def test_interactive_shell_subcommand_error_console(mocker, console):
     """A subcommand's own error_console must not be overridden by the root's."""
-    mocker.patch("cyclopts.core.input", side_effect=["sub foo notanint", "quit"])
+    mocker.patch("builtins.input", side_effect=["sub foo notanint", "quit"])
 
     root = App()
     sub = App(name="sub", error_console=console)
@@ -462,3 +473,367 @@ def test_interactive_shell_subcommand_error_console(mocker, console):
         root.interactive_shell()
 
     assert "Error" in capture.get()
+
+
+def test_interactive_shell_exit_word(app, mocker):
+    mock_input = mocker.patch("builtins.input", side_effect=["exit", "foo"])
+
+    @app.command
+    def foo():
+        pass
+
+    app.interactive_shell()
+    assert mock_input.call_count == 1
+
+
+def test_interactive_shell_intro_default(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console)
+
+    assert capture.get() == DEFAULT_SHELL_INTRO + "\n"
+
+
+def test_interactive_shell_intro_empty_prints_nothing(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="")
+
+    assert capture.get() == ""
+
+
+def test_interactive_shell_intro_custom(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="Welcome!")
+
+    assert capture.get() == "Welcome!\n"
+
+
+def test_interactive_shell_intro_none(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="")
+
+    assert capture.get() == ""
+
+
+def test_interactive_shell_history_file(app, mocker, tmp_path, readline):
+    mocker.patch("builtins.input", side_effect=["quit"])
+    history_file = tmp_path / "nested" / "history"
+
+    app.interactive_shell(history=str(history_file))
+
+    readline.clear_history.assert_called_once_with()
+    readline.read_history_file.assert_called_once_with(history_file)
+    readline.write_history_file.assert_called_once_with(history_file)
+    assert history_file.parent.is_dir()
+
+
+def test_interactive_shell_history_file_expands_user(app, mocker, readline):
+    mocker.patch("builtins.input", side_effect=["quit"])
+    mocker.patch("pathlib.Path.mkdir")
+
+    app.interactive_shell(history="~/.myapp_history")
+
+    readline.write_history_file.assert_called_once_with(Path.home() / ".myapp_history")
+
+
+def test_interactive_shell_history_true_default_location(app, mocker, readline):
+    mocker.patch("builtins.input", side_effect=["quit"])
+    mocker.patch("pathlib.Path.mkdir")
+
+    app.interactive_shell(history=True)
+
+    expected = Path.home() / f".{app.name[0]}_history"
+    readline.read_history_file.assert_called_once_with(expected)
+    readline.write_history_file.assert_called_once_with(expected)
+
+
+def test_interactive_shell_history_false_no_persistence(app, mocker, readline):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    app.interactive_shell(history=False)
+
+    readline.read_history_file.assert_not_called()
+    readline.write_history_file.assert_not_called()
+
+
+@pytest.mark.parametrize("error", [FileNotFoundError, PermissionError])
+def test_interactive_shell_history_file_read_error_ignored(app, mocker, readline, error):
+    """Missing file on first run, or libedit's PermissionError on a header-only file."""
+    mocker.patch("builtins.input", side_effect=["quit"])
+    readline.read_history_file.side_effect = error
+
+    app.interactive_shell(history="history")
+
+    readline.write_history_file.assert_called_once()
+
+
+def test_interactive_shell_history_file_write_error_ignored(app, mocker, readline):
+    mocker.patch("builtins.input", side_effect=["quit"])
+    readline.write_history_file.side_effect = PermissionError
+
+    app.interactive_shell(history="history")
+
+
+def test_interactive_shell_history_file_written_on_exception(mocker, readline):
+    mocker.patch("builtins.input", side_effect=["foo"])
+    app = App(suppress_keyboard_interrupt=False)
+
+    @app.command
+    def foo():
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        app.interactive_shell(history="history")
+
+    readline.write_history_file.assert_called_once()
+
+
+def test_interactive_shell_intro_markup(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="[bold]Welcome[/bold]")
+
+    assert capture.get() == "Welcome\n"
+
+
+def test_interactive_shell_intro_escaped_brackets(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=r"Type \[help] or \[q]")
+
+    assert capture.get() == "Type [help] or [q]\n"
+
+
+def test_interactive_shell_quit_word_user_command_wins(app, mocker):
+    mock_input = mocker.patch("builtins.input", side_effect=["exit", "quit"])
+    calls = []
+
+    @app.command
+    def exit():
+        calls.append("exit")
+
+    app.interactive_shell(intro="")
+    assert calls == ["exit"]
+    assert mock_input.call_count == 2
+
+
+def test_interactive_shell_remap_help_root(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+
+    @app.command
+    def foo(a: int):
+        """Foo docstring."""
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="")
+
+    actual = capture.get()
+    assert "Usage:" in actual
+    assert "Foo docstring." in actual
+
+
+def test_interactive_shell_remap_subcommand_not_remapped(app, mocker):
+    """Only the root remaps; ``foo help`` passes ``help`` through as data."""
+    mocker.patch("builtins.input", side_effect=["foo help", "quit"])
+    calls = []
+
+    @app.command
+    def foo(a: str):
+        calls.append(a)
+
+    app.interactive_shell(intro="")
+    assert calls == ["help"]
+
+
+def test_interactive_shell_remap_version(mocker, console):
+    mocker.patch("builtins.input", side_effect=["version", "quit"])
+    app = App(version="1.2.3")
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="")
+
+    assert capture.get() == "1.2.3\n"
+
+
+def test_interactive_shell_remap_user_command_wins(app, mocker):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+    calls = []
+
+    @app.command
+    def help():
+        calls.append("help")
+
+    app.interactive_shell(intro="")
+    assert calls == ["help"]
+
+
+def test_interactive_shell_remap_shadowed_by_parameter(app, mocker):
+    """A default command whose own parameter claims ``--help`` receives the bare word as data."""
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+    calls = []
+
+    @app.default
+    def main(help: str):
+        calls.append(help)
+
+    app.interactive_shell(intro="")
+    assert calls == ["help"]
+
+
+def test_interactive_shell_remap_only_first_token(app, mocker):
+    mocker.patch("builtins.input", side_effect=["1 help", "quit"])
+    calls = []
+
+    @app.default
+    def main(a: int, b: str):
+        calls.append((a, b))
+
+    app.interactive_shell(intro="")
+    assert calls == [(1, "help")]
+
+
+def test_interactive_shell_remap_short_flag_not_remapped(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["h", "quit"])
+
+    @app.command
+    def foo():
+        pass
+
+    with console.capture() as capture:
+        app.interactive_shell(error_console=console, intro="")
+
+    assert 'Unknown command "h"' in capture.get()
+
+
+def test_interactive_shell_remap_disabled(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+
+    @app.command
+    def foo():
+        pass
+
+    with console.capture() as capture:
+        app.interactive_shell(error_console=console, intro="", remap_flags=False)
+
+    assert 'Unknown command "help"' in capture.get()
+
+
+def test_interactive_shell_remap_help_panel_lists_bare_words(mocker, console):
+    """Remapped ``help``/``version`` are listed by their bare word and sorted like any other command."""
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+    app = App(name="app", version="1.0", result_action="return_value")
+
+    @app.command
+    def zoo():
+        """Zoo docstring."""
+
+    @app.command
+    def bar():
+        """Bar docstring."""
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="")
+
+    assert capture.get() == textwrap.dedent(
+        """\
+        Usage: app COMMAND
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ bar                  Bar docstring.                                │
+        │ help (--help, -h)    Display this message and exit.                │
+        │ version (--version)  Display application version.                  │
+        │ zoo                  Zoo docstring.                                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+
+def test_interactive_shell_remap_help_panel_user_command_not_aliased(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["--help", "quit"])
+
+    @app.command
+    def help():
+        """User help."""
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="")
+
+    actual = capture.get()
+    assert "User help." in actual
+    assert "--help (-h)" in actual
+    assert "help (--help" not in actual
+    assert "version (--version)" in actual
+
+
+def test_interactive_shell_remap_disabled_help_panel_unchanged(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["--help", "quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="", remap_flags=False)
+
+    actual = capture.get()
+    assert "--help (-h)" in actual
+    assert "help (--help" not in actual
+
+
+def test_interactive_shell_remap_help_panel_subcommand_unchanged(app, mocker, console):
+    """A nested app's help page keeps the plain flags; only the root lists ``help``."""
+    mocker.patch("builtins.input", side_effect=["foo --help", "quit"])
+    foo = App(name="foo")
+    app.command(foo)
+
+    @foo.command
+    def bar():
+        pass
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="")
+
+    actual = capture.get()
+    assert "│ bar" in actual
+    assert "help (--help" not in actual
+
+
+def test_interactive_shell_meta_command_wins_over_quit(app, mocker):
+    mocker.patch("builtins.input", side_effect=["exit", "quit"])
+    calls = []
+
+    @app.meta.command
+    def exit():
+        calls.append("exit")
+
+    app.interactive_shell(intro="")
+    assert calls == ["exit"]
+
+
+def test_interactive_shell_remap_meta_command_wins(app, mocker):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+    calls = []
+
+    @app.meta.command
+    def help():
+        calls.append("help")
+
+    app.interactive_shell(intro="")
+    assert calls == ["help"]
+
+
+def test_interactive_shell_remap_help_panel_all_long_aliases(mocker, console):
+    mocker.patch("builtins.input", side_effect=["help", "quit"])
+    app = App(name="app", help_flags=["--help", "--usage", "-h"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro="")
+
+    actual = capture.get()
+    assert "help (usage, --help," in actual
+    assert "--usage, -h)" in actual
