@@ -16,6 +16,13 @@ from cyclopts.completion._engine import Completion, CompletionContext, compute_c
 from cyclopts.utils import UNSET
 
 
+def _records(captured_out: str) -> list[str]:
+    r"""Candidate lines from ``__complete`` stdout, after the ``\x1fbegin`` start marker."""
+    lines = captured_out.rstrip("\n").splitlines()
+    assert lines[0] == "\x1fbegin"
+    return lines[1:]
+
+
 @pytest.fixture
 def users():
     return ["alice", "bob", "carol"]
@@ -122,13 +129,13 @@ def test_root_default_command_completion(users):
 def test_complete_command_prints_tab_separated(app, capsys):
     """The reserved ``__complete`` command prints ``value<TAB>description``."""
     app(["__complete", "deploy", ""], exit_on_error=False)
-    out = capsys.readouterr().out.strip().splitlines()
+    out = _records(capsys.readouterr().out)
     assert out == ["dev\tDevelopment", "prod\tProduction"]
 
 
 def test_complete_command_bare_values_have_no_tab(app, capsys):
     app(["__complete", "deploy", "--user", ""], exit_on_error=False)
-    out = capsys.readouterr().out.strip().splitlines()
+    out = _records(capsys.readouterr().out)
     assert out == ["alice", "bob", "carol"]
     assert all("\t" not in line for line in out)
 
@@ -145,7 +152,7 @@ def test_complete_command_sanitizes_delimiters(capsys):
         pass
 
     app(["__complete", "go", ""], exit_on_error=False)
-    out = capsys.readouterr().out.strip().splitlines()
+    out = _records(capsys.readouterr().out)
     assert out == ["nor mal", "forged", "two line\tde sc"]
     # Exactly one tab per line at most (the value/description delimiter), and no
     # line may start with the reserved control marker.
@@ -168,7 +175,7 @@ def test_complete_command_captures_completer_stdout(capfd):
 
     app(["__complete", "go", ""], exit_on_error=False)
     captured = capfd.readouterr()
-    assert captured.out.strip().splitlines() == ["real"]
+    assert _records(captured.out) == ["real"]
     assert "noise" in captured.err
     assert "fd-noise" in captured.err
 
@@ -177,14 +184,14 @@ def test_complete_command_via_parse_args(app, capsys):
     """``__complete`` is intercepted inside the shared parse pipeline, so entry points that skip ``__call__`` (e.g. custom scripts using ``parse_args``) still handle it."""
     command, bound, _ = app.parse_args(["__complete", "deploy", "--user", ""])
     command(*bound.args, **bound.kwargs)
-    assert capsys.readouterr().out.strip().splitlines() == ["alice", "bob", "carol"]
+    assert _records(capsys.readouterr().out) == ["alice", "bob", "carol"]
 
 
 def test_complete_command_via_parse_known_args(app, capsys):
     command, bound, unused, _ = app.parse_known_args(["__complete", "deploy", ""])
     assert unused == []
     command(*bound.args, **bound.kwargs)
-    assert capsys.readouterr().out.strip().splitlines() == ["dev\tDevelopment", "prod\tProduction"]
+    assert _records(capsys.readouterr().out) == ["dev\tDevelopment", "prod\tProduction"]
 
 
 def test_broken_completer_is_swallowed(capsys):
@@ -199,7 +206,7 @@ def test_broken_completer_is_swallowed(capsys):
         pass
 
     app(["__complete", "deploy", ""], exit_on_error=False)
-    assert capsys.readouterr().out.strip() == ""
+    assert _records(capsys.readouterr().out) == []
 
 
 # --- active-slot resolution (real-parser backbone) ----------------------------
@@ -598,7 +605,7 @@ def test_sibling_value_unset_without_default():
 def test_debug_off_by_default_is_silent_on_stderr(app, capsys):
     app(["__complete", "deploy", "--user", ""], exit_on_error=False)
     captured = capsys.readouterr()
-    assert captured.out.strip().splitlines() == ["alice", "bob", "carol"]  # candidates on stdout
+    assert _records(captured.out) == ["alice", "bob", "carol"]  # candidates on stdout
     assert "[cyclopts:completion]" not in captured.err  # nothing on stderr
 
 
@@ -634,7 +641,7 @@ def test_debug_surfaces_broken_completer_traceback(capsys, monkeypatch):
 
     app(["__complete", "deploy", ""], exit_on_error=False)
     captured = capsys.readouterr()
-    assert captured.out.strip() == ""  # still no candidates on stdout
+    assert _records(captured.out) == []  # still no candidates on stdout
     assert "RuntimeError: kaboom" in captured.err  # traceback surfaced on stderr
 
 
@@ -1029,16 +1036,18 @@ def test_e2e_dependent_completion(dynamic_completion_tester, shell):
 
 
 # Emits RAW wire records from __main__, bypassing App's sanitizing _run_complete,
-# to test the generated script's own parsing of the forward-compat protocol: a
-# normal record, a record with a reserved 3rd tab field, and a reserved \x1f
-# global control line. A real completer can't produce these (its return value is
-# sanitized and its stdout is captured), so this is the only way to feed the
-# reader the future protocol shape.
+# to test the generated script's own parsing of the forward-compat protocol:
+# import-time noise before the \x1fbegin marker, a normal record, a record with a
+# reserved 3rd tab field, and a reserved \x1f global control line. A real
+# completer can't produce these (its return value is sanitized and its stdout is
+# captured), so this is the only way to feed the reader the future protocol shape.
 E2E_RAW_PROTOCOL_SOURCE = """
 import sys
 from typing import Annotated
 
 from cyclopts import App, Parameter
+
+print("startup-noise")
 
 app = App(name="deployer")
 
@@ -1054,6 +1063,7 @@ def deploy(thing: Annotated[str, Parameter(completer=_c)] = ""):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "__complete":
+        sys.stdout.write("\\x1fbegin\\n")
         sys.stdout.write("real\\n")
         sys.stdout.write("val\\tdesc\\tSTYLE\\n")
         sys.stdout.write("\\x1fglobal-directive\\n")
@@ -1063,10 +1073,10 @@ if __name__ == "__main__":
 
 
 def test_e2e_wire_protocol_forward_compat(dynamic_completion_tester, shell):
-    r"""The generated script keeps value+description, ignores a reserved 3rd field, and skips a \x1f global line."""
+    r"""The generated script drops output before \x1fbegin, keeps value+description, ignores a reserved 3rd field, and skips a \x1f global line."""
     tester = dynamic_completion_tester(E2E_RAW_PROTOCOL_SOURCE, prog_name="deployer", shell=shell)
     completions = tester.get_completions("deployer deploy ")
-    # \x1f global-directive line dropped; both real candidates survive by value.
+    # Import-time noise and the \x1f global-directive line dropped; both real candidates survive by value.
     assert [_lead(c) for c in completions] == ["real", "val"]
     # The reserved 3rd field must not leak into any candidate or its description.
     assert not any("STYLE" in c for c in completions)

@@ -281,8 +281,10 @@ def _generate_dynamic_helper(prog_name: str) -> list[str]:
         '  _cyc_lines=("${(@f)$($_cyc_cmd __complete "${(@)_cyc_words[2,_cyc_current]}" 2>/dev/null)}")',
         '  for _cyc_line in "${_cyc_lines[@]}"; do',
         '    [[ -z "$_cyc_line" ]] && continue',
-        # A line beginning with \x1f is a reserved global control directive, not a
-        # candidate; nothing emits one yet, so skip it (forward-compat headroom).
+        # ``\x1fbegin`` opens the record stream: drop anything printed before it
+        # (import-time output from the program). Other \x1f lines are reserved
+        # global control directives, not candidates; skip them (forward-compat).
+        "    [[ \"$_cyc_line\" == $'\\x1f'begin ]] && { _cyc_vals=(); _cyc_disp=(); continue; }",
         "    [[ \"$_cyc_line\" == $'\\x1f'* ]] && continue",
         # Each line is a tab-delimited record: value<TAB>description<TAB>reserved...
         # Read exactly value + description and ignore any trailing fields, so a

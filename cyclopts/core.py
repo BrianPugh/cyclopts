@@ -2741,7 +2741,9 @@ class App:
           no-space hint or a display style), mirroring carapace's tab records.
         * A line whose first character is ``\x1f`` (ASCII Unit Separator) is a
           reserved *global* control-directive channel; generated scripts skip it.
-          Nothing emits one yet.
+        * The first directive, ``\x1fbegin``, opens the record stream: readers
+          discard anything before it, so a program that prints during import (a
+          banner, a chatty dependency) can't pollute the candidates.
 
         To keep those field/line delimiters unambiguous, tabs and newlines in the
         value and description are flattened to spaces, and a leading ``\x1f`` is
@@ -2752,6 +2754,7 @@ class App:
         def sanitize(text: str) -> str:
             return text.replace("\t", " ").replace("\n", " ").replace("\r", " ").lstrip("\x1f")
 
+        print("\x1fbegin")
         try:
             # Completers are user code; anything they (or their subprocesses) print
             # must not be parsed as a record.

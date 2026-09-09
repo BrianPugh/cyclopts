@@ -101,8 +101,10 @@ def _emit_completer_completion(indent: str, prog_name: str) -> list[str]:
         f'{indent}local _cmd="${{COMP_WORDS[0]}}"',
         f'{indent}type -P "$_cmd" >/dev/null 2>&1 || [[ -x "$_cmd" ]] || _cmd="{prog_name}"',
         f"{indent}while IFS= read -r _line; do",
-        # A line beginning with \x1f is a reserved global control directive, not a
-        # candidate; nothing emits one yet, so skip it (forward-compat headroom).
+        # ``\x1fbegin`` opens the record stream: drop anything printed before it
+        # (import-time output from the program). Other \x1f lines are reserved
+        # global control directives, not candidates; skip them (forward-compat).
+        f"{indent}  [[ \"$_line\" == $'\\x1f'begin ]] && {{ _c=(); continue; }}",
         f"{indent}  [[ \"$_line\" == $'\\x1f'* ]] && continue",
         # Each line is a tab-delimited record (value<TAB>description<TAB>reserved...);
         # take only the value field. Trailing fields are reserved for future

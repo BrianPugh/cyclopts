@@ -48,18 +48,28 @@ def _generate_completer_fetch_function(prog_name: str) -> list[str]:
     space; ``-ct`` appends the mid-token current word (dropped when empty). Fish
     parses each printed line as a ``value<TAB>description`` record.
 
-    Two filters keep the wire protocol forward-compatible, so a later cyclopts can
-    extend it without an already-installed script garbling the new output:
+    Everything before the ``\x1fbegin`` marker is import-time output from the
+    program, not records, and is dropped. Two more filters keep the wire protocol
+    forward-compatible, so a later cyclopts can extend it without an
+    already-installed script garbling the new output:
 
     * ``string match --invert`` drops lines beginning with ``\x1f`` -- a reserved
-      global control-directive channel (nothing emits one yet).
+      global control-directive channel.
     * ``string replace`` collapses each record to its first two fields, so a
       future per-candidate field (e.g. no-space or style) appended as a third
       tab-delimited field is ignored rather than leaking into the description.
+
+    A ``string`` builtin re-splits piped input on newlines, so the marker is
+    located on the command-substitution list rather than in a pipeline.
     """
     return [
         f"function __fish_{prog_name}_complete",
-        f"    {prog_name} __complete (commandline -pco)[2..] (commandline -ct) 2>/dev/null"
+        f"    set -l lines ({prog_name} __complete (commandline -pco)[2..] (commandline -ct) 2>/dev/null)",
+        r"    if set -l i (contains -i -- \x1f'begin' $lines)",
+        "        set lines $lines[(math $i + 1)..]",
+        "    end",
+        "    set -q lines[1]; or return",
+        r"    printf '%s\n' $lines"
         r" | string match --invert --regex '^\x1f'"
         r" | string replace --regex '^([^\t]*\t[^\t]*)\t.*$' '$1'",
         "end",
