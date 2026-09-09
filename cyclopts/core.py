@@ -2962,8 +2962,9 @@ class App:
         error_console: Console | None
             Rich Console to use for error messages and tracebacks. If :obj:`None`, uses :attr:`App.error_console`.
         intro: str | None
-            Banner printed once when the shell starts, verbatim (no Rich markup).
-            :obj:`None` uses a default banner; an empty string prints nothing.
+            Banner printed once when the shell starts; supports Rich markup
+            (e.g. ``"[bold]Welcome[/bold]"``). :obj:`None` uses a default banner;
+            an empty string prints nothing.
         history_file: str | Path | None
             File to load ``readline`` history from on entry and save it to on exit. ``~`` is expanded.
             Created (along with parent directories) if it doesn't exist; read/write errors are ignored.
@@ -3024,7 +3025,7 @@ class App:
                 if intro is None:
                     intro = DEFAULT_SHELL_INTRO
                 if intro:
-                    self.console.print(intro, markup=False, highlight=False)
+                    self.console.print(intro, highlight=False)
                 while True:
                     try:
                         user_input = input(prompt)

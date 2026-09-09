@@ -575,11 +575,20 @@ def test_interactive_shell_history_file_written_on_exception(mocker, readline):
     readline.write_history_file.assert_called_once()
 
 
-def test_interactive_shell_intro_not_markup(app, mocker, console):
+def test_interactive_shell_intro_markup(app, mocker, console):
     mocker.patch("builtins.input", side_effect=["quit"])
 
     with console.capture() as capture:
-        app.interactive_shell(console=console, intro="Type [help] or [q]")
+        app.interactive_shell(console=console, intro="[bold]Welcome[/bold]")
+
+    assert capture.get() == "Welcome\n"
+
+
+def test_interactive_shell_intro_escaped_brackets(app, mocker, console):
+    mocker.patch("builtins.input", side_effect=["quit"])
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console, intro=r"Type \[help] or \[q]")
 
     assert capture.get() == "Type [help] or [q]\n"
 
