@@ -6,6 +6,7 @@ reserved ``__complete`` command routing, without spawning a real shell.
 
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated
 
@@ -301,6 +302,57 @@ def test_var_positional_completer_fires_for_every_slot():
     assert _values(compute_completions(app, ["add", ""])) == ["f"]
     assert _values(compute_completions(app, ["add", "one", ""])) == ["f"]
     assert _values(compute_completions(app, ["add", "one", "two", ""])) == ["f"]
+
+
+def test_structured_parameter_completer_inherited_by_fields():
+    """A completer on a dataclass parameter serves its fields (dispatching on ``ctx.argument``)
+    unless a field declares its own. This is the only way to attach completions to the fields
+    of a third-party class, so ``completer`` must stay out of ``PARAMETER_SUBKEY_BLOCKER``.
+    """
+    app = App(name="myapp")
+
+    def complete_field(ctx):
+        return {"host": ["localhost"], "port": ["5432"]}.get(ctx.argument.field_info.name, [])
+
+    @dataclass
+    class Database:
+        host: str = "localhost"
+        port: int = 5432
+        user: Annotated[str, Parameter(completer=lambda ctx: ["admin"])] = "admin"
+
+    @app.command
+    def connect(db: Annotated[Database, Parameter(completer=complete_field)]):
+        pass
+
+    assert _values(compute_completions(app, ["connect", "--db.host", ""])) == ["localhost"]
+    assert _values(compute_completions(app, ["connect", "--db.port", ""])) == ["5432"]
+    assert _values(compute_completions(app, ["connect", "--db.user", ""])) == ["admin"]
+
+
+def test_structured_parameter_completer_inherited_by_nested_fields():
+    """Inheritance recurses through nested classes; ``ctx.argument.keys`` gives the full path."""
+    app = App(name="myapp")
+
+    def complete_field(ctx):
+        return {("host",): ["localhost"], ("creds", "user"): ["admin"]}.get(ctx.argument.keys, [])
+
+    @dataclass
+    class Credentials:
+        user: str = "admin"
+        password: Annotated[str, Parameter(completer=lambda ctx: ["hunter2"])] = ""
+
+    @dataclass
+    class Database:
+        host: str = "localhost"
+        creds: Credentials = field(default_factory=Credentials)
+
+    @app.command
+    def connect(db: Annotated[Database, Parameter(completer=complete_field)]):
+        pass
+
+    assert _values(compute_completions(app, ["connect", "--db.host", ""])) == ["localhost"]
+    assert _values(compute_completions(app, ["connect", "--db.creds.user", ""])) == ["admin"]
+    assert _values(compute_completions(app, ["connect", "--db.creds.password", ""])) == ["hunter2"]
 
 
 def test_hidden_positional_occupies_a_slot():
