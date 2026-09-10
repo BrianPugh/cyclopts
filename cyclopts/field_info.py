@@ -385,12 +385,7 @@ def signature_parameters(f: Any) -> dict[str, FieldInfo]:
 
     out = {}
     for name, iparam in inspect.signature(f).parameters.items():
-        # Prefer the raw iparam.annotation; fall back to get_type_hints only for forward
-        # references (strings) or empty annotations, which need resolving.
-        if iparam.annotation is inspect.Parameter.empty or isinstance(iparam.annotation, str):
-            annotation = type_hints.get(name, iparam.annotation)
-        else:
-            annotation = iparam.annotation
+        annotation = type_hints.get(name, iparam.annotation)
         out[name] = FieldInfo.from_iparam(iparam, annotation=annotation)
 
     if inspect.isclass(func):

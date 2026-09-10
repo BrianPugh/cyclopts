@@ -436,3 +436,21 @@ def test_frozenset_multi_token_union(app, assert_parse_args):
 
     _, bound, _ = app.parse_args("1 2 hello 3 4", print_error=False, exit_on_error=False)
     assert bound.arguments["values"] == frozenset({(1, 2), "hello", (3, 4)})
+
+
+class Point:
+    def __init__(self, x: int):
+        self.x = x
+
+    def __eq__(self, other):
+        return isinstance(other, Point) and other.x == self.x
+
+
+def test_list_of_forward_ref(app, assert_parse_args):
+    """A string forward reference nested inside a generic must resolve to the class."""
+
+    @app.default
+    def foo(a: list["Point"]):
+        pass
+
+    assert_parse_args(foo, "1 2", [Point(1), Point(2)])
