@@ -19,8 +19,7 @@ from cyclopts.utils import UNSET
 def _records(captured_out: str) -> list[str]:
     r"""Candidate lines from ``__complete`` stdout, after the ``\x1fbegin`` start marker."""
     lines = captured_out.rstrip("\n").splitlines()
-    assert lines[0] == "\x1fbegin"
-    return lines[1:]
+    return lines[lines.index("\x1fbegin") + 1 :]
 
 
 @pytest.fixture
@@ -131,6 +130,14 @@ def test_complete_command_prints_tab_separated(app, capsys):
     app(["__complete", "deploy", ""], exit_on_error=False)
     out = _records(capsys.readouterr().out)
     assert out == ["dev\tDevelopment", "prod\tProduction"]
+
+
+def test_complete_marker_starts_its_own_line(app, capsys):
+    """Import-time output with no trailing newline must not swallow the start marker."""
+    sys.stdout.write("Loading...")
+    app(["__complete", "deploy", ""], exit_on_error=False)
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[:2] == ["Loading...", "\x1fbegin"]
 
 
 def test_complete_command_bare_values_have_no_tab(app, capsys):
