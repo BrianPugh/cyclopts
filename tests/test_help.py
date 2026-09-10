@@ -1039,6 +1039,25 @@ def test_help_format_group_parameters_choices_optional_enum_default(capture_form
     assert actual == expected
 
 
+def test_help_format_group_parameters_optional_enum_none_default_shown(capture_format_group_parameters):
+    class CompSciProblem(Enum):
+        fizz = "bleep bloop blop"
+        buzz = "blop bleep bloop"
+
+    def cmd(foo: Annotated[CompSciProblem | None, Parameter(show_default=True)] = None):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO --foo  [choices: fizz, buzz] [default: None]                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_group_parameters_choices_enum_list(capture_format_group_parameters):
     class CompSciProblem(Enum):
         fizz = "bleep bloop blop"

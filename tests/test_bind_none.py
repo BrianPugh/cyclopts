@@ -638,6 +638,28 @@ def test_bind_optional_validator_receives_resolved_type(app, mocker):
     my_validator.assert_called_once_with(int, 5)
 
 
+def test_bind_optional_validator_var_positional_receives_resolved_type(app, mocker):
+    my_validator = mocker.Mock()
+
+    @app.default
+    def default(*values: Annotated[int | None, Parameter(validator=my_validator)]):
+        pass
+
+    app.parse_args(["1", "2"], exit_on_error=False)
+    assert my_validator.call_args_list == [mocker.call(int, 1), mocker.call(int, 2)]
+
+
+def test_bind_optional_validator_var_keyword_receives_resolved_type(app, mocker):
+    my_validator = mocker.Mock()
+
+    @app.default
+    def default(**values: Annotated[int | None, Parameter(validator=my_validator)]):
+        pass
+
+    app.parse_args(["--a", "1", "--b", "2"], exit_on_error=False)
+    assert my_validator.call_args_list == [mocker.call(int, 1), mocker.call(int, 2)]
+
+
 def test_bind_validation_error_propagation_in_union(app):
     """Test that ValidationError is properly propagated during union probing.
 
