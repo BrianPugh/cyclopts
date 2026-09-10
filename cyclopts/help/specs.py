@@ -1,6 +1,7 @@
 import math
 import textwrap
 from collections.abc import Iterable, Mapping
+from functools import cache
 from operator import attrgetter
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, Optional, Self, Union
@@ -57,6 +58,24 @@ def default_styles_theme(console: "Console") -> "Theme":
         except MissingStyle:
             styles[name] = fallback
     return Theme(styles)
+
+
+@cache
+def _default_styled(cls: type[Any]) -> type[Any]:
+    """Subclass ``cls`` so it renders under the ``cyclopts.*`` defaults on any console.
+
+    Spec defaults are bare ``cyclopts.*`` style names (so they're themeable), which
+    Rich can only resolve while :func:`default_styles_theme` is active. The
+    subclass pushes that theme itself, so ``PanelSpec().build(...)`` prints
+    correctly outside :class:`DefaultFormatter`. Built lazily to keep Rich imports
+    out of module load.
+    """
+
+    def rich_console(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
+        with console.use_theme(default_styles_theme(console)):
+            yield from cls.__rich_console__(self, console, options)
+
+    return type(cls.__name__, (cls,), {"__rich_console__": rich_console, "__module__": cls.__module__})
 
 
 class DefaultStyled:
@@ -757,7 +776,7 @@ class TableSpec:
 
         from rich.table import Table
 
-        table = Table(**opts)
+        table = _default_styled(Table)(**opts)
 
         for column in columns:
             col_opts = {
@@ -917,7 +936,7 @@ class PanelSpec:
 
         from rich.panel import Panel
 
-        return Panel(renderable, **opts)
+        return _default_styled(Panel)(renderable, **opts)
 
     def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)

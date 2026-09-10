@@ -1876,3 +1876,17 @@ def test_help_group_theme_end_to_end():
     assert "\x1b[32m╭" in safe_border  # border -> green (Theme form)
     # Safe Zone only overrode its border; its names fall back to the base cyan.
     assert "\x1b[36mkeep" in safe_row
+
+
+def test_specs_render_outside_default_formatter():
+    """PanelSpec/TableSpec defaults are bare cyclopts.* names; they must still resolve on a plain console."""
+    from rich.text import Text
+
+    console = Console(width=40, force_terminal=True, color_system="truecolor", legacy_windows=False, highlight=False)
+    entries = [HelpEntry(positive_names=("--alpha",), description="A")]
+    with console.capture() as capture:
+        console.print(PanelSpec().build(Text("x")))
+        console.print(TableSpec().build((NameColumn, DescriptionColumn), entries))
+    output = capture.get()
+    assert "╭" in output
+    assert "\x1b[36m--alpha" in output  # cyclopts.name -> cyan
