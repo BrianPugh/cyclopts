@@ -20,7 +20,6 @@ from typing import (
     get_origin,
 )
 
-from cyclopts._cache import cache
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     NoneType,
@@ -592,25 +591,6 @@ def _convert_structured_type(
     return instantiate_from_dict(type_, data)
 
 
-def _convert_cache_key(type_, token, *, converter, name_transform) -> tuple:
-    """Generate cache key for _convert based on type and token content.
-
-    Note: We use the type directly (not id(type_)) because generic types like
-    set[str] are created as temporary objects that may be garbage collected
-    and their memory address reused by subsequent types.
-    Using the type directly leverages proper __eq__ and __hash__ for types.
-    """
-    from cyclopts.argument import Token
-
-    if isinstance(token, Token):
-        token_key = (token.value, id(token.implicit_value))
-    else:
-        token_key = tuple((t.value, id(t.implicit_value)) for t in token)
-
-    return (type_, token_key, id(converter) if converter else None, id(name_transform))
-
-
-@cache(_convert_cache_key)
 def _convert(
     type_,
     token: Union["Token", Sequence["Token"]],
