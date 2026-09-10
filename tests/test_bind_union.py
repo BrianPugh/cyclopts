@@ -214,3 +214,23 @@ def test_union_scalar_and_consume_all_member_multiple_tokens(app, assert_parse_a
         pass
 
     assert_parse_args(default, "--a 1 --a 2", a=[1, 2])
+
+
+def test_union_member_order_is_per_parameter(app, assert_parse_args):
+    """``int | str`` and ``str | int`` compare equal but convert differently; each
+    parameter must get its own order-respecting conversion for the same token.
+    """
+
+    @app.default
+    def default(a: int | str = 0, b: str | int = "", y: None | str = "d", z: str | None = "d"):
+        pass
+
+    assert_parse_args(default, "--a 5 --b 5 --y none --z none", 5, "5", None, "none")
+
+
+def test_same_type_same_tokens_do_not_alias(app):
+    @app.default
+    def default(a: list[int], b: list[int]):
+        return a is b
+
+    assert app("--a 1 --a 2 --b 1 --b 2") is False

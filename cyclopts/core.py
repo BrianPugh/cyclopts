@@ -27,7 +27,6 @@ from typing import (
 from attrs import Factory, define, field
 from attrs import validators as attrs_validators
 
-from cyclopts._convert import _convert
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
@@ -1987,8 +1986,6 @@ class App:
                 if isinstance(e, UnknownOptionError) and e.parent_apps_with_collections is None:
                     e.parent_apps_with_collections = _build_strict_parent_info(self.app_stack)
                 raise
-            finally:
-                _convert.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
 
         return command, bound, unused_tokens, ignored, argument_collection
 
