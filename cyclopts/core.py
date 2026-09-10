@@ -2754,7 +2754,9 @@ class App:
         def sanitize(text: str) -> str:
             return text.replace("\t", " ").replace("\n", " ").replace("\r", " ").lstrip("\x1f")
 
-        print("\x1fbegin")
+        # Leading newline: import-time output that ended without one would
+        # otherwise glue onto the marker and hide it from the shell readers.
+        print("\n\x1fbegin")
         try:
             # Completers are user code; anything they (or their subprocesses) print
             # must not be parsed as a record.
