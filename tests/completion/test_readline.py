@@ -39,8 +39,13 @@ def app():
         ("deploy prod --region ", []),
         ("--", ["--help", "--version"]),
         ("delete a", ["alpha"]),
+        ("delete m", ["my\\ file"]),
         ("delete 'my", ["'my file'"]),
-        ('delete "my', ["'my file'"]),
+        ('delete "my', ['"my file"']),
+        ("delete 'my f", ["file'"]),
+        ('delete "my f', ['file"']),
+        ("delete my\\ f", ["file"]),
+        ("delete 'my file", ["file'"]),
         ("delete --name=b", ["--name=beta"]),
     ],
 )
@@ -72,6 +77,8 @@ def test_complete_line_paths(app, tmp_path, monkeypatch):
     assert complete_line(app, "deploy prod --path ./da") == ["./data/", "./data.bak"]
     (tmp_path / ".hidden").touch()
     assert complete_line(app, "deploy prod --path .") == [".hidden"]
+    assert complete_line(app, "deploy prod --path 'da") == ["'data/", "'data.bak'"]
+    assert complete_line(app, "deploy prod --path 'data/a") == ["'data/a.txt'"]
 
 
 def test_complete_line_remapped_bare_flags(app):
@@ -94,6 +101,15 @@ def test_readline_completer_states(app, mocker):
 
     assert completer("p", 0) == "prod "
     assert completer("p", 1) is None
+
+
+def test_readline_completer_replaces_only_readline_word(app, mocker):
+    """Readline splits on whitespace, so for ``delete 'my f`` it replaces just ``f``."""
+    readline = mocker.MagicMock()
+    readline.get_line_buffer.return_value = "delete 'my f"
+    readline.get_endidx.return_value = len("delete 'my f")
+
+    assert make_readline_completer(app, readline)("f", 0) == "file' "
 
 
 def test_readline_completer_no_space_after_directory(app, mocker, tmp_path, monkeypatch):

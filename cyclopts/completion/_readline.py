@@ -7,6 +7,7 @@ static candidates in Python and merges in the dynamic ones.
 """
 
 import glob
+import re
 import shlex
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -21,21 +22,31 @@ if TYPE_CHECKING:
     from cyclopts import App
 
 
-def split_line(line: str) -> list[str] | None:
+def split_line(line: str) -> tuple[list[str], str] | None:
     """Split ``line`` into words, the last being the (possibly empty) word under the cursor.
 
     An unterminated quote is closed for the caller (``--path 'my fi`` completes ``my fi``);
-    returns ``None`` only when the line cannot be tokenized at all.
+    the second element is that quote (``""`` when the last word is unquoted).
+    Returns ``None`` only when the line cannot be tokenized at all.
     """
-    for suffix in ("", "'", '"'):
+    for quote in ("", "'", '"'):
         try:
-            words = shlex.split(line + suffix)
+            words = shlex.split(line + quote)
         except ValueError:
             continue
-        if not line or (not suffix and line[-1].isspace()):
+        if not line or (not quote and line[-1].isspace()):
             words.append("")
-        return words
+        return words, quote
     return None
+
+
+def _shell_escape(text: str, quote: str) -> str:
+    """Escape ``text`` so it continues a word typed inside ``quote`` (``""`` for an unquoted word)."""
+    if quote == "'":
+        return text.replace("'", "'\\''")
+    if quote == '"':
+        return re.sub(r'(["\\$`])', r"\\\1", text)
+    return re.sub(r"([^\w@%+=:,./-])", r"\\\1", text)
 
 
 def _static_candidates(slot: Slot) -> list[str]:
@@ -75,19 +86,26 @@ def _static_candidates(slot: Slot) -> list[str]:
 
 
 def complete_line(app: "App", line: str) -> list[str]:
-    """Shell-quoted, prefix-filtered candidates for the word at the end of ``line``.
+    """Prefix-filtered replacements for the whitespace-delimited word at the end of ``line``.
 
-    For ``--opt=va`` the candidates carry the ``--opt=`` prefix.
+    readline's word boundary is whitespace, so for ``delete 'my f`` it replaces only ``f``.
+    Each replacement is that word plus the candidate's remaining characters, escaped for the
+    quoting context the user is already in, and closed unless it names a directory (so the
+    user can keep typing into it). For ``--opt=va`` the word already carries ``--opt=``.
     """
-    words = split_line(line)
-    if words is None:
+    split = split_line(line)
+    if split is None:
         return []
+    words, quote = split
     slot = resolve_slot(app, words)
     if slot is None:
         return []
+    text = re.split(r"[ \t\n]", line)[-1]
     candidates = _static_candidates(slot) + [value for value, _ in dynamic_candidates(slot)]
     matches = dict.fromkeys(c for c in candidates if c.startswith(slot.incomplete))
-    return [shlex.quote(slot.prefix + c) for c in matches]
+    return [
+        text + _shell_escape(c[len(slot.incomplete) :], quote) + ("" if c.endswith("/") else quote) for c in matches
+    ]
 
 
 def make_readline_completer(app: "App", readline) -> Callable[[str, int], str | None]:
