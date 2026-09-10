@@ -737,7 +737,7 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
         default = argument.show_default
     elif argument.show_default:
         default_val = argument.field_info.default
-        if is_class_and_subclass(argument.hint, Enum):
+        if is_class_and_subclass(resolve_optional(argument.hint), Enum):
             default = argument.parameter.name_transform(default_val.name)
         elif isinstance(default_val, (list, tuple, set, frozenset)):
             formatted_items = []

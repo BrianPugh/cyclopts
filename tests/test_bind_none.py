@@ -626,6 +626,18 @@ def test_bind_optional_custom_converter_receives_resolved_type(app, assert_parse
     my_converter.assert_called_once_with(int, mocker.ANY)
 
 
+def test_bind_optional_validator_receives_resolved_type(app, mocker):
+    """Validators, like custom converters, receive ``int`` rather than ``int | None``."""
+    my_validator = mocker.Mock()
+
+    @app.default
+    def default(value: Annotated[int | None, Parameter(validator=my_validator)] = None):
+        pass
+
+    app.parse_args(["5"], exit_on_error=False)
+    my_validator.assert_called_once_with(int, 5)
+
+
 def test_bind_validation_error_propagation_in_union(app):
     """Test that ValidationError is properly propagated during union probing.
 

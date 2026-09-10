@@ -97,7 +97,7 @@ class Argument:
     Fully resolved user-provided :class:`.Parameter`.
     """
 
-    hint: Any = field(default=str)
+    hint: Any = field(default=str, converter=partial(resolve, optional=False))
     """
     The type hint for this argument; may be different from :attr:`.FieldInfo.annotation`.
     Annotated wrappers are stripped, but Optional is preserved for none-coercion.
@@ -979,7 +979,7 @@ class Argument:
                 and self.field_info.kind is self.field_info.VAR_KEYWORD
                 and self._accepts_arbitrary_keywords
             ):
-                hint = get_args(self.hint)[1]
+                hint = resolve_optional(get_args(self.hint)[1])
                 for validator in self.parameter.validator:
                     validator = _resolve(validator, hint)
                     is_method = inspect.ismethod(validator)
@@ -990,7 +990,7 @@ class Argument:
                             validator(hint, val)
                 validate_pydantic(dict[str, self.field_info.annotation], value)
             elif self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
-                hint = get_args(self.hint)[0]
+                hint = resolve_optional(get_args(self.hint)[0])
                 for validator in self.parameter.validator:
                     validator = _resolve(validator, hint)
                     is_method = inspect.ismethod(validator)
@@ -1001,12 +1001,14 @@ class Argument:
                             validator(hint, val)
                 validate_pydantic(tuple[self.field_info.annotation, ...], value)
             else:
+                # Validators, like custom converters, receive the Optional-stripped type.
+                hint = resolve_optional(self.hint)
                 for validator in self.parameter.validator:
-                    validator = _resolve(validator, self.hint)
+                    validator = _resolve(validator, hint)
                     if inspect.ismethod(validator):
                         validator(value)
                     else:
-                        validator(self.hint, value)
+                        validator(hint, value)
                 validate_pydantic(self.field_info.annotation, value)
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
