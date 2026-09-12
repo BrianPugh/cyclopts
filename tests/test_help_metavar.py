@@ -296,7 +296,7 @@ def test_metavar_strips_nested_annotated(app):
 
 
 def test_metavar_choice_for_literal_and_enum(app):
-    """``Literal``/``Enum`` derive ``CHOICE`` (Click-style); shown only when the ``[choices]`` list is hidden."""
+    """``Literal``/``Enum`` derive ``CHOICE`` (Click-style), like every other value-consuming type."""
     from enum import Enum
 
     class Color(Enum):
@@ -318,7 +318,8 @@ def test_metavar_choice_for_literal_and_enum(app):
     assert color.metavar == "CHOICE"
     assert either.metavar == "CHOICE|INT"
     assert pair.metavar == "CHOICE INT"
-    assert shown.metavar is None
+    # A displayed ``[choices]`` list no longer suppresses the placeholder.
+    assert shown.metavar == "CHOICE"
     assert shown.choices == ("x", "y")
 
 
@@ -326,8 +327,7 @@ def test_metavar_choice_for_explicit_parameter_choices(app):
     """An explicit ``Parameter.choices`` derives ``CHOICE`` like ``Literal``/``Enum``, not the underlying type name.
 
     The choice list describes the value, so a plain ``int``/``str`` carrying ``choices``
-    shows ``CHOICE`` in usage and is suppressed in the panel (where ``[choices]`` is listed),
-    exactly like a ``Literal`` hint. With ``show_choices=False`` the placeholder stays ``CHOICE``.
+    shows ``CHOICE`` instead of ``INT``/``STR``, exactly like a ``Literal`` hint.
     """
 
     @app.default
@@ -341,12 +341,11 @@ def test_metavar_choice_for_explicit_parameter_choices(app):
         pass
 
     num, color, hidden, plain = _parameter_entries(app)
-    # Panel rows: the ``[choices]`` list stands in for the placeholder.
-    assert num.metavar is None
+    assert num.metavar == "CHOICE"
     assert num.choices == ("1", "2", "3")
-    assert color.metavar is None
+    assert color.metavar == "CHOICE"
     assert color.choices == ("red", "green")
-    # ``show_choices=False`` hides the list, so the ``CHOICE`` placeholder returns.
+    # ``show_choices=False`` hides the list but the ``CHOICE`` placeholder is unchanged.
     assert hidden.metavar == "CHOICE"
     # A plain type without choices is unaffected.
     assert plain.metavar == "INT"
@@ -382,8 +381,8 @@ def test_usage_wraps_choice_in_container_for_explicit_parameter_choices(app, con
     assert "Usage: test_help_metavar --a LIST[CHOICE] --b LIST[CHOICE]" in capture.get()
 
     a, b = _parameter_entries(app)
-    assert a.metavar is None
-    assert b.metavar is None
+    assert a.metavar == "LIST[CHOICE]"
+    assert b.metavar == "LIST[CHOICE]"
 
 
 def test_explicit_metavar_shown_alongside_choices(app, console: Console):
@@ -467,11 +466,12 @@ def test_usage_keeps_choice_metavar_for_required_choice_parameters(app, console:
         app.help_print(console=console)
     actual = capture.get()
     assert "Usage: test_help_metavar --color CHOICE --mode CHOICE --n INT" in actual
-    assert "--color  [choices: red, blue]" in actual
+    assert "--color CHOICE" in actual
+    assert "[choices: red, blue]" in actual
 
 
-def test_mixed_union_keeps_free_form_metavar_when_choices_shown(app):
-    """Only the choice half is dropped in favour of the ``[choices]`` list; ``INT`` still parses and still shows."""
+def test_mixed_union_renders_both_members(app):
+    """A ``Literal | int`` union renders both members (``CHOICE|INT``) alongside the ``[choices]`` list."""
 
     @app.default
     def main(*, mixed: Literal["auto"] | int = 1):
@@ -479,7 +479,7 @@ def test_mixed_union_keeps_free_form_metavar_when_choices_shown(app):
 
     (entry,) = _parameter_entries(app)
     assert entry.choices == ("auto",)
-    assert entry.metavar == "INT"
+    assert entry.metavar == "CHOICE|INT"
 
 
 def test_metavar_for_dict_with_accepts_keys_false(app, console: Console):
@@ -581,7 +581,7 @@ def test_metavar_strips_none_from_nested_unions(app):
 
     a, b = _parameter_entries(app)
     assert a.metavar == "LIST[INT]"
-    assert b.metavar is None
+    assert b.metavar == "LIST[CHOICE]"
 
 
 def test_metavar_honors_element_metavars_in_containers(app):

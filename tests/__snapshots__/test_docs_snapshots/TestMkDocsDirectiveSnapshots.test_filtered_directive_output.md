@@ -8,7 +8,7 @@ Administrative commands for system management.
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
 * `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ### complex-cli admin users
@@ -52,7 +52,7 @@ Create a new user.
 
 **Parameters**:
 
-* `--role`: User role assignment. *[choices: admin, user, guest]* *[default: user]*
+* `--role CHOICE`: User role assignment. *[choices: admin, user, guest]* *[default: user]*
 * `--permissions.none, --permissions.no-none`: Initial permission flags. *[default: False]*
 * `--permissions.read, --permissions.no-read`: Initial permission flags. *[default: False]*
 * `--permissions.write, --permissions.no-write`: Initial permission flags. *[default: False]*

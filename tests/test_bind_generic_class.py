@@ -160,10 +160,11 @@ def test_bind_generic_class_accepts_default_multiple_args(
         PRIORITY
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  COORDS.X --coords.x  [required]                                 │
-        │ *  COORDS.Y --coords.y  [required]                                 │
-        │ *  PRIORITY --priority  [required]                                 │
-        │    --coords.color       [choices: red, green, blue] [default: red] │
+        │ *  COORDS.X --coords.x    [required]                               │
+        │ *  COORDS.Y --coords.y    [required]                               │
+        │ *  PRIORITY --priority    [required]                               │
+        │    --coords.color CHOICE  [choices: red, green, blue] [default:    │
+        │                           red]                                     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

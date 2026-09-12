@@ -21,7 +21,7 @@ Complex CLI application for comprehensive documentation testing.
 ``--quiet, -q, --no-quiet``
     Suppress non-essential output. [Default: ``False``]
 
-``--log-level``
+``--log-level CHOICE``
     Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
 
 ``--no-color, --no-no-color``
@@ -80,7 +80,7 @@ Demonstrates Pydantic model support for CLI parameters.
 ``--server.debug, --server.no-debug``
     Enable debug mode. [Default: ``False``]
 
-``--auth.provider``
+``--auth.provider CHOICE``
     Authentication provider type. [Choices: ``oauth2``, ``jwt``, ``basic``, ``none``, Default: ``jwt``]
 
 ``--auth.token-expiry INT``

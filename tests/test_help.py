@@ -3527,7 +3527,7 @@ def test_help_pydantic_dict_literal_choices(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ --models.{NAME}.level  verbosity level [choices: low, med, high]   │
-        │                        [default: low]                              │
+        │   CHOICE               [default: low]                              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

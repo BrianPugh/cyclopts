@@ -398,7 +398,7 @@ def format_usage(
     for argument in required_keyword_params:
         # Keyword parameters show the value placeholder (``--foo STR``); positionals
         # below show their name-derived label instead.
-        metavar = _resolve_metavar(argument, in_usage=True) if shows_metavar(argument) else None
+        metavar = _resolve_metavar(argument) if shows_metavar(argument) else None
         usage.append(f"{argument.name} {metavar}" if metavar else argument.name)
 
     if optional_keyword_params:
@@ -576,7 +576,7 @@ def _expand_structured_dict_for_help(
                 yield _make_help_entry(leaf, format)
 
 
-def _resolve_metavar(argument: "Argument", *, in_usage: bool = False) -> str | None:
+def _resolve_metavar(argument: "Argument") -> str | None:
     """Resolve the value placeholder representing ``argument``'s **value** (the ``PATH`` in ``--config PATH``).
 
     Returns :obj:`None` for arguments that never consume a value on the command line
@@ -584,11 +584,8 @@ def _resolve_metavar(argument: "Argument", *, in_usage: bool = False) -> str | N
     would misrepresent the CLI. For value-consuming arguments an explicit
     :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` wins (an empty string suppresses
     it); structured/dict parameters populated only through dotted sub-keys otherwise get
-    :obj:`None`. The default derives from the type hint (``STR``, ``PATH``, ``CHOICE``). In
-    panel rows a displayed ``[choices]`` list conveys the value's shape better than
-    ``CHOICE``, so the choice part is dropped there; the usage line has no such list and
-    keeps it (``in_usage``). Independent of the positional display identifier; see
-    :func:`_resolve_positional_label`.
+    :obj:`None`. The default derives from the type hint (``STR``, ``PATH``, ``CHOICE``).
+    Independent of the positional display identifier; see :func:`_resolve_positional_label`.
     """
     if argument.parameter.count:
         return None
@@ -610,17 +607,16 @@ def _resolve_metavar(argument: "Argument", *, in_usage: bool = False) -> str | N
         and (argument._accepts_arbitrary_keywords or argument.children)
     ):
         return None
-    choice = "CHOICE" if in_usage or not argument.get_choices() else ""
     # An explicit ``Parameter.choices`` describes the leaf value exactly like a
-    # ``Literal``/``Enum`` hint does, so the leaf renders as ``choice`` (``LIST[CHOICE]``),
+    # ``Literal``/``Enum`` hint does, so the leaf renders as ``CHOICE`` (``LIST[CHOICE]``),
     # never as the underlying type name.
-    leaf = choice if argument._explicit_choices() else None
-    metavar = _type_metavar(hint, choice=choice, leaf=leaf)
+    leaf = "CHOICE" if argument._explicit_choices() else None
+    metavar = _type_metavar(hint, leaf=leaf)
     n_tokens = argument.parameter.n_tokens
     if metavar and n_tokens and get_origin(resolved) is not tuple:
         if is_iterable_type(resolved) and (args := get_args(resolved)):
             # Each consumed token is one element, not one whole container.
-            metavar = _type_metavar(args[0], choice=choice, leaf=leaf)
+            metavar = _type_metavar(args[0], leaf=leaf)
         metavar = f"{metavar}..." if n_tokens == -1 else " ".join([metavar] * n_tokens)
     return metavar or None
 
@@ -635,7 +631,7 @@ def _explicit_metavar(hint) -> tuple[Any, str | None]:
     return hint, next((p.metavar for p in reversed(params) if p.metavar is not None), None)
 
 
-def _type_metavar(hint, *, choice: str = "CHOICE", leaf: str | None = None) -> str:
+def _type_metavar(hint, *, leaf: str | None = None) -> str:
     """Derive the default metavar from a type hint.
 
     Tuples render argparse-style, one placeholder per token the user types
@@ -643,7 +639,7 @@ def _type_metavar(hint, *, choice: str = "CHOICE", leaf: str | None = None) -> s
     tuples flattened. Other generics are the uppercased type name over their arguments
     (``LIST[STR]``, ``LIST[INT INT]``); a multi-token member is parenthesized when it has
     siblings (``(INT INT)|STR``, ``DICT[STR, (INT INT)]``) so the grouping stays unambiguous.
-    ``Literal``/``Enum`` render as ``choice``; ``leaf`` replaces every non-generic leaf name
+    ``Literal``/``Enum`` render as ``CHOICE``; ``leaf`` replaces every non-generic leaf name
     (explicit ``Parameter.choices``).
     """
     if hint is Ellipsis:
@@ -655,8 +651,8 @@ def _type_metavar(hint, *, choice: str = "CHOICE", leaf: str | None = None) -> s
     # parameter being optional, not by a ``NONE`` the user would type.
     hint = resolve_optional(hint)
     if get_origin(hint) is Literal or is_enum(hint):
-        return choice
-    recurse = partial(_type_metavar, choice=choice, leaf=leaf)
+        return "CHOICE"
+    recurse = partial(_type_metavar, leaf=leaf)
     if is_union(hint):
         return "|".join(_group_tokens(m) for arg in get_args(hint) if (m := recurse(arg)))
     origin, args = get_origin(hint), get_args(hint)
@@ -668,7 +664,8 @@ def _type_metavar(hint, *, choice: str = "CHOICE", leaf: str | None = None) -> s
     if origin and args:
         names = [recurse(arg) for arg in args]
         if not all(names):
-            # A suppressed ``CHOICE`` element means the ``[choices]`` list describes the value.
+            # An element suppressed via an explicit empty ``Parameter.metavar`` collapses
+            # the whole container's placeholder.
             return ""
         if len(names) > 1:
             names = [_group_tokens(n) for n in names]
