@@ -1,7 +1,17 @@
 import inspect
 import sys
 import typing
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import (
+    Callable,
+    Collection,
+    Container,
+    Iterable,
+    MutableSequence,
+    MutableSet,
+    Reversible,
+    Sequence,
+    Set,
+)
 from enum import Enum, Flag
 from functools import partial
 from types import UnionType
@@ -27,6 +37,23 @@ ITERABLE_TYPES = {
     list,
     set,
     tuple,
+}
+
+# Single-element iterables that consume one value per CLI token, so they share ``tuple[X, ...]``'s
+# ``X...`` metavar. Excludes ``tuple`` (fixed arity / explicit ``...``) and mappings (key/value pairs).
+VARIADIC_COLLECTION_TYPES = {
+    Iterable,
+    typing.Sequence,
+    Sequence,
+    Collection,
+    Container,
+    Reversible,
+    MutableSequence,
+    Set,
+    MutableSet,
+    frozenset,
+    list,
+    set,
 }
 
 

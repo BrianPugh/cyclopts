@@ -18,6 +18,7 @@ from typing import (
 from attrs import define, evolve, field
 
 from cyclopts.annotations import (
+    VARIADIC_COLLECTION_TYPES,
     get_hint_name,
     is_enum,
     is_iterable_type,
@@ -636,9 +637,13 @@ def _type_metavar(hint, *, leaf: str | None = None) -> str:
 
     Tuples render argparse-style, one placeholder per token the user types
     (``tuple[int, int]`` -> ``INT INT``, ``tuple[int, ...]`` -> ``INT...``), with nested
-    tuples flattened. Other generics are the uppercased type name over their arguments
-    (``LIST[STR]``, ``LIST[INT INT]``); a multi-token member is parenthesized when it has
-    siblings (``(INT INT)|STR``, ``DICT[STR, (INT INT)]``) so the grouping stays unambiguous.
+    tuples flattened. Other variadic collections (``list``, ``set``, ``Sequence``, ...) consume
+    one element per token, so a single-token element renders like ``tuple[X, ...]``
+    (``list[str]`` -> ``STR...``); a multi-token element keeps the container form so its grouping
+    stays unambiguous (``list[tuple[int, str]]`` -> ``LIST[INT STR]``).
+    Remaining generics (e.g. ``dict``) are the uppercased type name over their arguments
+    (``DICT[STR, INT]``); a multi-token member is parenthesized when it has siblings
+    (``(INT INT)|STR``, ``DICT[STR, (INT INT)]``) so the grouping stays unambiguous.
     ``Literal``/``Enum`` render as ``CHOICE``; ``leaf`` replaces every non-generic leaf name
     (explicit ``Parameter.choices``).
     """
@@ -661,6 +666,13 @@ def _type_metavar(hint, *, leaf: str | None = None) -> str:
             element = recurse(args[0])
             return f"{element}..." if element else ""
         return " ".join(m for arg in args if (m := recurse(arg)))
+    if origin in VARIADIC_COLLECTION_TYPES and args:
+        # Consumes one element per token, like ``tuple[X, ...]``. Only a single-token element
+        # collapses to ``X...``; a multi-token element keeps the ``LIST[...]`` form below so its
+        # grouping stays unambiguous (``LIST[INT STR]``, not ``INT STR...``).
+        element = recurse(args[0])
+        if element and " " not in element and "..." not in element:
+            return f"{element}..."
     if origin and args:
         names = [recurse(arg) for arg in args]
         if not all(names):

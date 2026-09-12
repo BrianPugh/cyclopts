@@ -89,7 +89,7 @@ Demonstrates Pydantic model support for CLI parameters.
 ``--auth.refresh-enabled, --auth.no-refresh-enabled``
     Enable token refresh. [Default: ``True``]
 
-``--auth.allowed-origins LIST[STR], --auth.empty-allowed-origins``
+``--auth.allowed-origins STR..., --auth.empty-allowed-origins``
     List of allowed CORS origins. [Default: ``['*']``]
 
 .. _cyclopts-complex-cli-server-stop:

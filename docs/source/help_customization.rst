@@ -739,7 +739,8 @@ The default derives from the parameter's **type** (:class:`~pathlib.Path` → ``
 stripped, so ``Path | None`` yields ``PATH`` rather than ``PATH|NONE`` (the value you provide is always a
 :class:`~pathlib.Path`; its absence is conveyed by the parameter being optional). Tuples render one placeholder
 per token, the way the values are typed on the command line: ``tuple[int, int]`` → ``INT INT`` and
-``tuple[int, ...]`` → ``INT...``.
+``tuple[int, ...]`` → ``INT...``. Variadic collections (``list``, ``set``, ``Sequence``, ...) consume one element
+per token, so a single-element type renders the same way: ``list[str]`` → ``STR...``, ``set[int]`` → ``INT...``.
 
 This is distinct from a positional parameter's *identifier* — the ``SRC`` in ``SRC --src`` — which is its
 :attr:`HelpEntry.positional_label <cyclopts.help.HelpEntry.positional_label>`, derived from the parameter's **name** (change it via

@@ -32,7 +32,7 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 * `--num-workers INT|CHOICE`: Number of parallel workers. Use "auto" for automatic detection. *[choices: auto]* *[default: auto]*
 * `--quality-level INT|CHOICE`: Processing quality level. Higher values mean better quality but slower. *[choices: high, medium, low]* *[default: high]*
 * `--device CHOICE|INT`: Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. *[choices: cuda, cpu, auto]* *[default: auto]*
-* `--output-formats LIST[CHOICE], --empty-output-formats`: List of output formats to generate. *[choices: json, yaml, table, csv]* *[default: [json]]*
+* `--output-formats CHOICE..., --empty-output-formats`: List of output formats to generate. *[choices: json, yaml, table, csv]* *[default: [json]]*
 * `--input-dir PATH`: Input data directory. *[default: data/input]*
 * `--output-dir PATH`: Output results directory. *[default: data/output]*
 * `--cache-dir PATH`: Cache directory for intermediate files.
@@ -60,7 +60,7 @@ PathConfig and ProcessingConfig).
 * `--num-workers INT|CHOICE`: Number of parallel workers. Use "auto" for automatic detection. *[choices: auto]* *[default: auto]*
 * `--quality-level INT|CHOICE`: Processing quality level. Higher values mean better quality but slower. *[choices: high, medium, low]* *[default: high]*
 * `--device CHOICE|INT`: Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. *[choices: cuda, cpu, auto]* *[default: auto]*
-* `--output-formats LIST[CHOICE], --empty-output-formats`: List of output formats to generate. *[choices: json, yaml, table, csv]* *[default: [json]]*
+* `--output-formats CHOICE..., --empty-output-formats`: List of output formats to generate. *[choices: json, yaml, table, csv]* *[default: [json]]*
 * `--dry-run, --no-dry-run`: If True, simulate execution without making changes. *[default: False]*
 
 ### complex-cli data validate
@@ -79,7 +79,7 @@ Validate data files against schema.
 
 * `--strict, --no-strict`: Enable strict validation mode. *[default: False]*
 * `--schema-file PATH`: Custom schema file (must exist).
-* `--ignore-patterns LIST[STR], --empty-ignore-patterns`: Patterns to ignore during validation.
+* `--ignore-patterns STR..., --empty-ignore-patterns`: Patterns to ignore during validation.
 
 ## Server Commands
 
@@ -112,7 +112,7 @@ Demonstrates Pydantic model support for CLI parameters.
 * `--auth.provider CHOICE`: Authentication provider type. *[choices: oauth2, jwt, basic, none]* *[default: jwt]*
 * `--auth.token-expiry INT`: Token expiration time in seconds. *[default: 3600]*
 * `--auth.refresh-enabled, --auth.no-refresh-enabled`: Enable token refresh. *[default: True]*
-* `--auth.allowed-origins LIST[STR], --auth.empty-allowed-origins`: List of allowed CORS origins. *[default: ['*']]*
+* `--auth.allowed-origins STR..., --auth.empty-allowed-origins`: List of allowed CORS origins. *[default: ['*']]*
 
 ### complex-cli server stop
 

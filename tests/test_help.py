@@ -3340,7 +3340,7 @@ def test_help_pydantic_dict_list_basemodel_is_leaf(app, console):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ --models.{NAME}.path STR  path to data                             │
         │ --models.{NAME}.items     list of items [default: []]              │
-        │   LIST[INNER]                                                      │
+        │   INNER...                                                         │
         │   --models.{NAME}                                                  │
         │   .empty-items                                                     │
         ╰────────────────────────────────────────────────────────────────────╯

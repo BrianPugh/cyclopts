@@ -105,7 +105,7 @@ def test_metavar_tuple_renders_one_placeholder_per_token(app):
     "hint, expected",
     [
         (tuple[int, int] | str, "(INT INT)|STR"),
-        (list[int] | tuple[int, int], "LIST[INT]|(INT INT)"),
+        (list[int] | tuple[int, int], "INT...|(INT INT)"),
         (list[tuple[int, int] | str], "LIST[(INT INT)|STR]"),
         (list[tuple[int, ...]], "LIST[INT...]"),
         (dict[str, tuple[int, int]], "DICT[STR, (INT INT)]"),
@@ -113,7 +113,7 @@ def test_metavar_tuple_renders_one_placeholder_per_token(app):
     ],
 )
 def test_type_metavar_groups_multi_token_members(hint, expected):
-    """A tuple is always its tokens; it is parenthesized only when it sits beside siblings."""
+    """A single-token element collapses to ``X...``; a multi-token element keeps the ``LIST[...]`` form."""
     from cyclopts.help.help import _type_metavar
 
     assert _type_metavar(hint) == expected
@@ -292,7 +292,7 @@ def test_metavar_strips_nested_annotated(app):
         pass
 
     (ports,) = _parameter_entries(app)
-    assert ports.metavar == "LIST[PORT]"
+    assert ports.metavar == "PORT..."
 
 
 def test_metavar_choice_for_literal_and_enum(app):
@@ -378,11 +378,11 @@ def test_usage_wraps_choice_in_container_for_explicit_parameter_choices(app, con
 
     with console.capture() as capture:
         app.help_print(console=console)
-    assert "Usage: test_help_metavar --a LIST[CHOICE] --b LIST[CHOICE]" in capture.get()
+    assert "Usage: test_help_metavar --a CHOICE... --b CHOICE..." in capture.get()
 
     a, b = _parameter_entries(app)
-    assert a.metavar == "LIST[CHOICE]"
-    assert b.metavar == "LIST[CHOICE]"
+    assert a.metavar == "CHOICE..."
+    assert b.metavar == "CHOICE..."
 
 
 def test_explicit_metavar_shown_alongside_choices(app, console: Console):
@@ -580,8 +580,8 @@ def test_metavar_strips_none_from_nested_unions(app):
         pass
 
     a, b = _parameter_entries(app)
-    assert a.metavar == "LIST[INT]"
-    assert b.metavar == "LIST[CHOICE]"
+    assert a.metavar == "INT..."
+    assert b.metavar == "CHOICE..."
 
 
 def test_metavar_honors_element_metavars_in_containers(app):
@@ -594,7 +594,7 @@ def test_metavar_honors_element_metavars_in_containers(app):
 
     ports, emails, p = _parameter_entries(app)
     assert ports.metavar == "PORT PORT"
-    assert emails.metavar == "LIST[EMAIL]"
+    assert emails.metavar == "EMAIL..."
     assert p.metavar == "PORT"
 
 

@@ -70,7 +70,7 @@ def test_create_burger_help(console):
         │ --mustard --no-mustard  Add mustard. [default: True]               │
         │ --ketchup --no-ketchup  Add ketchup. [default: True]               │
         │ --mayo --no-mayo        [default: True]                            │
-        │ --custom LIST[STR]                                                 │
+        │ --custom STR...                                                    │
         │   --empty-custom                                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Toppings ─────────────────────────────────────────────────────────╮

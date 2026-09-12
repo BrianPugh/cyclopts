@@ -83,7 +83,7 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 ``--device CHOICE|INT``
     Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. [Choices: ``cuda``, ``cpu``, ``auto``, Default: ``auto``]
 
-``--output-formats LIST[CHOICE], --empty-output-formats``
+``--output-formats CHOICE..., --empty-output-formats``
     List of output formats to generate. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``[json]``]
 
 ``--input-dir PATH``
@@ -141,7 +141,7 @@ PathConfig and ProcessingConfig).
 ``--device CHOICE|INT``
     Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. [Choices: ``cuda``, ``cpu``, ``auto``, Default: ``auto``]
 
-``--output-formats LIST[CHOICE], --empty-output-formats``
+``--output-formats CHOICE..., --empty-output-formats``
     List of output formats to generate. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``[json]``]
 
 ``--dry-run, --no-dry-run``
@@ -171,5 +171,5 @@ Validate data files against schema.
 ``--schema-file PATH``
     Custom schema file (must exist).
 
-``--ignore-patterns LIST[STR], --empty-ignore-patterns``
+``--ignore-patterns STR..., --empty-ignore-patterns``
     Patterns to ignore during validation.
