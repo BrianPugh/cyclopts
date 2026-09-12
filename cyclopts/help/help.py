@@ -615,9 +615,7 @@ def _resolve_metavar(argument: "Argument") -> str | None:
     metavar = _type_metavar(hint, leaf=leaf)
     n_tokens = argument.parameter.n_tokens
     if metavar and n_tokens and get_origin(resolved) is not tuple:
-        if (is_iterable_type(resolved) or get_origin(resolved) in VARIADIC_COLLECTION_TYPES) and (
-            args := get_args(resolved)
-        ):
+        if is_iterable_type(resolved) and (args := get_args(resolved)):
             # Each consumed token is one element, not one whole container.
             metavar = _type_metavar(args[0], leaf=leaf)
         metavar = f"{metavar}..." if n_tokens == -1 else " ".join([metavar] * n_tokens)

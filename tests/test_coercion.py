@@ -358,13 +358,11 @@ def test_coerce_frozenset():
         (AbcMutableSet[str], {"123", "456"}),
         (AbcMutableSequence[str], ["123", "456"]),
         (AbcCollection[str], ["123", "456"]),
-        (AbcContainer[str], ["123", "456"]),
         (AbcReversible[str], ["123", "456"]),
         (AbcSet, {"123", "456"}),
         (AbcMutableSet, {"123", "456"}),
         (AbcMutableSequence, ["123", "456"]),
         (AbcCollection, ["123", "456"]),
-        (AbcContainer, ["123", "456"]),
         (AbcReversible, ["123", "456"]),
     ],
 )
@@ -376,6 +374,17 @@ def test_coerce_abstract_collection_types(hint, expected):
     """
     result = convert(hint, ["123", "456"])
     assert expected == result
+
+
+@pytest.mark.parametrize("hint", [AbcContainer[str], AbcContainer])
+def test_coerce_container_unsupported(hint):
+    """``Container`` only promises ``__contains__``, not iteration, so it is not a supported CLI collection type.
+
+    It falls through to the scalar-constructor path, which raises (the bind layer surfaces this as a
+    ``CoercionError``); it must not silently coerce to a ``list`` like the iterable abstract collections do.
+    """
+    with pytest.raises((CoercionError, TypeError)):
+        convert(hint, ["123", "456"])
 
 
 def test_coerce_literal():

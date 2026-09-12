@@ -141,12 +141,8 @@ def test_get_annotated_discriminator_positive():
 
 
 def test_get_choices_from_hint_abstract_collections():
-    """Abstract collections normalize to concrete containers, so their ``Literal`` element's choices must survive.
-
-    ``Container`` in particular is not an ``Iterable`` subclass, so it slips past subclass-based
-    iterable checks; membership in ``VARIADIC_COLLECTION_TYPES`` is what recognizes it here.
-    """
-    from collections.abc import Collection, Container, MutableSequence, MutableSet, Set
+    """Abstract collections normalize to concrete containers, so their ``Literal`` element's choices must survive."""
+    from collections.abc import Collection, MutableSequence, MutableSet, Set
 
     choice = Literal["fizz", "buzz"]
     hints = [
@@ -156,7 +152,6 @@ def test_get_choices_from_hint_abstract_collections():
         MutableSequence[choice],
         Set[choice],
         MutableSet[choice],
-        Container[choice],
     ]
     for hint in hints:
         assert get_choices_from_hint(hint, name_transform=lambda x: x) == ["fizz", "buzz"], hint

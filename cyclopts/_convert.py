@@ -70,7 +70,6 @@ _abstract_to_concrete_type_mapping: dict[type, type] = {
     collections.abc.MutableSet: set,
     collections.abc.MutableSequence: list,
     collections.abc.Collection: list,
-    collections.abc.Container: list,
     collections.abc.Reversible: list,
     collections.abc.Mapping: dict,
     collections.abc.MutableMapping: dict,

@@ -573,19 +573,14 @@ def test_metavar_repeats_for_n_tokens(app):
 
 
 def test_metavar_n_tokens_descends_into_abstract_collections(app):
-    """Every ``VARIADIC_COLLECTION_TYPES`` origin descends to its element under ``n_tokens``.
-
-    ``Container`` is the one such origin that is not an ``Iterable`` subclass, so it slipped
-    past the ``is_iterable_type`` gate and rendered the whole ``STR...`` container per token
-    (``STR... STR...``) instead of the element (``STR STR``).
-    """
-    from collections.abc import Container
+    """An abstract collection descends to its element under ``n_tokens``, one placeholder per token."""
+    from collections.abc import Collection
 
     @app.default
     def main(
         *,
-        x: Annotated[Container[str], Parameter(n_tokens=2)],
-        y: Annotated[Container[str], Parameter(n_tokens=-1)],
+        x: Annotated[Collection[str], Parameter(n_tokens=2)],
+        y: Annotated[Collection[str], Parameter(n_tokens=-1)],
     ):
         pass
 

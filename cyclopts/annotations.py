@@ -4,7 +4,6 @@ import typing
 from collections.abc import (
     Callable,
     Collection,
-    Container,
     Iterable,
     MutableSequence,
     MutableSet,
@@ -46,7 +45,6 @@ VARIADIC_COLLECTION_TYPES = {
     typing.Sequence,
     Sequence,
     Collection,
-    Container,
     Reversible,
     MutableSequence,
     Set,
@@ -355,7 +353,7 @@ def get_choices_from_hint(type_: Any, name_transform: Callable[[str], str]) -> l
                 choices.extend(x)
     elif _origin is Literal:
         choices.extend(str(x) for x in get_args(type_))
-    elif _origin in ITERABLE_TYPES or _origin in VARIADIC_COLLECTION_TYPES:
+    elif is_class_and_subclass(_origin, tuple(ITERABLE_TYPES)):
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
             choices.extend(get_choices(args[0]))
