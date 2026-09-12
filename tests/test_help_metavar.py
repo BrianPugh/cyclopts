@@ -572,6 +572,28 @@ def test_metavar_repeats_for_n_tokens(app):
     assert w.metavar == "INT INT INT"
 
 
+def test_metavar_n_tokens_descends_into_abstract_collections(app):
+    """Every ``VARIADIC_COLLECTION_TYPES`` origin descends to its element under ``n_tokens``.
+
+    ``Container`` is the one such origin that is not an ``Iterable`` subclass, so it slipped
+    past the ``is_iterable_type`` gate and rendered the whole ``STR...`` container per token
+    (``STR... STR...``) instead of the element (``STR STR``).
+    """
+    from collections.abc import Container
+
+    @app.default
+    def main(
+        *,
+        x: Annotated[Container[str], Parameter(n_tokens=2)],
+        y: Annotated[Container[str], Parameter(n_tokens=-1)],
+    ):
+        pass
+
+    x, y = _parameter_entries(app)
+    assert x.metavar == "STR STR"
+    assert y.metavar == "STR..."
+
+
 def test_metavar_strips_none_from_nested_unions(app):
     """``None`` inside a container element is never something the user types, so it is not advertised."""
 
@@ -1001,8 +1023,9 @@ def test_metavar_default_panel_rendering_unchanged(app, console: Console):
     assert "│ *  URL  [required]" in actual
     # Optional positional-or-keyword: name-derived label precedes the option name.
     assert "DEST --dest" in actual
-    # Keyword-only with choices: option name only; ``[choices]`` suppresses the metavar.
-    assert "│ --quality " in actual
+    # Keyword-only with choices: option name plus a ``CHOICE`` metavar, alongside ``[choices]``.
+    assert "--quality CHOICE" in actual
+    assert "[choices: 144, 720]" in actual
     assert "QUALITY" not in actual
     # Keyword-only boolean flag: negatives shown, never a label.
     assert "--flag --no-flag" in actual

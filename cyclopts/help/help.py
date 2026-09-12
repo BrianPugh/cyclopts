@@ -107,8 +107,8 @@ class HelpEntry:
     ``Literal``/``Enum`` → ``CHOICE``) and can be overridden with
     :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`. :obj:`None` for entries that do not
     consume a value (boolean flags, counting parameters, dict/structured parameters populated via
-    dotted keys, commands), even with an explicit ``Parameter.metavar``, and for entries whose
-    ``[choices]`` list is displayed unless an explicit ``Parameter.metavar`` is set.
+    dotted keys, commands), even with an explicit ``Parameter.metavar``. Entries whose ``[choices]``
+    list is displayed still carry a ``CHOICE`` metavar (both are shown).
 
     This is *not* how a positional parameter is displayed — that is its :attr:`positional_label`,
     derived from the parameter's name. ``metavar`` never affects the identifier.
@@ -609,13 +609,15 @@ def _resolve_metavar(argument: "Argument") -> str | None:
     ):
         return None
     # An explicit ``Parameter.choices`` describes the leaf value exactly like a
-    # ``Literal``/``Enum`` hint does, so the leaf renders as ``CHOICE`` (``LIST[CHOICE]``),
-    # never as the underlying type name.
+    # ``Literal``/``Enum`` hint does, so the leaf renders as ``CHOICE`` (``CHOICE...`` for a
+    # single-token collection, ``LIST[CHOICE]`` for a multi-token one), never the type name.
     leaf = "CHOICE" if argument._explicit_choices() else None
     metavar = _type_metavar(hint, leaf=leaf)
     n_tokens = argument.parameter.n_tokens
     if metavar and n_tokens and get_origin(resolved) is not tuple:
-        if is_iterable_type(resolved) and (args := get_args(resolved)):
+        if (is_iterable_type(resolved) or get_origin(resolved) in VARIADIC_COLLECTION_TYPES) and (
+            args := get_args(resolved)
+        ):
             # Each consumed token is one element, not one whole container.
             metavar = _type_metavar(args[0], leaf=leaf)
         metavar = f"{metavar}..." if n_tokens == -1 else " ".join([metavar] * n_tokens)
