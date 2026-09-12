@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 from attrs import field
 
-from cyclopts.annotations import ITERABLE_TYPES, is_annotated, is_union
+from cyclopts.annotations import ITERABLE_TYPES, VARIADIC_COLLECTION_TYPES, is_annotated, is_union
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError
 from cyclopts.field_info import VAR_KEYWORD
@@ -180,7 +180,7 @@ def get_completion_action(type_hint: Any) -> CompletionAction:
     origin = get_origin(type_hint)
 
     # For collection types, unwrap to get element type
-    if is_class_and_subclass(origin, tuple(ITERABLE_TYPES)):
+    if is_class_and_subclass(origin, tuple(ITERABLE_TYPES)) or origin in VARIADIC_COLLECTION_TYPES:
         args = get_args(type_hint)
         if args and len(args) >= 1:
             # list[Path], set[Path], tuple[Path, ...] -> check first arg

@@ -293,3 +293,27 @@ def test_behavior(
     assert not leaked, (
         f"[{scenario_id}] completions {leaked} should NOT have been offered. partial={partial!r} got={results!r}"
     )
+
+
+def test_get_completion_action_abstract_collections():
+    """Path elements inside abstract collections still resolve to FILES completion.
+
+    ``Container`` is the one collection origin that is not an ``Iterable`` subclass, so a
+    subclass-only check left ``Container[Path]`` at ``NONE`` instead of unwrapping to ``Path``.
+    """
+    from collections.abc import Collection, Container, MutableSequence, MutableSet, Set
+    from pathlib import Path
+
+    from cyclopts.completion._base import CompletionAction, get_completion_action
+
+    hints = [
+        list[Path],
+        set[Path],
+        Collection[Path],
+        MutableSequence[Path],
+        Set[Path],
+        MutableSet[Path],
+        Container[Path],
+    ]
+    for hint in hints:
+        assert get_completion_action(hint) == CompletionAction.FILES, hint

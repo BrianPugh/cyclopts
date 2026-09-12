@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal, Optional, Union
 
 import pytest
 
-from cyclopts.annotations import contains_hint, get_hint_name, is_iterable_type, resolve
+from cyclopts.annotations import contains_hint, get_choices_from_hint, get_hint_name, is_iterable_type, resolve
 
 
 def test_resolve_annotated():
@@ -138,3 +138,25 @@ def test_get_annotated_discriminator_positive():
     from cyclopts.annotations import get_annotated_discriminator
 
     assert get_annotated_discriminator(Annotated[int, SimpleNamespace(discriminator="type")]) == "type"
+
+
+def test_get_choices_from_hint_abstract_collections():
+    """Abstract collections normalize to concrete containers, so their ``Literal`` element's choices must survive.
+
+    ``Container`` in particular is not an ``Iterable`` subclass, so it slips past subclass-based
+    iterable checks; membership in ``VARIADIC_COLLECTION_TYPES`` is what recognizes it here.
+    """
+    from collections.abc import Collection, Container, MutableSequence, MutableSet, Set
+
+    choice = Literal["fizz", "buzz"]
+    hints = [
+        list[choice],
+        set[choice],
+        Collection[choice],
+        MutableSequence[choice],
+        Set[choice],
+        MutableSet[choice],
+        Container[choice],
+    ]
+    for hint in hints:
+        assert get_choices_from_hint(hint, name_transform=lambda x: x) == ["fizz", "buzz"], hint
