@@ -739,7 +739,8 @@ The default derives from the parameter's **type** (:class:`~pathlib.Path` → ``
 stripped, so ``Path | None`` yields ``PATH`` rather than ``PATH|NONE`` (the value you provide is always a
 :class:`~pathlib.Path`; its absence is conveyed by the parameter being optional). Tuples render one placeholder
 per token, the way the values are typed on the command line: ``tuple[int, int]`` → ``INT INT`` and
-``tuple[int, ...]`` → ``INT...``.
+``tuple[int, ...]`` → ``INT...``. Variadic collections (``list``, ``set``, ``Sequence``, ...) consume one element
+per token, so a single-element type renders the same way: ``list[str]`` → ``STR...``, ``set[int]`` → ``INT...``.
 
 This is distinct from a positional parameter's *identifier* — the ``SRC`` in ``SRC --src`` — which is its
 :attr:`HelpEntry.positional_label <cyclopts.help.HelpEntry.positional_label>`, derived from the parameter's **name** (change it via
@@ -747,11 +748,8 @@ This is distinct from a positional parameter's *identifier* — the ``SRC`` in `
 
 Every builtin formatter (rich, plain, markdown, rst, html) appends the metavar to **keyword-only** parameters
 (``--config PATH``), and the usage line shows it for required keyword parameters. Positional-capable rows show
-their identifier instead (the ``CONFIG`` in ``CONFIG --config``, since it already stands in for the value). Rows
-carrying a ``[choices]`` list omit the *type-derived* ``CHOICE`` because the list conveys the value's shape better
-(the usage line, which has no such list, keeps ``CHOICE``); an explicit
-:attr:`Parameter.metavar <cyclopts.Parameter.metavar>` is shown alongside the list. Parameters that consume no
-value (boolean flags, counters) never show a metavar, explicit or not. Disable metavars entirely with
+their identifier instead (the ``CONFIG`` in ``CONFIG --config``, since it already stands in for the value).
+Parameters that consume no value (boolean flags, counters) never show a metavar, explicit or not. Disable metavars entirely with
 :attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>`, which drops them from the
 usage line and clears :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` on every entry before the
 columns render, so it also applies to custom ``column_specs``:

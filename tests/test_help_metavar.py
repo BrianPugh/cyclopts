@@ -105,7 +105,7 @@ def test_metavar_tuple_renders_one_placeholder_per_token(app):
     "hint, expected",
     [
         (tuple[int, int] | str, "(INT INT)|STR"),
-        (list[int] | tuple[int, int], "LIST[INT]|(INT INT)"),
+        (list[int] | tuple[int, int], "INT...|(INT INT)"),
         (list[tuple[int, int] | str], "LIST[(INT INT)|STR]"),
         (list[tuple[int, ...]], "LIST[INT...]"),
         (dict[str, tuple[int, int]], "DICT[STR, (INT INT)]"),
@@ -113,7 +113,7 @@ def test_metavar_tuple_renders_one_placeholder_per_token(app):
     ],
 )
 def test_type_metavar_groups_multi_token_members(hint, expected):
-    """A tuple is always its tokens; it is parenthesized only when it sits beside siblings."""
+    """A single-token element collapses to ``X...``; a multi-token element keeps the ``LIST[...]`` form."""
     from cyclopts.help.help import _type_metavar
 
     assert _type_metavar(hint) == expected
@@ -292,11 +292,11 @@ def test_metavar_strips_nested_annotated(app):
         pass
 
     (ports,) = _parameter_entries(app)
-    assert ports.metavar == "LIST[PORT]"
+    assert ports.metavar == "PORT..."
 
 
 def test_metavar_choice_for_literal_and_enum(app):
-    """``Literal``/``Enum`` derive ``CHOICE`` (Click-style); shown only when the ``[choices]`` list is hidden."""
+    """``Literal``/``Enum`` derive ``CHOICE`` (Click-style), like every other value-consuming type."""
     from enum import Enum
 
     class Color(Enum):
@@ -318,7 +318,8 @@ def test_metavar_choice_for_literal_and_enum(app):
     assert color.metavar == "CHOICE"
     assert either.metavar == "CHOICE|INT"
     assert pair.metavar == "CHOICE INT"
-    assert shown.metavar is None
+    # A displayed ``[choices]`` list no longer suppresses the placeholder.
+    assert shown.metavar == "CHOICE"
     assert shown.choices == ("x", "y")
 
 
@@ -326,8 +327,7 @@ def test_metavar_choice_for_explicit_parameter_choices(app):
     """An explicit ``Parameter.choices`` derives ``CHOICE`` like ``Literal``/``Enum``, not the underlying type name.
 
     The choice list describes the value, so a plain ``int``/``str`` carrying ``choices``
-    shows ``CHOICE`` in usage and is suppressed in the panel (where ``[choices]`` is listed),
-    exactly like a ``Literal`` hint. With ``show_choices=False`` the placeholder stays ``CHOICE``.
+    shows ``CHOICE`` instead of ``INT``/``STR``, exactly like a ``Literal`` hint.
     """
 
     @app.default
@@ -341,12 +341,11 @@ def test_metavar_choice_for_explicit_parameter_choices(app):
         pass
 
     num, color, hidden, plain = _parameter_entries(app)
-    # Panel rows: the ``[choices]`` list stands in for the placeholder.
-    assert num.metavar is None
+    assert num.metavar == "CHOICE"
     assert num.choices == ("1", "2", "3")
-    assert color.metavar is None
+    assert color.metavar == "CHOICE"
     assert color.choices == ("red", "green")
-    # ``show_choices=False`` hides the list, so the ``CHOICE`` placeholder returns.
+    # ``show_choices=False`` hides the list but the ``CHOICE`` placeholder is unchanged.
     assert hidden.metavar == "CHOICE"
     # A plain type without choices is unaffected.
     assert plain.metavar == "INT"
@@ -379,11 +378,11 @@ def test_usage_wraps_choice_in_container_for_explicit_parameter_choices(app, con
 
     with console.capture() as capture:
         app.help_print(console=console)
-    assert "Usage: test_help_metavar --a LIST[CHOICE] --b LIST[CHOICE]" in capture.get()
+    assert "Usage: test_help_metavar --a CHOICE... --b CHOICE..." in capture.get()
 
     a, b = _parameter_entries(app)
-    assert a.metavar is None
-    assert b.metavar is None
+    assert a.metavar == "CHOICE..."
+    assert b.metavar == "CHOICE..."
 
 
 def test_explicit_metavar_shown_alongside_choices(app, console: Console):
@@ -467,11 +466,12 @@ def test_usage_keeps_choice_metavar_for_required_choice_parameters(app, console:
         app.help_print(console=console)
     actual = capture.get()
     assert "Usage: test_help_metavar --color CHOICE --mode CHOICE --n INT" in actual
-    assert "--color  [choices: red, blue]" in actual
+    assert "--color CHOICE" in actual
+    assert "[choices: red, blue]" in actual
 
 
-def test_mixed_union_keeps_free_form_metavar_when_choices_shown(app):
-    """Only the choice half is dropped in favour of the ``[choices]`` list; ``INT`` still parses and still shows."""
+def test_mixed_union_renders_both_members(app):
+    """A ``Literal | int`` union renders both members (``CHOICE|INT``) alongside the ``[choices]`` list."""
 
     @app.default
     def main(*, mixed: Literal["auto"] | int = 1):
@@ -479,7 +479,7 @@ def test_mixed_union_keeps_free_form_metavar_when_choices_shown(app):
 
     (entry,) = _parameter_entries(app)
     assert entry.choices == ("auto",)
-    assert entry.metavar == "INT"
+    assert entry.metavar == "CHOICE|INT"
 
 
 def test_metavar_for_dict_with_accepts_keys_false(app, console: Console):
@@ -572,6 +572,23 @@ def test_metavar_repeats_for_n_tokens(app):
     assert w.metavar == "INT INT INT"
 
 
+def test_metavar_n_tokens_descends_into_abstract_collections(app):
+    """An abstract collection descends to its element under ``n_tokens``, one placeholder per token."""
+    from collections.abc import Collection
+
+    @app.default
+    def main(
+        *,
+        x: Annotated[Collection[str], Parameter(n_tokens=2)],
+        y: Annotated[Collection[str], Parameter(n_tokens=-1)],
+    ):
+        pass
+
+    x, y = _parameter_entries(app)
+    assert x.metavar == "STR STR"
+    assert y.metavar == "STR..."
+
+
 def test_metavar_strips_none_from_nested_unions(app):
     """``None`` inside a container element is never something the user types, so it is not advertised."""
 
@@ -580,8 +597,8 @@ def test_metavar_strips_none_from_nested_unions(app):
         pass
 
     a, b = _parameter_entries(app)
-    assert a.metavar == "LIST[INT]"
-    assert b.metavar is None
+    assert a.metavar == "INT..."
+    assert b.metavar == "CHOICE..."
 
 
 def test_metavar_honors_element_metavars_in_containers(app):
@@ -594,7 +611,7 @@ def test_metavar_honors_element_metavars_in_containers(app):
 
     ports, emails, p = _parameter_entries(app)
     assert ports.metavar == "PORT PORT"
-    assert emails.metavar == "LIST[EMAIL]"
+    assert emails.metavar == "EMAIL..."
     assert p.metavar == "PORT"
 
 
@@ -1001,8 +1018,9 @@ def test_metavar_default_panel_rendering_unchanged(app, console: Console):
     assert "│ *  URL  [required]" in actual
     # Optional positional-or-keyword: name-derived label precedes the option name.
     assert "DEST --dest" in actual
-    # Keyword-only with choices: option name only; ``[choices]`` suppresses the metavar.
-    assert "│ --quality " in actual
+    # Keyword-only with choices: option name plus a ``CHOICE`` metavar, alongside ``[choices]``.
+    assert "--quality CHOICE" in actual
+    assert "[choices: 144, 720]" in actual
     assert "QUALITY" not in actual
     # Keyword-only boolean flag: negatives shown, never a label.
     assert "--flag --no-flag" in actual

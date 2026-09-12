@@ -1,7 +1,16 @@
 import inspect
 import sys
 import typing
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import (
+    Callable,
+    Collection,
+    Iterable,
+    MutableSequence,
+    MutableSet,
+    Reversible,
+    Sequence,
+    Set,
+)
 from enum import Enum, Flag
 from functools import partial
 from types import UnionType
@@ -27,6 +36,22 @@ ITERABLE_TYPES = {
     list,
     set,
     tuple,
+}
+
+# Single-element iterables that consume one value per CLI token, so they share ``tuple[X, ...]``'s
+# ``X...`` metavar. Excludes ``tuple`` (fixed arity / explicit ``...``) and mappings (key/value pairs).
+VARIADIC_COLLECTION_TYPES = {
+    Iterable,
+    typing.Sequence,
+    Sequence,
+    Collection,
+    Reversible,
+    MutableSequence,
+    Set,
+    MutableSet,
+    frozenset,
+    list,
+    set,
 }
 
 
@@ -328,7 +353,7 @@ def get_choices_from_hint(type_: Any, name_transform: Callable[[str], str]) -> l
                 choices.extend(x)
     elif _origin is Literal:
         choices.extend(str(x) for x in get_args(type_))
-    elif _origin in ITERABLE_TYPES:
+    elif is_iterable_type(type_):
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
             choices.extend(get_choices(args[0]))
