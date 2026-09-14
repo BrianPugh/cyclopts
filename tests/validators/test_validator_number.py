@@ -15,7 +15,7 @@ MOD_PAT = re.compile(r" multiple of ")
 @mark.parametrize(
     "type_,value,expectation", [(int, "this is a string.", raises(TypeError)), (str, "foo", raises(TypeError))]
 )
-def test_validator_number_type(type_, value, expectation):
+def test_type(type_, value, expectation):
     validator = Number()
     with nullcontext() if expectation is None else expectation:
         validator(type_, value)
@@ -56,7 +56,7 @@ def test_validator_number_type(type_, value, expectation):
         (list[set[int]], [{0}, {6}], 5, raises(ValueError)),
     ],
 )
-def test_validator_number_lt(type_, value, lt, expectation):
+def test_lt(type_, value, lt, expectation):
     validator = Number(lt=lt)
     with decimal.localcontext(decimal.ExtendedContext), nullcontext() if expectation is None else expectation:
         validator(type_, value)
@@ -79,7 +79,7 @@ def test_validator_number_lt(type_, value, lt, expectation):
         (float, float("-inf"), 0, None),
     ],
 )
-def test_validator_number_lte(type_, value, lte, expectation):
+def test_lte(type_, value, lte, expectation):
     validator = Number(lte=lte)
     with nullcontext() if expectation is None else expectation:
         validator(type_, value)
@@ -102,7 +102,7 @@ def test_validator_number_lte(type_, value, lte, expectation):
         (float, float("inf"), 0, None),
     ],
 )
-def test_validator_number_gt(type_, value, gt, expectation):
+def test_gt(type_, value, gt, expectation):
     validator = Number(gt=gt)
     with nullcontext() if expectation is None else expectation:
         validator(type_, value)
@@ -125,7 +125,7 @@ def test_validator_number_gt(type_, value, gt, expectation):
         (float, float("inf"), 0, None),
     ],
 )
-def test_validator_number_gte(type_, value, gte, expectation):
+def test_gte(type_, value, gte, expectation):
     validator = Number(gte=gte)
     with nullcontext() if expectation is None else expectation:
         validator(type_, value)
@@ -143,7 +143,7 @@ def test_validator_number_gte(type_, value, gte, expectation):
         (Decimal, Decimal(9), 4, raises(ValueError, match=MOD_PAT)),
     ],
 )
-def test_validator_number_modulo(type_, value, modulo, expectation):
+def test_modulo(type_, value, modulo, expectation):
     validator = Number(modulo=modulo)
     with decimal.localcontext(decimal.ExtendedContext), nullcontext() if expectation is None else expectation:
         validator(type_, value)
