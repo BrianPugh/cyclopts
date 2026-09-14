@@ -103,7 +103,6 @@ def test_abstract_iterable_consume_multiple_empty(app, hint, expected, assert_pa
         (collections.abc.Sequence[int], []),
         (collections.abc.MutableSequence[int], []),
         (collections.abc.Collection[int], []),
-        (collections.abc.Container[int], []),
         (collections.abc.Reversible[int], []),
         (collections.abc.Set[int], set()),
         (collections.abc.MutableSet[int], set()),

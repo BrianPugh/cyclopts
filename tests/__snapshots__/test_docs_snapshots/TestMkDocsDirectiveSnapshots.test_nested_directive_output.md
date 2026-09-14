@@ -8,7 +8,7 @@ Administrative commands for system management.
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
 * `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 #### complex-cli admin users

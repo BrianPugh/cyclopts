@@ -22,7 +22,7 @@ Complex CLI application for comprehensive documentation testing.
 ``--quiet, -q, --no-quiet``
     Suppress non-essential output. [Default: ``False``]
 
-``--log-level``
+``--log-level CHOICE``
     Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
 
 ``--no-color, --no-no-color``
@@ -159,7 +159,7 @@ Configure database settings.
 ``--password STR``
     Authentication password (optional).
 
-``--ssl-mode``
+``--ssl-mode CHOICE``
     SSL connection mode. [Choices: ``disable``, ``prefer``, ``require``, ``verify-full``, Default: ``prefer``]
 
 ``--pool-size INT``
@@ -232,7 +232,7 @@ Create a new user.
 
 **Parameters:**
 
-``--role``
+``--role CHOICE``
     User role assignment. [Choices: ``admin``, ``user``, ``guest``, Default: ``user``]
 
 ``--permissions.none, --permissions.no-none``
@@ -475,16 +475,16 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 ``--batch-size INT``
     Number of items to process per batch. [Default: ``32``]
 
-``--num-workers INT``
+``--num-workers INT|CHOICE``
     Number of parallel workers. Use "auto" for automatic detection. [Choices: ``auto``, Default: ``auto``]
 
-``--quality-level INT``
+``--quality-level INT|CHOICE``
     Processing quality level. Higher values mean better quality but slower. [Choices: ``high``, ``medium``, ``low``, Default: ``high``]
 
-``--device INT``
+``--device CHOICE|INT``
     Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. [Choices: ``cuda``, ``cpu``, ``auto``, Default: ``auto``]
 
-``--output-formats, --empty-output-formats``
+``--output-formats CHOICE..., --empty-output-formats``
     List of output formats to generate. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``[json]``]
 
 ``--input-dir PATH``
@@ -533,16 +533,16 @@ PathConfig and ProcessingConfig).
 ``--batch-size INT``
     Number of items to process per batch. [Default: ``32``]
 
-``--num-workers INT``
+``--num-workers INT|CHOICE``
     Number of parallel workers. Use "auto" for automatic detection. [Choices: ``auto``, Default: ``auto``]
 
-``--quality-level INT``
+``--quality-level INT|CHOICE``
     Processing quality level. Higher values mean better quality but slower. [Choices: ``high``, ``medium``, ``low``, Default: ``high``]
 
-``--device INT``
+``--device CHOICE|INT``
     Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. [Choices: ``cuda``, ``cpu``, ``auto``, Default: ``auto``]
 
-``--output-formats, --empty-output-formats``
+``--output-formats CHOICE..., --empty-output-formats``
     List of output formats to generate. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``[json]``]
 
 ``--dry-run, --no-dry-run``
@@ -572,7 +572,7 @@ Validate data files against schema.
 ``--schema-file PATH``
     Custom schema file (must exist).
 
-``--ignore-patterns LIST[STR], --empty-ignore-patterns``
+``--ignore-patterns STR..., --empty-ignore-patterns``
     Patterns to ignore during validation.
 
 .. _cyclopts-complex-cli-server:
@@ -623,7 +623,7 @@ Demonstrates Pydantic model support for CLI parameters.
 ``--server.debug, --server.no-debug``
     Enable debug mode. [Default: ``False``]
 
-``--auth.provider``
+``--auth.provider CHOICE``
     Authentication provider type. [Choices: ``oauth2``, ``jwt``, ``basic``, ``none``, Default: ``jwt``]
 
 ``--auth.token-expiry INT``
@@ -632,7 +632,7 @@ Demonstrates Pydantic model support for CLI parameters.
 ``--auth.refresh-enabled, --auth.no-refresh-enabled``
     Enable token refresh. [Default: ``True``]
 
-``--auth.allowed-origins LIST[STR], --auth.empty-allowed-origins``
+``--auth.allowed-origins STR..., --auth.empty-allowed-origins``
     List of allowed CORS origins. [Default: ``['*']``]
 
 .. _cyclopts-complex-cli-server-stop:
@@ -709,7 +709,7 @@ Demonstrates attrs class support for CLI parameters.
 
 **Parameters:**
 
-``--config.backend``
+``--config.backend CHOICE``
     Cache backend type. [Choices: ``memory``, ``redis``, ``memcached``, ``disk``, Default: ``memory``]
 
 ``--config.ttl INT``

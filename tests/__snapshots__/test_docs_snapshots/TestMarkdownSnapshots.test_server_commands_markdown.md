@@ -4,7 +4,7 @@ Server management commands.
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
 * `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ### complex-cli server start
@@ -24,10 +24,10 @@ Demonstrates Pydantic model support for CLI parameters.
 * `--server.workers INT`: Number of worker processes. *[default: 4]*
 * `--server.timeout FLOAT`: Request timeout in seconds. *[default: 30.0]*
 * `--server.debug, --server.no-debug`: Enable debug mode. *[default: False]*
-* `--auth.provider`: Authentication provider type. *[choices: oauth2, jwt, basic, none]* *[default: jwt]*
+* `--auth.provider CHOICE`: Authentication provider type. *[choices: oauth2, jwt, basic, none]* *[default: jwt]*
 * `--auth.token-expiry INT`: Token expiration time in seconds. *[default: 3600]*
 * `--auth.refresh-enabled, --auth.no-refresh-enabled`: Enable token refresh. *[default: True]*
-* `--auth.allowed-origins LIST[STR], --auth.empty-allowed-origins`: List of allowed CORS origins. *[default: ['*']]*
+* `--auth.allowed-origins STR..., --auth.empty-allowed-origins`: List of allowed CORS origins. *[default: ['*']]*
 
 ### complex-cli server stop
 

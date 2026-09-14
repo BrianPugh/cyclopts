@@ -21,7 +21,7 @@ Complex CLI application for comprehensive documentation testing.
 ``--quiet, -q, --no-quiet``
     Suppress non-essential output. [Default: ``False``]
 
-``--log-level``
+``--log-level CHOICE``
     Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
 
 ``--no-color, --no-no-color``
@@ -111,7 +111,7 @@ Create a new user.
 
 **Parameters:**
 
-``--role``
+``--role CHOICE``
     User role assignment. [Choices: ``admin``, ``user``, ``guest``, Default: ``user``]
 
 ``--permissions.none, --permissions.no-none``

@@ -10,7 +10,7 @@ Complex CLI application for comprehensive documentation testing.
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
 * `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 **Utilities**:
@@ -34,7 +34,7 @@ Displays the application version and system information.
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
 * `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ### complex-cli info
@@ -54,7 +54,7 @@ Show application information.
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
 * `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ### complex-cli cache
@@ -65,7 +65,7 @@ Cache management commands.
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
 * `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 #### complex-cli cache configure
@@ -80,7 +80,7 @@ Demonstrates attrs class support for CLI parameters.
 
 **Parameters**:
 
-* `--config.backend`: Cache backend type. *[choices: memory, redis, memcached, disk]* *[default: memory]*
+* `--config.backend CHOICE`: Cache backend type. *[choices: memory, redis, memcached, disk]* *[default: memory]*
 * `--config.ttl INT`: Time-to-live in seconds. *[default: 300]*
 * `--config.max-size INT`: Maximum cache size in MB. *[default: 1024]*
 * `--config.compression, --config.no-compression`: Enable compression. *[default: False]*
@@ -135,5 +135,5 @@ documentation system needs to handle correctly.
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
 * `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*

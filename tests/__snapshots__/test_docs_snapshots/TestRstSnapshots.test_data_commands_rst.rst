@@ -21,7 +21,7 @@ Complex CLI application for comprehensive documentation testing.
 ``--quiet, -q, --no-quiet``
     Suppress non-essential output. [Default: ``False``]
 
-``--log-level``
+``--log-level CHOICE``
     Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
 
 ``--no-color, --no-no-color``
@@ -74,16 +74,16 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 ``--batch-size INT``
     Number of items to process per batch. [Default: ``32``]
 
-``--num-workers INT``
+``--num-workers INT|CHOICE``
     Number of parallel workers. Use "auto" for automatic detection. [Choices: ``auto``, Default: ``auto``]
 
-``--quality-level INT``
+``--quality-level INT|CHOICE``
     Processing quality level. Higher values mean better quality but slower. [Choices: ``high``, ``medium``, ``low``, Default: ``high``]
 
-``--device INT``
+``--device CHOICE|INT``
     Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. [Choices: ``cuda``, ``cpu``, ``auto``, Default: ``auto``]
 
-``--output-formats, --empty-output-formats``
+``--output-formats CHOICE..., --empty-output-formats``
     List of output formats to generate. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``[json]``]
 
 ``--input-dir PATH``
@@ -132,16 +132,16 @@ PathConfig and ProcessingConfig).
 ``--batch-size INT``
     Number of items to process per batch. [Default: ``32``]
 
-``--num-workers INT``
+``--num-workers INT|CHOICE``
     Number of parallel workers. Use "auto" for automatic detection. [Choices: ``auto``, Default: ``auto``]
 
-``--quality-level INT``
+``--quality-level INT|CHOICE``
     Processing quality level. Higher values mean better quality but slower. [Choices: ``high``, ``medium``, ``low``, Default: ``high``]
 
-``--device INT``
+``--device CHOICE|INT``
     Computing device to use. Can be "cuda", "cpu", "auto", or a GPU index. [Choices: ``cuda``, ``cpu``, ``auto``, Default: ``auto``]
 
-``--output-formats, --empty-output-formats``
+``--output-formats CHOICE..., --empty-output-formats``
     List of output formats to generate. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``[json]``]
 
 ``--dry-run, --no-dry-run``
@@ -171,5 +171,5 @@ Validate data files against schema.
 ``--schema-file PATH``
     Custom schema file (must exist).
 
-``--ignore-patterns LIST[STR], --empty-ignore-patterns``
+``--ignore-patterns STR..., --empty-ignore-patterns``
     Patterns to ignore during validation.
