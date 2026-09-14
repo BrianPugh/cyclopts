@@ -4,7 +4,7 @@ from contextlib import nullcontext
 from decimal import Decimal
 from fractions import Fraction
 
-from pytest import mark, param, raises
+from pytest import mark, raises
 
 from cyclopts.validators import Number
 
@@ -37,12 +37,8 @@ def test_type(type_, value, expectation):
         (int, (0, 0, 6), 5, raises(ValueError)),
         (int, (0, 0, (1, 6)), 5, raises(ValueError)),
         *(
-            param(float, value, 0, raises(ValueError, match=r"Must be < 0."), id=id)
-            for value, id in [
-                (float("nan"), "scalar"),
-                ([float("nan")], "list"),
-                ({"value": [float("nan")]}, "nested_mapping"),
-            ]
+            (float, value, 0, raises(ValueError, match=r"Must be < 0."))
+            for value in [float("nan"), [float("nan")], {"value": [float("nan")]}]
         ),
         (float, float("-inf"), 0, None),
         (set[int], {0, 1, 2}, 5, None),
@@ -69,12 +65,8 @@ def test_lt(type_, value, lt, expectation):
         (int, 5, 5, None),
         (int, 6, 5, raises(ValueError)),
         *(
-            param(float, value, 0, raises(ValueError, match=r"Must be <= 0."), id=id)
-            for value, id in [
-                (float("nan"), "scalar"),
-                ([float("nan")], "list"),
-                ({"value": [float("nan")]}, "nested_mapping"),
-            ]
+            (float, value, 0, raises(ValueError, match=r"Must be <= 0."))
+            for value in [float("nan"), [float("nan")], {"value": [float("nan")]}]
         ),
         (float, float("-inf"), 0, None),
     ],
@@ -92,12 +84,8 @@ def test_lte(type_, value, lte, expectation):
         (int, 5, 5, raises(ValueError)),
         (int, 4, 5, raises(ValueError)),
         *(
-            param(float, value, 0, raises(ValueError, match=r"Must be > 0."), id=id)
-            for value, id in [
-                (float("nan"), "scalar"),
-                ([float("nan")], "list"),
-                ({"value": [float("nan")]}, "nested_mapping"),
-            ]
+            (float, value, 0, raises(ValueError, match=r"Must be > 0."))
+            for value in [float("nan"), [float("nan")], {"value": [float("nan")]}]
         ),
         (float, float("inf"), 0, None),
     ],
@@ -115,12 +103,8 @@ def test_gt(type_, value, gt, expectation):
         (int, 5, 5, None),
         (int, 4, 5, raises(ValueError)),
         *(
-            param(float, value, 0, raises(ValueError, match=r"Must be >= 0."), id=id)
-            for value, id in [
-                (float("nan"), "scalar"),
-                ([float("nan")], "list"),
-                ({"value": [float("nan")]}, "nested_mapping"),
-            ]
+            (float, value, 0, raises(ValueError, match=r"Must be >= 0."))
+            for value in [float("nan"), [float("nan")], {"value": [float("nan")]}]
         ),
         (float, float("inf"), 0, None),
     ],
