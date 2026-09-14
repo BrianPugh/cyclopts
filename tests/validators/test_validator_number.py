@@ -1,147 +1,136 @@
-import pytest
+import decimal
+import re
+from contextlib import nullcontext
+from decimal import Decimal
+from fractions import Fraction
+
+from pytest import mark, raises
 
 from cyclopts.validators import Number
 
+GT_PAT = re.compile(r" > ")
+GTE_PAT = re.compile(r" >= ")
+LT_PAT = re.compile(r" < ")
+LTE_PAT = re.compile(r" <= ")
+MOD_PAT = re.compile(r" multiple of ")
 
-def test_validator_number_type():
+
+@mark.parametrize(
+    "type_,value,expectation", [(int, "this is a string.", raises(TypeError)), (str, "foo", raises(TypeError))]
+)
+def test_type(type_, value, expectation):
     validator = Number()
-    with pytest.raises(TypeError):
-        validator(int, "this is a string.")  # pyright: ignore[reportArgumentType]
+    with nullcontext() if expectation is None else expectation:
+        validator(type_, value)
 
 
-def test_validator_number_lt():
-    validator = Number(lt=5)
-    validator(int, 0)
-
-    with pytest.raises(ValueError):
-        validator(int, 5)
-
-    with pytest.raises(ValueError):
-        validator(int, 6)
-
-
-def test_validator_number_lt_sequence():
-    validator = Number(lt=5)
-    validator(int, (0, 0, 0))
-    validator(int, (0, 0, (1, 2)))
-
-    with pytest.raises(ValueError):
-        validator(int, 5)
-
-    with pytest.raises(ValueError):
-        validator(int, 6)
-
-    with pytest.raises(ValueError):
-        validator(int, (0, 0, 6))
-
-    with pytest.raises(ValueError):
-        validator(int, (0, 0, (1, 6)))
-
-
-def test_validator_number_lte():
-    validator = Number(lte=5)
-    validator(int, 0)
-    validator(int, 5)
-
-    with pytest.raises(ValueError):
-        validator(int, 6)
-
-
-def test_validator_number_gt():
-    validator = Number(gt=5)
-    validator(int, 10)
-
-    with pytest.raises(ValueError):
-        validator(int, 5)
-
-    with pytest.raises(ValueError):
-        validator(int, 4)
-
-
-def test_validator_number_gte():
-    validator = Number(gte=5)
-    validator(int, 10)
-    validator(int, 5)
-
-    with pytest.raises(ValueError):
-        validator(int, 4)
-
-
-@pytest.mark.parametrize(
-    "validator, message",
+@mark.parametrize(
+    "type_,value,lt,expectation",
     [
-        (Number(lt=0), "Must be < 0."),
-        (Number(lte=0), "Must be <= 0."),
-        (Number(gt=0), "Must be > 0."),
-        (Number(gte=0), "Must be >= 0."),
+        (int, 0, 5, None),
+        (int, 5, 5, raises(ValueError, match=LT_PAT)),
+        (int, 6, 5, raises(ValueError, match=LT_PAT)),
+        (Fraction, Fraction(0, 1), 1, None),
+        (Fraction, Fraction(0, 1), 0, raises(ValueError, match=LT_PAT)),
+        (Decimal, Decimal("0"), 1, None),
+        (Decimal, Decimal("Infinity"), 0, raises(ValueError, match=LT_PAT)),
+        (Decimal, Decimal("NaN"), 0, raises(ValueError, match=LT_PAT)),
+        (int, (0, 0, 0), 5, None),
+        (int, (0, 0, (1, 2)), 5, None),
+        (int, (0, 0, 6), 5, raises(ValueError, match=LT_PAT)),
+        (int, (0, 0, (1, 6)), 5, raises(ValueError, match=LT_PAT)),
+        *(
+            (float, value, 0, raises(ValueError, match=LT_PAT))
+            for value in [float("nan"), [float("nan")], {"value": [float("nan")]}]
+        ),
+        (float, float("-inf"), 0, None),
+        (set[int], {0, 1, 2}, 5, None),
+        (frozenset[int], frozenset({0, 1, 2}), 5, None),
+        (set[int], {0, 6}, 5, raises(ValueError, match=LT_PAT)),
+        (frozenset[int], frozenset({0, 6}), 5, raises(ValueError, match=LT_PAT)),
+        (dict[str, int], {"a": 0, "b": 1}, 5, None),
+        (dict[str, int], {"a": 0, "b": 6}, 5, raises(ValueError, match=LT_PAT)),
+        (dict[str, list[int]], {"a": [0, 1]}, 5, None),
+        (dict[str, list[int]], {"a": [0, 6]}, 5, raises(ValueError, match=LT_PAT)),
+        (list[set[int]], [{0}, {6}], 5, raises(ValueError, match=LT_PAT)),
     ],
 )
-@pytest.mark.parametrize(
-    "value",
-    [float("nan"), [float("nan")], {"value": [float("nan")]}],
-    ids=["scalar", "list", "nested_mapping"],
-)
-def test_validator_number_nan(validator, message, value):
-    with pytest.raises(ValueError) as exc_info:
-        validator(float, value)
-    assert str(exc_info.value) == message
+def test_lt(type_, value, lt, expectation):
+    validator = Number(lt=lt)
+    with decimal.localcontext(decimal.ExtendedContext), nullcontext() if expectation is None else expectation:
+        validator(type_, value)
 
 
-@pytest.mark.parametrize(
-    "validator, value",
+@mark.parametrize(
+    "type_,value,lte,expectation",
     [
-        (Number(lt=0), float("-inf")),
-        (Number(lte=0), float("-inf")),
-        (Number(gt=0), float("inf")),
-        (Number(gte=0), float("inf")),
+        (int, 0, 5, None),
+        (int, 5, 5, None),
+        (int, 6, 5, raises(ValueError, match=LTE_PAT)),
+        *(
+            (float, value, 0, raises(ValueError, match=LTE_PAT))
+            for value in [float("nan"), [float("nan")], {"value": [float("nan")]}]
+        ),
+        (float, float("-inf"), 0, None),
     ],
 )
-def test_validator_number_infinity(validator, value):
-    validator(float, value)
+def test_lte(type_, value, lte, expectation):
+    validator = Number(lte=lte)
+    with nullcontext() if expectation is None else expectation:
+        validator(type_, value)
 
 
-def test_validator_number_modulo():
-    validator = Number(modulo=4)
-    validator(int, 8)
-    validator(float, 8.0)
-    with pytest.raises(ValueError):
-        validator(int, 9)
+@mark.parametrize(
+    "type_,value,gt,expectation",
+    [
+        (int, 10, 5, None),
+        (int, 5, 5, raises(ValueError, match=GT_PAT)),
+        (int, 4, 5, raises(ValueError, match=GT_PAT)),
+        *(
+            (float, value, 0, raises(ValueError, match=GT_PAT))
+            for value in [float("nan"), [float("nan")], {"value": [float("nan")]}]
+        ),
+        (float, float("inf"), 0, None),
+    ],
+)
+def test_gt(type_, value, gt, expectation):
+    validator = Number(gt=gt)
+    with nullcontext() if expectation is None else expectation:
+        validator(type_, value)
 
 
-def test_validator_number_typeerror():
-    validator = Number(gte=5)
-    with pytest.raises(TypeError):
-        validator(str, "foo")  # pyright: ignore[reportArgumentType]
+@mark.parametrize(
+    "type_,value,gte,expectation",
+    [
+        (int, 10, 5, None),
+        (int, 5, 5, None),
+        (int, 4, 5, raises(ValueError, match=GTE_PAT)),
+        *(
+            (float, value, 0, raises(ValueError, match=GTE_PAT))
+            for value in [float("nan"), [float("nan")], {"value": [float("nan")]}]
+        ),
+        (float, float("inf"), 0, None),
+    ],
+)
+def test_gte(type_, value, gte, expectation):
+    validator = Number(gte=gte)
+    with nullcontext() if expectation is None else expectation:
+        validator(type_, value)
 
 
-def test_validator_number_set():
-    """Sets are validated element-wise, just like sequences."""
-    validator = Number(lt=5)
-    validator(set[int], {0, 1, 2})
-    validator(frozenset[int], frozenset({0, 1, 2}))
-
-    with pytest.raises(ValueError):
-        validator(set[int], {0, 6})
-
-    with pytest.raises(ValueError):
-        validator(frozenset[int], frozenset({0, 6}))
-
-
-def test_validator_number_mapping():
-    """Mapping **values** are validated element-wise."""
-    validator = Number(lt=5)
-    validator(dict[str, int], {"a": 0, "b": 1})
-
-    with pytest.raises(ValueError):
-        validator(dict[str, int], {"a": 0, "b": 6})
-
-
-def test_validator_number_nested_containers():
-    validator = Number(lt=5)
-    validator(dict[str, list[int]], {"a": [0, 1]})
-
-    with pytest.raises(ValueError):
-        validator(dict[str, list[int]], {"a": [0, 6]})
-
-    with pytest.raises(ValueError):
-        validator(list[set[int]], [{0}, {6}])
+@mark.parametrize(
+    "type_,value,modulo,expectation",
+    [
+        (int, 8, 4, None),
+        (float, 8.0, 4, None),
+        (int, 9, 4, raises(ValueError, match=MOD_PAT)),
+        (Fraction, Fraction(8, 1), 4, None),
+        (Fraction, Fraction(9, 1), 4, raises(ValueError, match=MOD_PAT)),
+        (Decimal, Decimal(8), 4, None),
+        (Decimal, Decimal(9), 4, raises(ValueError, match=MOD_PAT)),
+    ],
+)
+def test_modulo(type_, value, modulo, expectation):
+    validator = Number(modulo=modulo)
+    with decimal.localcontext(decimal.ExtendedContext), nullcontext() if expectation is None else expectation:
+        validator(type_, value)
