@@ -66,9 +66,6 @@ class Number:
             for v in elements:
                 self(type_, v)
         else:
-            if not isinstance(value, int | float):
-                return
-
             # Negate the required comparison so NaN cannot bypass a bound.
             if self.lt is not None and not value < self.lt:
                 raise ValueError(f"Must be < {self.lt}.")
