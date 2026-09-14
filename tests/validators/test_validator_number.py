@@ -1,4 +1,3 @@
-import decimal
 import re
 from contextlib import nullcontext
 from decimal import Decimal
@@ -57,7 +56,7 @@ def test_type(type_, value, expectation):
 )
 def test_lt(type_, value, lt, expectation):
     validator = Number(lt=lt)
-    with decimal.localcontext(decimal.ExtendedContext), nullcontext() if expectation is None else expectation:
+    with nullcontext() if expectation is None else expectation:
         validator(type_, value)
 
 
@@ -132,5 +131,5 @@ def test_gte(type_, value, gte, expectation):
 )
 def test_modulo(type_, value, modulo, expectation):
     validator = Number(modulo=modulo)
-    with decimal.localcontext(decimal.ExtendedContext), nullcontext() if expectation is None else expectation:
+    with nullcontext() if expectation is None else expectation:
         validator(type_, value)

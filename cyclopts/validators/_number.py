@@ -66,17 +66,20 @@ class Number:
             for v in elements:
                 self(type_, v)
         else:
-            # Negate the required comparison so NaN cannot bypass a bound.
-            if self.lt is not None and not value < self.lt:
+            # Negate the required comparison so NaN cannot bypass a bound. A Decimal NaN raises
+            # decimal.InvalidOperation on ordering comparisons under the default context, so detect
+            # it up front (NaN is the only value unequal to itself) and treat it as out of bounds.
+            is_nan = value != value
+            if self.lt is not None and (is_nan or not value < self.lt):
                 raise ValueError(f"Must be < {self.lt}.")
 
-            if self.lte is not None and not value <= self.lte:
+            if self.lte is not None and (is_nan or not value <= self.lte):
                 raise ValueError(f"Must be <= {self.lte}.")
 
-            if self.gt is not None and not value > self.gt:
+            if self.gt is not None and (is_nan or not value > self.gt):
                 raise ValueError(f"Must be > {self.gt}.")
 
-            if self.gte is not None and not value >= self.gte:
+            if self.gte is not None and (is_nan or not value >= self.gte):
                 raise ValueError(f"Must be >= {self.gte}.")
 
             if self.modulo is not None and value % self.modulo:
