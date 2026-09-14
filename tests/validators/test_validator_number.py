@@ -33,10 +33,10 @@ def test_validator_number_lt():
     "type_,value,lt,expectation",
     [
         (Fraction, Fraction(0, 1), 1, None),
-        pytest.param(Fraction, Fraction(0, 1), 0, pytest.raises(ValueError, match=LT_PAT), marks=pytest.mark.xfail),
+        (Fraction, Fraction(0, 1), 0, pytest.raises(ValueError, match=LT_PAT)),
         (Decimal, Decimal("0"), 1, None),
-        pytest.param(Decimal, Decimal("Infinity"), 0, pytest.raises(ValueError, match=LT_PAT), marks=pytest.mark.xfail),
-        pytest.param(Decimal, Decimal("NaN"), 0, pytest.raises(ValueError, match=LT_PAT), marks=pytest.mark.xfail),
+        (Decimal, Decimal("Infinity"), 0, pytest.raises(ValueError, match=LT_PAT)),
+        (Decimal, Decimal("NaN"), 0, pytest.raises(ValueError, match=LT_PAT)),
     ],
 )
 def test_validator_lt_fraction_decimal(type_, value, lt, expectation):
@@ -137,9 +137,9 @@ def test_validator_number_modulo():
     "type_,value,modulo,expectation",
     [
         (Fraction, Fraction(8, 1), 4, None),
-        pytest.param(Fraction, Fraction(9, 1), 4, pytest.raises(ValueError, match=MOD_PAT), marks=pytest.mark.xfail),
+        (Fraction, Fraction(9, 1), 4, pytest.raises(ValueError, match=MOD_PAT)),
         (Decimal, Decimal(8), 4, None),
-        pytest.param(Decimal, Decimal(9), 4, pytest.raises(ValueError, match=MOD_PAT), marks=pytest.mark.xfail),
+        (Decimal, Decimal(9), 4, pytest.raises(ValueError, match=MOD_PAT)),
     ],
 )
 def test_validator_modulo_fraction_decimal(type_, value, modulo, expectation):
