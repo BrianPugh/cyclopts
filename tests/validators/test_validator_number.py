@@ -1,6 +1,15 @@
+import decimal
+import re
+from contextlib import nullcontext
+from decimal import Decimal
+from fractions import Fraction
+
 import pytest
 
 from cyclopts.validators import Number
+
+LT_PAT = re.compile(r" < ")
+MOD_PAT = re.compile(r" multiple of ")
 
 
 def test_validator_number_type():
@@ -18,6 +27,22 @@ def test_validator_number_lt():
 
     with pytest.raises(ValueError):
         validator(int, 6)
+
+
+@pytest.mark.parametrize(
+    "type_,value,lt,expectation",
+    [
+        (Fraction, Fraction(0, 1), 1, None),
+        pytest.param(Fraction, Fraction(0, 1), 0, pytest.raises(ValueError, match=LT_PAT), marks=pytest.mark.xfail),
+        (Decimal, Decimal("0"), 1, None),
+        pytest.param(Decimal, Decimal("Infinity"), 0, pytest.raises(ValueError, match=LT_PAT), marks=pytest.mark.xfail),
+        pytest.param(Decimal, Decimal("NaN"), 0, pytest.raises(ValueError, match=LT_PAT), marks=pytest.mark.xfail),
+    ],
+)
+def test_validator_lt_fraction_decimal(type_, value, lt, expectation):
+    validator = Number(lt=lt)
+    with decimal.localcontext(decimal.ExtendedContext), nullcontext() if expectation is None else expectation:
+        validator(type_, value)
 
 
 def test_validator_number_lt_sequence():
@@ -106,6 +131,21 @@ def test_validator_number_modulo():
     validator(float, 8.0)
     with pytest.raises(ValueError):
         validator(int, 9)
+
+
+@pytest.mark.parametrize(
+    "type_,value,modulo,expectation",
+    [
+        (Fraction, Fraction(8, 1), 4, None),
+        pytest.param(Fraction, Fraction(9, 1), 4, pytest.raises(ValueError, match=MOD_PAT), marks=pytest.mark.xfail),
+        (Decimal, Decimal(8), 4, None),
+        pytest.param(Decimal, Decimal(9), 4, pytest.raises(ValueError, match=MOD_PAT), marks=pytest.mark.xfail),
+    ],
+)
+def test_validator_modulo_fraction_decimal(type_, value, modulo, expectation):
+    validator = Number(modulo=modulo)
+    with decimal.localcontext(decimal.ExtendedContext), nullcontext() if expectation is None else expectation:
+        validator(type_, value)
 
 
 def test_validator_number_typeerror():
