@@ -1,4 +1,5 @@
-from typing import Any
+import numbers
+from typing import Any, cast
 
 from cyclopts.utils import frozen
 from cyclopts.validators._utils import iter_container_elements
@@ -66,21 +67,29 @@ class Number:
             for v in elements:
                 self(type_, v)
         else:
-            if not isinstance(value, int | float):
+            if not isinstance(value, numbers.Number):
                 return
+            # numbers.Number has no ordering operators in the type stubs, but every
+            # value reaching here (int, float, Decimal, Fraction, numpy scalar, ...)
+            # supports them.
+            value = cast(Any, value)
 
-            # Negate the required comparison so NaN cannot bypass a bound.
-            if self.lt is not None and not value < self.lt:
+            # NaN of any numeric type (float, Decimal, numpy) is unequal to itself.
+            # Short-circuit on it: it can satisfy no bound, and Decimal NaN would
+            # otherwise raise InvalidOperation on the ordered comparison below.
+            is_nan = value != value
+
+            if self.lt is not None and (is_nan or not value < self.lt):
                 raise ValueError(f"Must be < {self.lt}.")
 
-            if self.lte is not None and not value <= self.lte:
+            if self.lte is not None and (is_nan or not value <= self.lte):
                 raise ValueError(f"Must be <= {self.lte}.")
 
-            if self.gt is not None and not value > self.gt:
+            if self.gt is not None and (is_nan or not value > self.gt):
                 raise ValueError(f"Must be > {self.gt}.")
 
-            if self.gte is not None and not value >= self.gte:
+            if self.gte is not None and (is_nan or not value >= self.gte):
                 raise ValueError(f"Must be >= {self.gte}.")
 
-            if self.modulo is not None and value % self.modulo:
+            if self.modulo is not None and (is_nan or value % self.modulo):
                 raise ValueError(f"Must be a multiple of {self.modulo}.")

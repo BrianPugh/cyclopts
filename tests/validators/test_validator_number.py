@@ -1,3 +1,6 @@
+from decimal import Decimal
+from fractions import Fraction
+
 import pytest
 
 from cyclopts.validators import Number
@@ -98,6 +101,27 @@ def test_validator_number_nan(validator, message, value):
 )
 def test_validator_number_infinity(validator, value):
     validator(float, value)
+
+
+@pytest.mark.parametrize("type_", [Decimal, Fraction])
+def test_validator_number_other_real_types(type_):
+    """Non-``int``/``float`` real numbers (Decimal, Fraction, ...) are validated too."""
+    validator = Number(gt=0)
+    validator(type_, type_(1))
+
+    with pytest.raises(ValueError):
+        validator(type_, type_(0))
+
+    with pytest.raises(ValueError):
+        validator(type_, type_(-100))
+
+
+def test_validator_number_decimal_nan():
+    """Decimal NaN is rejected cleanly rather than raising InvalidOperation."""
+    validator = Number(gt=0)
+    with pytest.raises(ValueError) as exc_info:
+        validator(Decimal, Decimal("nan"))
+    assert str(exc_info.value) == "Must be > 0."
 
 
 def test_validator_number_modulo():
