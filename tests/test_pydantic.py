@@ -900,6 +900,32 @@ def test_pydantic_nested_list_json(app):
     )
 
 
+def test_pydantic_list_of_models_with_nested_list_json(app, assert_parse_args):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/953
+
+    A ``list[Model]`` bound from a single JSON token must preserve a nested
+    collection-of-models field instead of silently dropping it.
+    """
+
+    class Bucket(BaseModel):
+        bid: str
+        amt: str
+
+    class Alloc(BaseModel):
+        partner: str
+        buckets: list[Bucket]
+
+    @app.default
+    def main(*, allocs: list[Alloc] | None = None):
+        pass
+
+    assert_parse_args(
+        main,
+        ["--allocs", '[{"partner": "p1", "buckets": [{"bid": "b1", "amt": "10"}]}]'],
+        allocs=[Alloc(partner="p1", buckets=[Bucket(bid="b1", amt="10")])],
+    )
+
+
 def test_pydantic_secretstr_from_env(app, assert_parse_args, monkeypatch):
     """Test that Pydantic SecretStr works with environment variables.
 
