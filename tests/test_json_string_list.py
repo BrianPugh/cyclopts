@@ -582,3 +582,32 @@ def test_json_mixed_list_and_single_objects(app, assert_parse_args):
         ],
         [User("Alice", 30), User("Bob", 25)],
     )
+
+
+def test_json_list_of_dataclass_with_nested_collections(app, assert_parse_args):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/953
+
+    Collection-typed fields inside a ``list[dataclass]`` element bound from a single
+    JSON token must be converted element-wise rather than dropped or stringified.
+    """
+
+    @dataclass
+    class Inner:
+        a: str
+
+    @dataclass
+    class Outer:
+        inner: list[Inner]
+        tags: list[str]
+        pt: tuple[int, int]
+        meta: dict[str, int]
+
+    @app.default
+    def main(*, xs: list[Outer] | None = None):
+        pass
+
+    assert_parse_args(
+        main,
+        ["--xs", '[{"inner": [{"a": "x"}], "tags": ["t"], "pt": [1, 2], "meta": {"k": 3}}]'],
+        xs=[Outer(inner=[Inner(a="x")], tags=["t"], pt=(1, 2), meta={"k": 3})],
+    )

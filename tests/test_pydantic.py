@@ -926,6 +926,20 @@ def test_pydantic_list_of_models_with_nested_list_json(app, assert_parse_args):
     )
 
 
+def test_pydantic_list_of_models_json_alias_key(app, assert_parse_args):
+    """A JSON element of a ``list[Model]`` may use the pydantic alias as its key."""
+
+    class Model(BaseModel):
+        model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+        my_field: str
+
+    @app.default
+    def main(*, xs: list[Model] | None = None):
+        pass
+
+    assert_parse_args(main, ["--xs", '[{"myField": "v"}]'], xs=[Model(my_field="v")])
+
+
 def test_pydantic_secretstr_from_env(app, assert_parse_args, monkeypatch):
     """Test that Pydantic SecretStr works with environment variables.
 
