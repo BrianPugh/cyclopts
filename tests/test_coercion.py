@@ -7,6 +7,7 @@ from collections.abc import MutableSequence as AbcMutableSequence
 from collections.abc import MutableSet as AbcMutableSet
 from collections.abc import Reversible as AbcReversible
 from collections.abc import Set as AbcSet
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
 from pathlib import Path
@@ -611,3 +612,20 @@ def test_parse_timedelta_equivalence():
     assert convert(timedelta, ["1w"]) == convert(timedelta, ["7d"])
     assert convert(timedelta, ["1h30m"]) == convert(timedelta, ["90m"])
     assert convert(timedelta, ["1d12h"]) == convert(timedelta, ["36h"])
+
+
+def test_convert_json_object_for_type_whose_fields_consume_all_tokens():
+    """A structured type whose only field is a collection receives its tokens as a
+    sequence rather than a single token; a JSON object must still be recognized.
+    """
+
+    @dataclass
+    class Inner:
+        a: str
+
+    @dataclass
+    class Outer:
+        inner: list[Inner]
+
+    assert convert(Outer, ['{"inner": [{"a": "x"}]}']) == Outer(inner=[Inner(a="x")])
+    assert convert(Outer, [Token(value='{"inner": [{"a": "x"}]}')]) == Outer(inner=[Inner(a="x")])
