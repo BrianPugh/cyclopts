@@ -750,7 +750,10 @@ def _convert(
                 raise CoercionError(token=token, target_type=type_) from None
         else:
             # Convert it into a user-supplied class.
-            # First check if we have a single token that's a JSON string
+            # A type whose fields consume all tokens (e.g. a sole ``list`` field) arrives as a
+            # one-element sequence; unwrap it so a JSON-object token is still recognized.
+            if isinstance(token, Sequence) and len(token) == 1 and isinstance(token[0], Token):
+                token = token[0]
             if isinstance(token, Token) and token.value.strip().startswith("{") and type_ is not str:
                 try:
                     data = json.loads(token.value)
