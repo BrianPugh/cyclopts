@@ -98,6 +98,16 @@ Looping! 2
 With just a few additional lines of code, we have a full-featured CLI app.
 See [the docs](https://cyclopts.readthedocs.io) for more advanced usage.
 
+## AI Coding Assistants
+Cyclopts ships a [skill](https://agentskills.io) that teaches coding assistants idiomatic Cyclopts. Install it for whichever agents you use:
+
+```bash
+npx skills add BrianPugh/cyclopts   # Claude Code, Codex, Cursor, Copilot, and others
+cyclopts skill install              # Claude Code only, no Node required
+```
+
+The docs are also available as [llms.txt](https://cyclopts.readthedocs.io/en/latest/llms.txt) and [llms-full.txt](https://cyclopts.readthedocs.io/en/latest/llms-full.txt).
+
 # Compared to Typer
 Cyclopts is what you thought Typer was.
 Cyclopts includes information from docstrings, supports more complex types (even Unions!), and includes proper validation support.

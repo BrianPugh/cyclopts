@@ -238,9 +238,15 @@ class Parameter:
 
         $ my-script --bar 100
         100
+
+    Most parameters need no :class:`Parameter` at all: help text comes from the function's docstring,
+    positional/keyword behavior comes from the signature, and choices come from :obj:`~typing.Literal`
+    or :class:`~enum.Enum` type hints.
+    Reach for :class:`Parameter` only to change a specific behavior, and prefer the narrowest option
+    (e.g. ``alias`` to add a short flag rather than ``name`` to replace all names).
     """
 
-    # All attribute docstrings has been moved to ``docs/api.rst`` for greater control with attrs.
+    # All attribute docstrings live in ``docs/api.rst`` for greater control with attrs.
 
     # This can ONLY ever be a Tuple[str, ...]
     # Usually starts with "--" or "-"
