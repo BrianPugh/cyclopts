@@ -5,7 +5,7 @@ from typing import Annotated, TypedDict
 import pytest
 from attrs import define
 
-from cyclopts import CoercionError, CycloptsError, MissingArgumentError, Parameter
+from cyclopts import CoercionError, CycloptsError, MissingArgumentError, Parameter, ValidationError
 
 LIST_STR_LIKE_TYPES = [
     pytest.param(list, id="list"),
@@ -732,3 +732,66 @@ def test_json_list_of_structured_element_with_nested_collections(app, assert_par
         pass
 
     assert_parse_args(main, ["--xs", token], xs=expected)
+
+
+def test_json_list_element_class_level_validator_runs(app):
+    """A ``@Parameter(validator=...)`` on the element type runs for JSON-object elements."""
+
+    def reject(type_, value):
+        raise ValueError("rejected")
+
+    @Parameter(validator=reject)
+    @dataclass
+    class Item:
+        a: str
+
+    @app.default
+    def main(*, xs: list[Item] | None = None):
+        pass
+
+    with pytest.raises(ValidationError, match="rejected"):
+        app(["--xs", '[{"a": "x"}]'], exit_on_error=False)
+
+
+def test_json_list_element_positional_only_init_field(app, assert_parse_args):
+    class Item:
+        def __init__(self, a: str, /, b: int = 0):
+            self.a, self.b = a, b
+
+        def __eq__(self, other):
+            return (self.a, self.b) == (other.a, other.b)
+
+    @app.default
+    def main(*, xs: list[Item] | None = None):
+        pass
+
+    assert_parse_args(main, ["--xs", '[{"a": "x", "b": 2}]'], xs=[Item("x", b=2)])
+
+
+@pytest.mark.parametrize("as_list", [False, True], ids=["single", "list"])
+def test_json_null_for_nested_model_and_collection_fields(app, assert_parse_args, as_list):
+    """A JSON ``null`` for an optional nested model or collection field yields ``None``,
+    both for a top-level model and for elements of a list of models.
+    """
+
+    @dataclass
+    class Inner:
+        a: str
+
+    @dataclass
+    class Outer:
+        inner: Inner | None
+        tags: list[str] | None = None
+
+    annotation = list[Outer] if as_list else Outer
+
+    @app.default
+    def main(*, xs: annotation | None = None):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    payload = '{"inner": null, "tags": null}'
+    expected = Outer(inner=None, tags=None)
+    if as_list:
+        assert_parse_args(main, ["--xs", f"[{payload}]"], xs=[expected])
+    else:
+        assert_parse_args(main, ["--xs", payload], xs=expected)

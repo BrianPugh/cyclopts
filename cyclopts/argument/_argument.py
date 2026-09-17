@@ -366,6 +366,16 @@ class Argument:
             return self.parameter.show_default
 
     @property
+    def _explicit_none(self) -> bool:
+        """A lone keyless ``None`` token (a JSON/config ``null``) with no populated children."""
+        return (
+            len(self.tokens) == 1
+            and not self.tokens[0].keys
+            and self.tokens[0].implicit_value is None
+            and not any(child.has_tokens for child in self.children)
+        )
+
+    @property
     def _use_pydantic_type_adapter(self) -> bool:
         return bool(
             is_pydantic(self.hint)
@@ -734,6 +744,8 @@ class Argument:
             out = UNSET
         elif self.parameter.count:
             out = sum(token.implicit_value for token in self.tokens if token.implicit_value is not UNSET)
+        elif self._explicit_none:
+            return None
         elif not self.children:
             positional: list[Token] = []
             keyword = {}
@@ -1284,7 +1296,9 @@ class Argument:
             if not child.has_tokens:
                 continue
             keys = child.keys[len(self.keys) :]
-            if child._accepts_keywords:
+            if child._explicit_none:
+                out[keys[0]] = None
+            elif child._accepts_keywords:
                 result = child._json()
                 if result:
                     out[keys[0]] = result

@@ -940,6 +940,29 @@ def test_pydantic_list_of_models_json_alias_key(app, assert_parse_args):
     assert_parse_args(main, ["--xs", '[{"myField": "v"}]'], xs=[Model(my_field="v")])
 
 
+@pytest.mark.parametrize("as_list", [False, True], ids=["single", "list"])
+def test_pydantic_json_null_for_nested_model_and_collection_fields(app, assert_parse_args, as_list):
+    class Inner(BaseModel):
+        a: str
+
+    class Outer(BaseModel):
+        inner: Inner | None
+        tags: list[str] | None = None
+
+    annotation = list[Outer] if as_list else Outer
+
+    @app.default
+    def main(*, xs: annotation | None = None):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    payload = '{"inner": null, "tags": null}'
+    expected = Outer(inner=None, tags=None)
+    if as_list:
+        assert_parse_args(main, ["--xs", f"[{payload}]"], xs=[expected])
+    else:
+        assert_parse_args(main, ["--xs", payload], xs=expected)
+
+
 def test_pydantic_list_of_models_json_choices_enforced(app, assert_parse_args):
     """``Parameter(choices=)`` on a model field is checked for elements bound from JSON."""
 

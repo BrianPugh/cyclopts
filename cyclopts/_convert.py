@@ -401,7 +401,7 @@ def _convert_json_dict(type_: Any, token: "Token", name_transform: Callable[[str
 
     # Reuse the originating option name so nested error messages read ``--outer.field``.
     name = token.keyword if token.keyword and token.keyword.startswith("-") else "--json"
-    field_info = FieldInfo(names=("json",), kind=FieldInfo.KEYWORD_ONLY, annotation=type_, required=True)
+    field_info = FieldInfo(names=("json",), kind=FieldInfo.POSITIONAL_OR_KEYWORD, annotation=type_, required=True)
     collection = ArgumentCollection._from_type(
         field_info,
         (),
@@ -415,7 +415,7 @@ def _convert_json_dict(type_: Any, token: "Token", name_transform: Callable[[str
     argument = collection[0]
     assert not argument.keys
     argument.append(token.evolve(keys=()))
-    return argument.convert()
+    return argument.convert_and_validate()
 
 
 def _create_json_decode_error_message(
