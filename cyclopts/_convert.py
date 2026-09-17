@@ -28,6 +28,7 @@ else:
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     get_annotated_discriminator,
+    get_hint_name,
     is_annotated,
     is_enum_flag,
     is_nonetype,
@@ -712,7 +713,17 @@ def _convert(
             gen = zip(*[iter(token)] * count, strict=False)
         else:
             gen = token
-        out = origin_type(convert(inner_types[0], e) for e in gen)
+        try:
+            out = origin_type(convert(inner_types[0], e) for e in gen)
+        except TypeError as e:
+            if origin_type in (set, frozenset) and str(e).startswith("unhashable type"):
+                raise CoercionError(
+                    msg=f"{get_hint_name(type_)} requires hashable elements, but {get_hint_name(inner_type)} is not "
+                    "hashable. Use a list instead, or make the element type hashable (e.g. a frozen dataclass).",
+                    token=token[0] if token and isinstance(token[0], Token) else None,
+                    target_type=type_,
+                ) from e
+            raise
     elif is_class_and_subclass(type_, Flag):
         # TODO: this might never execute since enum.Flag is now handled in ``convert``.
         out = convert_enum_flag(type_, token if isinstance(token, Sequence) else [token], name_transform)
