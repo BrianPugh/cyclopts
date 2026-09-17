@@ -1,10 +1,11 @@
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, TypedDict
 
 import pytest
+from attrs import define
 
-from cyclopts import CycloptsError, Parameter
+from cyclopts import CoercionError, CycloptsError, MissingArgumentError, Parameter, ValidationError
 
 LIST_STR_LIKE_TYPES = [
     pytest.param(list, id="list"),
@@ -384,16 +385,36 @@ def test_json_list_type_conversion_success(app, assert_parse_args):
     )
 
 
-def test_json_list_missing_required_field(app):
-    """Test that missing required fields in JSON raise appropriate errors."""
+@pytest.mark.parametrize(
+    "token, missing",
+    [
+        ('{"name": "Alice"}', "--values.age"),
+        ('[{"name": "Alice"}]', "--values.age"),
+        ("{}", "--values.name"),
+    ],
+)
+def test_json_list_missing_required_field(app, token, missing):
+    """A JSON element missing a required field raises ``MissingArgumentError`` naming the nested option."""
 
     @app.default
     def main(values: list[User]):
         pass
 
-    # Missing required 'age' field
-    with pytest.raises(CycloptsError):
-        app(["--values", '{"name": "Alice"}'], exit_on_error=False)
+    with pytest.raises(MissingArgumentError) as exc_info:
+        app(["--values", token], exit_on_error=False)
+
+    assert missing in str(exc_info.value)
+
+
+def test_json_list_missing_required_field_env_var(app, monkeypatch):
+    monkeypatch.setenv("USERS", '[{"name": "Alice"}]')
+
+    @app.default
+    def main(values: Annotated[list[User], Parameter(env_var="USERS")]):
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app([], exit_on_error=False)
 
 
 def test_json_list_extra_field_rejected(app):
@@ -582,3 +603,195 @@ def test_json_mixed_list_and_single_objects(app, assert_parse_args):
         ],
         [User("Alice", 30), User("Bob", 25)],
     )
+
+
+@dataclass
+class Inner:
+    a: str
+
+
+@dataclass
+class Outer:
+    inner: list[Inner]
+    tags: list[str]
+    pt: tuple[int, int]
+    meta: dict[str, int]
+
+
+OUTER_JSON = '{"inner": [{"a": "x"}], "tags": ["t"], "pt": [1, 2], "meta": {"k": 3}}'
+OUTER = Outer(inner=[Inner(a="x")], tags=["t"], pt=(1, 2), meta={"k": 3})
+
+
+@pytest.mark.parametrize("token", [f"[{OUTER_JSON}]", OUTER_JSON], ids=["array", "object"])
+def test_json_list_of_dataclass_with_nested_collections(app, assert_parse_args, token):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/953
+
+    Collection-typed fields inside a ``list[dataclass]`` element bound from a single
+    JSON token must be converted element-wise rather than dropped or stringified.
+    """
+
+    @app.default
+    def main(*, xs: list[Outer] | None = None):
+        pass
+
+    assert_parse_args(main, ["--xs", token], xs=[OUTER])
+
+
+def test_json_list_of_dataclass_with_nested_collections_env_var(app, assert_parse_args, monkeypatch):
+    """The env-var source carries a non-option keyword, exercising the fallback root name."""
+    monkeypatch.setenv("XS", f"[{OUTER_JSON}]")
+
+    @app.default
+    def main(*, xs: Annotated[list[Outer], Parameter(env_var="XS")] | None = None):
+        pass
+
+    assert_parse_args(main, "", xs=[OUTER])
+
+
+def test_json_single_and_list_of_dataclass_agree(app, assert_parse_args):
+    """The same JSON object must convert identically whether bound to ``T`` or an element of ``list[T]``."""
+
+    @app.default
+    def main(*, single: Outer | None = None, many: list[Outer] | None = None):
+        pass
+
+    assert_parse_args(main, ["--single", OUTER_JSON, "--many", f"[{OUTER_JSON}]"], single=OUTER, many=[OUTER])
+
+    with pytest.raises(CoercionError) as single_exc:
+        app(["--single", '{"inner": [], "tags": [], "pt": [1, "x"], "meta": {}}'], exit_on_error=False)
+    with pytest.raises(CoercionError) as many_exc:
+        app(["--many", '[{"inner": [], "tags": [], "pt": [1, "x"], "meta": {}}]'], exit_on_error=False)
+
+    assert "[single][pt]" in str(single_exc.value)
+    assert "[many][pt]" in str(many_exc.value)
+
+
+def test_json_list_deeply_nested_missing_required_field(app):
+    """A required field missing two levels down (inside a ``list[Inner]`` field of an element) is not silently accepted."""
+
+    @app.default
+    def main(*, xs: list[Outer] | None = None):
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app(["--xs", '[{"inner": [{}], "tags": [], "pt": [1, 2], "meta": {}}]'], exit_on_error=False)
+
+
+@dataclass(frozen=True)
+class FrozenInner:
+    a: str
+
+
+@dataclass(frozen=True)
+class FrozenOuter:
+    inner: tuple[FrozenInner, ...]
+
+
+@pytest.mark.parametrize(
+    "annotation, expected",
+    [
+        (list[FrozenOuter], [FrozenOuter((FrozenInner("x"),))]),
+        (tuple[FrozenOuter, ...], (FrozenOuter((FrozenInner("x"),)),)),
+        (set[FrozenOuter], {FrozenOuter((FrozenInner("x"),))}),
+    ],
+    ids=["list", "tuple", "set"],
+)
+def test_json_iterable_of_dataclass_with_nested_collections(app, assert_parse_args, annotation, expected):
+    @app.default
+    def main(*, xs: annotation | None = None):  # pyright: ignore
+        pass
+
+    assert_parse_args(main, ["--xs", '[{"inner": [{"a": "x"}]}]'], xs=expected)
+
+
+@define
+class AttrsInner:
+    a: str
+
+
+@define
+class AttrsOuter:
+    inner: list[AttrsInner]
+
+
+class TypedDictOuter(TypedDict):
+    nums: list[int]
+
+
+@pytest.mark.parametrize(
+    "annotation, token, expected",
+    [
+        (list[AttrsOuter], '[{"inner": [{"a": "x"}]}]', [AttrsOuter(inner=[AttrsInner(a="x")])]),
+        (list[TypedDictOuter], '[{"nums": [1, 2]}]', [{"nums": [1, 2]}]),
+    ],
+    ids=["attrs", "TypedDict"],
+)
+def test_json_list_of_structured_element_with_nested_collections(app, assert_parse_args, annotation, token, expected):
+    @app.default
+    def main(*, xs: annotation | None = None):  # pyright: ignore
+        pass
+
+    assert_parse_args(main, ["--xs", token], xs=expected)
+
+
+def test_json_list_element_class_level_validator_runs(app):
+    """A ``@Parameter(validator=...)`` on the element type runs for JSON-object elements."""
+
+    def reject(type_, value):
+        raise ValueError("rejected")
+
+    @Parameter(validator=reject)
+    @dataclass
+    class Item:
+        a: str
+
+    @app.default
+    def main(*, xs: list[Item] | None = None):
+        pass
+
+    with pytest.raises(ValidationError, match="rejected"):
+        app(["--xs", '[{"a": "x"}]'], exit_on_error=False)
+
+
+def test_json_list_element_positional_only_init_field(app, assert_parse_args):
+    class Item:
+        def __init__(self, a: str, /, b: int = 0):
+            self.a, self.b = a, b
+
+        def __eq__(self, other):
+            return (self.a, self.b) == (other.a, other.b)
+
+    @app.default
+    def main(*, xs: list[Item] | None = None):
+        pass
+
+    assert_parse_args(main, ["--xs", '[{"a": "x", "b": 2}]'], xs=[Item("x", b=2)])
+
+
+@pytest.mark.parametrize("as_list", [False, True], ids=["single", "list"])
+def test_json_null_for_nested_model_and_collection_fields(app, assert_parse_args, as_list):
+    """A JSON ``null`` for an optional nested model or collection field yields ``None``,
+    both for a top-level model and for elements of a list of models.
+    """
+
+    @dataclass
+    class Inner:
+        a: str
+
+    @dataclass
+    class Outer:
+        inner: Inner | None
+        tags: list[str] | None = None
+
+    annotation = list[Outer] if as_list else Outer
+
+    @app.default
+    def main(*, xs: annotation | None = None):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    payload = '{"inner": null, "tags": null}'
+    expected = Outer(inner=None, tags=None)
+    if as_list:
+        assert_parse_args(main, ["--xs", f"[{payload}]"], xs=[expected])
+    else:
+        assert_parse_args(main, ["--xs", payload], xs=expected)

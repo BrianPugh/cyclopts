@@ -374,52 +374,48 @@ def _validate_json_extra_keys(
         )
 
 
-def _convert_json(
-    type_: Any,
-    data: dict,
-    field_infos: dict,
-    converter: Callable | None,
-    name_transform: Callable[[str], str],
-):
-    """Convert JSON dict to dataclass with proper type conversion for fields.
+def _convert_json_dict(type_: Any, token: "Token", name_transform: Callable[[str], str]):
+    """Convert a JSON-object token into ``type_`` via the Argument machinery.
+
+    Building a throwaway :class:`ArgumentCollection` for ``type_`` reuses the same
+    key-matching, alias handling, nested-collection expansion, and pydantic
+    validation that a top-level structured parameter gets, so a model bound from a
+    JSON token behaves identically to one bound from ``--key.subkey`` options.
 
     Parameters
     ----------
     type_ : Type
-        The dataclass type to create.
-    data : dict
-        The JSON dictionary containing field values.
-    field_infos : dict
-        Field information from the dataclass.
-    converter : Callable | None
-        Optional converter function.
+        The structured type to create.
+    token : Token
+        Token whose value is a JSON object.
     name_transform : Callable[[str], str]
         Function to transform field names.
 
     Returns
     -------
-    Instance of type_ with properly converted field values.
+    Instance of type_.
     """
-    from cyclopts.token import Token
+    from cyclopts.argument import ArgumentCollection
+    from cyclopts.group import Group
+    from cyclopts.parameter import Parameter
 
-    _validate_json_extra_keys(data, type_)
-
-    converted_data = {}
-    for field_name, field_info in field_infos.items():
-        if field_name in data:
-            value = data[field_name]
-            # None and str-typed fields pass through unchanged; every other field is
-            # round-tripped through convert() via a Token, re-serializing dict/list back
-            # to JSON so the recursive call receives parseable JSON (scalars are stringified).
-            if value is not None and not is_class_and_subclass(field_info.hint, str):
-                token = Token(value=json.dumps(value) if isinstance(value, dict | list) else str(value))
-                # Always attempt conversion, let errors propagate for consistency
-                converted_value = convert(field_info.hint, [token], converter, name_transform)
-            else:
-                converted_value = value
-            converted_data[field_name] = converted_value
-
-    return type_(**converted_data)
+    # Reuse the originating option name so nested error messages read ``--outer.field``.
+    name = token.keyword if token.keyword and token.keyword.startswith("-") else "--json"
+    field_info = FieldInfo(names=("json",), kind=FieldInfo.POSITIONAL_OR_KEYWORD, annotation=type_, required=True)
+    collection = ArgumentCollection._from_type(
+        field_info,
+        (),
+        Parameter(name=name, name_transform=name_transform),
+        group_lookup={},
+        group_arguments=Group.create_default_arguments(),
+        group_parameters=Group.create_default_parameters(),
+        parse_docstring=False,
+        _resolve_groups=False,
+    )
+    argument = collection[0]
+    assert not argument.keys
+    argument.append(token.evolve(keys=()))
+    return argument.convert_and_validate()
 
 
 def _create_json_decode_error_message(
@@ -758,20 +754,11 @@ def _convert(
             if isinstance(token, Token) and token.value.strip().startswith("{") and type_ is not str:
                 try:
                     data = json.loads(token.value)
-                    if not isinstance(data, dict):
-                        # JSON was valid but didn't produce a dict (e.g., it was an array or scalar)
-                        raise TypeError  # noqa: TRY301
-                    # Convert dict to dataclass with proper type conversion
-                    out = _convert_json(type_, data, field_infos, converter, name_transform)
                 except json.JSONDecodeError as e:
-                    # Create helpful error message for invalid JSON
                     msg = _create_json_decode_error_message(token, type_, e)
                     raise CoercionError(msg=msg, token=token, target_type=type_) from e
-                except TypeError:
-                    # Fall back to positional argument parsing
-                    if not isinstance(token, Sequence):
-                        token = [token]
-                    out = _convert_structured_type(type_, token, field_infos, convert)
+                assert isinstance(data, dict)
+                out = _convert_json_dict(type_, token, name_transform)
             else:
                 # Standard positional argument parsing
                 if not isinstance(token, Sequence):
