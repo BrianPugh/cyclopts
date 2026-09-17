@@ -716,7 +716,8 @@ def _convert(
         try:
             out = origin_type(convert(inner_types[0], e) for e in gen)
         except TypeError as e:
-            if origin_type in (set, frozenset) and str(e).startswith("unhashable type"):
+            # Python 3.14 rewords this to "cannot use 'X' as a set element (unhashable type: 'X')".
+            if origin_type in (set, frozenset) and "unhashable type" in str(e):
                 raise CoercionError(
                     msg=f"{get_hint_name(type_)} requires hashable elements, but {get_hint_name(inner_type)} is not "
                     "hashable. Use a list instead, or make the element type hashable (e.g. a frozen dataclass).",
