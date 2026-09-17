@@ -6,6 +6,7 @@ from collections.abc import MutableSequence as AbcMutableSequence
 from collections.abc import MutableSet as AbcMutableSet
 from collections.abc import Reversible as AbcReversible
 from collections.abc import Set as AbcSet
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
 from pathlib import Path
@@ -738,3 +739,33 @@ def test_union_conversion_validation_error_returns_token_count():
     assert result is None  # Validation failed
     assert tc == 1  # int takes 1 token
     assert consume_all is False  # int doesn't consume all
+
+
+def test_convert_json_object_for_type_whose_fields_consume_all_tokens():
+    """A structured type whose only field is a collection receives its tokens as a
+    sequence rather than a single token; a JSON object must still be recognized.
+    """
+
+    @dataclass
+    class Inner:
+        a: str
+
+    @dataclass
+    class Outer:
+        inner: list[Inner]
+
+    assert convert(Outer, ['{"inner": [{"a": "x"}]}']) == Outer(inner=[Inner(a="x")])
+    assert convert(Outer, [Token(value='{"inner": [{"a": "x"}]}')]) == Outer(inner=[Inner(a="x")])
+
+
+@pytest.mark.parametrize("container", [set, frozenset])
+def test_coerce_set_of_unhashable_elements_error(container):
+    @dataclass
+    class Item:
+        a: str
+
+    with pytest.raises(
+        CoercionError,
+        match=rf"{container.__name__}\[Item\] requires hashable elements, but Item is not hashable\. Use a list",
+    ):
+        convert(container[Item], ['{"a": "x"}'])

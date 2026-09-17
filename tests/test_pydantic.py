@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, PositiveInt, SecretBytes, Sec
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
-from cyclopts import MissingArgumentError, Parameter, UnknownOptionError, ValidationError
+from cyclopts import CoercionError, MissingArgumentError, Parameter, UnknownOptionError, ValidationError
 
 
 # Modified from https://docs.pydantic.dev/latest/#pydantic-examples
@@ -899,6 +899,113 @@ def test_pydantic_nested_list_json(app):
         foo="test",
         simple_list=[SimpleConfig(bar="simple1")],
     )
+
+
+def test_pydantic_list_of_models_with_nested_list_json(app, assert_parse_args):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/953
+
+    A ``list[Model]`` bound from a single JSON token must preserve a nested
+    collection-of-models field instead of silently dropping it.
+    """
+
+    class Bucket(BaseModel):
+        bid: str
+        amt: str
+
+    class Alloc(BaseModel):
+        partner: str
+        buckets: list[Bucket]
+
+    @app.default
+    def main(*, allocs: list[Alloc] | None = None):
+        pass
+
+    assert_parse_args(
+        main,
+        ["--allocs", '[{"partner": "p1", "buckets": [{"bid": "b1", "amt": "10"}]}]'],
+        allocs=[Alloc(partner="p1", buckets=[Bucket(bid="b1", amt="10")])],
+    )
+
+
+def test_pydantic_list_of_models_json_alias_key(app, assert_parse_args):
+    """A JSON element of a ``list[Model]`` may use the pydantic alias as its key."""
+
+    class Model(BaseModel):
+        model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+        my_field: str
+
+    @app.default
+    def main(*, xs: list[Model] | None = None):
+        pass
+
+    assert_parse_args(main, ["--xs", '[{"myField": "v"}]'], xs=[Model(my_field="v")])
+
+
+@pytest.mark.parametrize("as_list", [False, True], ids=["single", "list"])
+def test_pydantic_json_null_for_nested_model_and_collection_fields(app, assert_parse_args, as_list):
+    class Inner(BaseModel):
+        a: str
+
+    class Outer(BaseModel):
+        inner: Inner | None
+        tags: list[str] | None = None
+
+    annotation = list[Outer] if as_list else Outer
+
+    @app.default
+    def main(*, xs: annotation | None = None):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    payload = '{"inner": null, "tags": null}'
+    expected = Outer(inner=None, tags=None)
+    if as_list:
+        assert_parse_args(main, ["--xs", f"[{payload}]"], xs=[expected])
+    else:
+        assert_parse_args(main, ["--xs", payload], xs=expected)
+
+
+def test_pydantic_list_of_models_json_choices_enforced(app, assert_parse_args):
+    """``Parameter(choices=)`` on a model field is checked for elements bound from JSON."""
+
+    class Model(BaseModel):
+        color: Annotated[str, Parameter(choices=["red", "blue"])]
+
+    @app.default
+    def main(*, xs: list[Model] | None = None):
+        pass
+
+    assert_parse_args(main, ["--xs", '[{"color": "red"}]'], xs=[Model(color="red")])
+
+    with pytest.raises(CoercionError) as exc_info:
+        app(["--xs", '[{"color": "green"}]'], exit_on_error=False)
+
+    assert "[xs][color]" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "token, exception",
+    [
+        ('[{"buckets": []}]', MissingArgumentError),
+        ('[{"partner": "p1", "buckets": [{}]}]', ValidationError),
+    ],
+    ids=["element-level", "nested-level"],
+)
+def test_pydantic_list_of_models_json_missing_required(app, token, exception):
+    """A field missing at the element level is caught by cyclopts; one missing deeper is caught by pydantic."""
+
+    class Bucket(BaseModel):
+        bid: str
+
+    class Alloc(BaseModel):
+        partner: str
+        buckets: list[Bucket]
+
+    @app.default
+    def main(*, allocs: list[Alloc] | None = None):
+        pass
+
+    with pytest.raises(exception):
+        app(["--allocs", token], exit_on_error=False)
 
 
 def test_pydantic_secretstr_from_env(app, assert_parse_args, monkeypatch):

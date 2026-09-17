@@ -220,6 +220,45 @@ def test_toml_nested_dataclass_structure(app, tmp_path, assert_parse_args):
     assert_parse_args(main, "", expected)
 
 
+def test_toml_list_of_dataclasses_with_nested_list_field(app, tmp_path, assert_parse_args):
+    """Collection-typed fields inside each array-of-tables element survive the JSON round-trip."""
+
+    @dataclass
+    class Tag:
+        label: str
+
+    @dataclass
+    class Item:
+        name: str
+        tags: list[Tag]
+        scores: list[int]
+
+    config_fn = tmp_path / "config.toml"
+    config_fn.write_text(
+        dedent(
+            """\
+            [[items]]
+            name = "a"
+            scores = [1, 2]
+
+            [[items.tags]]
+            label = "x"
+
+            [[items.tags]]
+            label = "y"
+            """
+        )
+    )
+
+    app.config = Toml(config_fn)
+
+    @app.default
+    def main(items: list[Item]):
+        pass
+
+    assert_parse_args(main, "", [Item("a", [Tag("x"), Tag("y")], [1, 2])])
+
+
 def test_toml_mixed_config_and_cli(app, tmp_path, assert_parse_args):
     """Test mixing TOML config with additional CLI arguments."""
     config_fn = tmp_path / "config.toml"
