@@ -629,3 +629,16 @@ def test_convert_json_object_for_type_whose_fields_consume_all_tokens():
 
     assert convert(Outer, ['{"inner": [{"a": "x"}]}']) == Outer(inner=[Inner(a="x")])
     assert convert(Outer, [Token(value='{"inner": [{"a": "x"}]}')]) == Outer(inner=[Inner(a="x")])
+
+
+@pytest.mark.parametrize("container", [set, frozenset])
+def test_coerce_set_of_unhashable_elements_error(container):
+    @dataclass
+    class Item:
+        a: str
+
+    with pytest.raises(
+        CoercionError,
+        match=rf"{container.__name__}\[Item\] requires hashable elements, but Item is not hashable\. Use a list",
+    ):
+        convert(container[Item], ['{"a": "x"}'])
