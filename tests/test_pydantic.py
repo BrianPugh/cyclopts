@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, PositiveInt, SecretBytes, Sec
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
-from cyclopts import MissingArgumentError, Parameter, UnknownOptionError, ValidationError
+from cyclopts import CoercionError, MissingArgumentError, Parameter, UnknownOptionError, ValidationError
 
 
 # Modified from https://docs.pydantic.dev/latest/#pydantic-examples
@@ -938,6 +938,50 @@ def test_pydantic_list_of_models_json_alias_key(app, assert_parse_args):
         pass
 
     assert_parse_args(main, ["--xs", '[{"myField": "v"}]'], xs=[Model(my_field="v")])
+
+
+def test_pydantic_list_of_models_json_choices_enforced(app, assert_parse_args):
+    """``Parameter(choices=)`` on a model field is checked for elements bound from JSON."""
+
+    class Model(BaseModel):
+        color: Annotated[str, Parameter(choices=["red", "blue"])]
+
+    @app.default
+    def main(*, xs: list[Model] | None = None):
+        pass
+
+    assert_parse_args(main, ["--xs", '[{"color": "red"}]'], xs=[Model(color="red")])
+
+    with pytest.raises(CoercionError) as exc_info:
+        app(["--xs", '[{"color": "green"}]'], exit_on_error=False)
+
+    assert "[xs][color]" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "token, exception",
+    [
+        ('[{"buckets": []}]', MissingArgumentError),
+        ('[{"partner": "p1", "buckets": [{}]}]', ValidationError),
+    ],
+    ids=["element-level", "nested-level"],
+)
+def test_pydantic_list_of_models_json_missing_required(app, token, exception):
+    """A field missing at the element level is caught by cyclopts; one missing deeper is caught by pydantic."""
+
+    class Bucket(BaseModel):
+        bid: str
+
+    class Alloc(BaseModel):
+        partner: str
+        buckets: list[Bucket]
+
+    @app.default
+    def main(*, allocs: list[Alloc] | None = None):
+        pass
+
+    with pytest.raises(exception):
+        app(["--allocs", token], exit_on_error=False)
 
 
 def test_pydantic_secretstr_from_env(app, assert_parse_args, monkeypatch):

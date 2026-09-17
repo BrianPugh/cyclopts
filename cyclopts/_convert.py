@@ -757,10 +757,8 @@ def _convert(
                 except json.JSONDecodeError as e:
                     msg = _create_json_decode_error_message(token, type_, e)
                     raise CoercionError(msg=msg, token=token, target_type=type_) from e
-                if isinstance(data, dict):
-                    out = _convert_json_dict(type_, token, name_transform)
-                else:
-                    out = _convert_structured_type(type_, [token], field_infos, convert)
+                assert isinstance(data, dict)
+                out = _convert_json_dict(type_, token, name_transform)
             else:
                 # Standard positional argument parsing
                 if not isinstance(token, Sequence):
