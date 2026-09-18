@@ -2176,6 +2176,121 @@ def test_help_docstring_deprecated_metadata(console, normalize_trailing_whitespa
     assert normalize_trailing_whitespace(capture.get()) == expected
 
 
+def test_help_app_deprecated_field(console, normalize_trailing_whitespace):
+    """Explicit ``App.deprecated`` renders like the docstring directive, without needing one."""
+    app = App(name="test_help", help="Main summary.")
+
+    @app.command(deprecated=("2.0", "Use other-tool instead."))
+    def sub():
+        """Subcommand summary."""
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    expected = dedent(
+        """\
+        Usage: test_help COMMAND
+
+        Main summary.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ sub          [⚠ Deprecated in v2.0] Subcommand summary.            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert normalize_trailing_whitespace(capture.get()) == expected
+
+    with console.capture() as capture:
+        app.help_print(["sub"], console=console)
+
+    expected = dedent(
+        """\
+        Usage: test_help sub
+
+        Subcommand summary.
+
+        [⚠ Deprecated in v2.0] Use other-tool instead.
+
+        """
+    )
+
+    assert normalize_trailing_whitespace(capture.get()) == expected
+
+
+def test_help_app_deprecated_field_no_version_no_help(console, normalize_trailing_whitespace):
+    """A plain string ``deprecated`` value is the message; no help text is required for the tag to render."""
+    app = App(name="test_help")
+
+    @app.command(deprecated="Will be removed.")
+    def sub():
+        pass
+
+    with console.capture() as capture:
+        app.help_print(["sub"], console=console)
+
+    expected = dedent(
+        """\
+        Usage: test_help sub
+
+        [⚠ Deprecated] Will be removed.
+
+        """
+    )
+
+    assert normalize_trailing_whitespace(capture.get()) == expected
+
+
+def test_help_app_deprecated_field_overrides_docstring(console, normalize_trailing_whitespace):
+    """The explicit ``deprecated`` field takes priority over a docstring ``.. deprecated::`` directive."""
+    app = App(name="test_help")
+
+    @app.command(deprecated="Explicit message wins.")
+    def sub():
+        """Summary.
+
+        .. deprecated:: 1.0
+            Docstring message should not be shown.
+        """
+
+    with console.capture() as capture:
+        app.help_print(["sub"], console=console)
+
+    expected = dedent(
+        """\
+        Usage: test_help sub
+
+        Summary.
+
+        [⚠ Deprecated] Explicit message wins.
+
+        """
+    )
+
+    assert normalize_trailing_whitespace(capture.get()) == expected
+
+
+def test_help_parameter_deprecated_field(app, console, normalize_trailing_whitespace):
+    """Explicit ``Parameter.deprecated`` renders a tag alongside the parameter's help entry."""
+
+    @app.default
+    def main(
+        x: Annotated[int, Parameter(deprecated=("1.5", "Use --y instead."), help="An int.")] = 0,
+        y: Annotated[int, Parameter(deprecated="No version given.")] = 0,
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = normalize_trailing_whitespace(capture.get())
+
+    assert "[⚠ Deprecated in v1.5] Use --y instead. An int." in actual
+    assert "[⚠ Deprecated] No version given." in actual
+
+
 def test_help_rich(app, console, normalize_trailing_whitespace):
     """Newlines actually get interpreted with rich."""
     description = dedent(

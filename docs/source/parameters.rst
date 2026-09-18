@@ -1,3 +1,5 @@
+.. _Parameters:
+
 ==========
 Parameters
 ==========
@@ -249,6 +251,39 @@ It is recommended to use docstrings for your parameter help, but if necessary, y
    ╭─ Parameters ──────────────────────────────────────────────────╮
    │ *  VALUE,--value  THIS IS USED. [required]                    │
    ╰───────────────────────────────────────────────────────────────╯
+
+-----------------------
+Deprecating a Parameter
+-----------------------
+Mark an individual parameter as deprecated via :attr:`Parameter.deprecated <cyclopts.Parameter.deprecated>`,
+either a plain message or a ``(version, message)`` tuple:
+
+.. code-block:: python
+
+   @app.command
+   def foo(
+       *,
+       new_parameter: int = 0,
+       old_parameter: Annotated[int, Parameter(deprecated="Use --new-parameter instead.")] = 0,
+   ):
+       pass
+
+.. code-block:: console
+
+   $ my-script foo --help
+   Usage: my-script foo [OPTIONS]
+
+   ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+   │ --new-parameter  [default: 0]                                                │
+   │ --old-parameter  [⚠ Deprecated] Use --new-parameter instead. [default: 0]    │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+
+This only changes what's *displayed*. To also get notified at runtime whenever ``old_parameter`` is
+actually supplied on the CLI (unused defaults never trigger it), set
+:attr:`Parameter.deprecated_handler <cyclopts.Parameter.deprecated_handler>`, or set
+:attr:`App.deprecated_handler <cyclopts.App.deprecated_handler>` once to cover every deprecated
+command and parameter in the application -- see :ref:`Deprecating a Command` for details
+and a logging example.
 
 .. _Converters:
 
