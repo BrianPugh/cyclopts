@@ -3,8 +3,8 @@ Administrative commands for system management.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
-* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ### complex-cli admin status
@@ -19,7 +19,7 @@ Show system status.
 
 * `SERVICES, --services`: Specific services to check (all if not specified).
 * `--watch, -w`: Continuously watch status. *[default: False]*
-* `--interval`: Refresh interval in seconds when watching. *[default: 5]*
+* `--interval INT`: Refresh interval in seconds when watching. *[default: 5]*
 
 ### complex-cli admin config-cmd
 
@@ -31,12 +31,12 @@ Configure database settings.
 
 **Parameters**:
 
-* `--host`: Database server hostname. *[default: localhost]*
-* `--port`: Database server port number. *[default: 5432]*
-* `--username`: Authentication username. *[default: admin]*
-* `--password`: Authentication password (optional).
-* `--ssl-mode`: SSL connection mode. *[choices: disable, prefer, require, verify-full]* *[default: prefer]*
-* `--pool-size`: Connection pool size. *[default: 10]*
+* `--host STR`: Database server hostname. *[default: localhost]*
+* `--port INT`: Database server port number. *[default: 5432]*
+* `--username STR`: Authentication username. *[default: admin]*
+* `--password STR`: Authentication password (optional).
+* `--ssl-mode CHOICE`: SSL connection mode. *[choices: disable, prefer, require, verify-full]* *[default: prefer]*
+* `--pool-size INT`: Connection pool size. *[default: 10]*
 
 ### complex-cli admin users
 
@@ -79,7 +79,7 @@ Create a new user.
 
 **Parameters**:
 
-* `--role`: User role assignment. *[choices: admin, user, guest]* *[default: user]*
+* `--role CHOICE`: User role assignment. *[choices: admin, user, guest]* *[default: user]*
 * `--permissions.none, --permissions.no-none`: Initial permission flags. *[default: False]*
 * `--permissions.read, --permissions.no-read`: Initial permission flags. *[default: False]*
 * `--permissions.write, --permissions.no-write`: Initial permission flags. *[default: False]*
@@ -101,7 +101,7 @@ Delete a user.
 
 **Parameters**:
 
-* `--force, --no-force, -f`: Skip confirmation prompt. *[default: False]*
+* `--force, -f, --no-force`: Skip confirmation prompt. *[default: False]*
 * `--backup, --no-backup`: Create backup before deletion. *[default: True]*
 
 #### complex-cli admin users permissions
@@ -123,8 +123,8 @@ Grant permissions to a user.
 
 **Parameters**:
 
-* `--resource`: Specific resource to grant access to.
-* `--expires`: Expiration date (ISO format).
+* `--resource STR`: Specific resource to grant access to.
+* `--expires STR`: Expiration date (ISO format).
 
 ##### complex-cli admin users permissions revoke
 
@@ -193,4 +193,4 @@ Create a new role template.
 * `--permissions.write, --permissions.no-write`: Default permissions for this role. *[default: False]*
 * `--permissions.execute, --permissions.no-execute`: Default permissions for this role. *[default: False]*
 * `--permissions.admin, --permissions.no-admin`: Default permissions for this role. *[default: False]*
-* `--description`: Role description. *[default: ""]*
+* `--description STR`: Role description. *[default: ""]*

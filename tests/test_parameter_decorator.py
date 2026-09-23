@@ -56,9 +56,9 @@ def test_parameter_decorator_dataclass_nested_1(app, decorator, console):
         STR
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  --bucket  [required]                                            │
-        │ *  --key     [required]                                            │
-        │ *  --region  [required]                                            │
+        │ *  --bucket STR  [required]                                        │
+        │ *  --key STR     [required]                                        │
+        │ *  --region STR  [required]                                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

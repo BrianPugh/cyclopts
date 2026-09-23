@@ -9,7 +9,7 @@ from rich.console import Console
 from cyclopts import App, Group, Parameter
 from cyclopts.annotations import get_hint_name
 from cyclopts.help import ColumnSpec, DefaultFormatter, HelpEntry, PanelSpec, TableSpec
-from cyclopts.help.specs import DescriptionColumn, DescriptionRenderer
+from cyclopts.help.specs import DescriptionColumn, DescriptionRenderer, NameColumn
 
 
 def _type_renderer(entry: Any) -> str:
@@ -114,12 +114,15 @@ def test_group_custom_columns(console: Console):
     """Test that custom columns can be specified via DefaultFormatter."""
 
     def names_renderer(entry):
-        """Render names and shorts as a single string."""
-        names_str = " ".join(entry.names) if entry.names else ""
-        shorts_str = " ".join(entry.shorts) if entry.shorts else ""
-        if names_str and shorts_str:
-            return names_str + " " + shorts_str
-        return names_str or shorts_str
+        """Render the positional label (positionals only), names, and shorts as a single string.
+
+        Mirrors the builtin :attr:`HelpEntry.display_labels` by prefixing the
+        positional label for positional parameters.
+        """
+        parts = [entry.positional_label] if entry.positional_label else []
+        parts.extend(entry.names)
+        parts.extend(entry.shorts)
+        return " ".join(parts)
 
     custom_columns = (
         ColumnSpec(renderer=names_renderer, style="green bold", header="Option"),
@@ -442,7 +445,7 @@ def test_table_headers_suppressed_when_all_empty(console: Console):
 
     # Create columns with explicitly empty headers
     custom_columns = (
-        ColumnSpec(renderer=lambda entry: " ".join(entry.names) if entry.names else "", header="", style="cyan"),
+        ColumnSpec(renderer=lambda entry: " ".join(entry.display_labels), header="", style="cyan"),
         ColumnSpec(renderer=DescriptionRenderer(), header=""),
     )
 
@@ -488,12 +491,15 @@ def test_table_headers_with_non_empty_headers(console: Console):
     """Test that headers appear when column headers have text."""
 
     def names_renderer(entry):
-        """Render names and shorts as a single string."""
-        names_str = " ".join(entry.names) if entry.names else ""
-        shorts_str = " ".join(entry.shorts) if entry.shorts else ""
-        if names_str and shorts_str:
-            return names_str + " " + shorts_str
-        return names_str or shorts_str
+        """Render the positional label (positionals only), names, and shorts as a single string.
+
+        Mirrors the builtin :attr:`HelpEntry.display_labels` by prefixing the
+        positional label for positional parameters.
+        """
+        parts = [entry.positional_label] if entry.positional_label else []
+        parts.extend(entry.names)
+        parts.extend(entry.shorts)
+        return " ".join(parts)
 
     custom_columns = (
         ColumnSpec(renderer=names_renderer, header="Option", style="cyan"),
@@ -568,9 +574,10 @@ class SimpleCustomFormatter:
                 console.print(f"| {desc_text:<66} |")
 
         for entry in panel.entries:
+            label = entry.positional_label if entry.positional_label else ""
             names = " ".join(entry.names) if entry.names else ""
             shorts = " ".join(entry.shorts) if entry.shorts else ""
-            name_part = f"{names} {shorts}".strip()
+            name_part = f"{label} {names} {shorts}".strip()
 
             # Handle entry description - convert to plain text if needed
             desc = ""
@@ -695,6 +702,8 @@ def test_custom_help_formatter_with_optional_methods(console: Console):
                 shorts = " ".join(entry.shorts) if entry.shorts else ""
                 if shorts:
                     names += " " + shorts
+                if entry.positional_label:
+                    names = f"{entry.positional_label} {names}".strip()
 
                 # Handle entry description - convert to plain text if needed
                 desc = ""
@@ -768,7 +777,7 @@ def test_multiple_groups_different_formatters(console: Console):
 
             console.print(f">> {panel.title}")
             for entry in panel.entries:
-                names = " ".join(entry.names) if entry.names else ""
+                names = " ".join(entry.display_labels) if entry.display_labels else ""
 
                 # Handle entry description - convert to plain text if needed
                 desc = ""
@@ -852,7 +861,7 @@ def test_custom_formatter_protocol_validation(console: Console):
     def minimal_formatter(console, options, panel):
         console.print(f"[{panel.title}]")
         for entry in panel.entries:
-            names = " ".join(entry.names) if entry.names else ""
+            names = " ".join(entry.display_labels) if entry.display_labels else ""
             console.print(f"  {names}")
 
     custom_group = Group(
@@ -952,7 +961,7 @@ def test_custom_formatter_receives_correct_arguments(console: Console):
             assert len(panel.entries) == 1
             entry = panel.entries[0]
             assert "test" in " ".join(entry.names).lower() and "param" in " ".join(entry.names).lower()
-            console.print(f"  Entry: {' '.join(entry.names)}")
+            console.print(f"  Entry: {' '.join(entry.display_labels)}")
 
     custom_group = Group(
         "Validated Group",
@@ -1480,6 +1489,43 @@ def test_with_newline_metadata_classmethod(console: Console):
             break
 
 
+def test_show_metavar_toggle(console: Console):
+    """``DefaultFormatter.show_metavar`` controls the keyword-only value placeholder."""
+
+    def render(fmt):
+        app = App(name="app", help_formatter=fmt)
+
+        @app.default
+        def main(*, config: str = "cfg", timeout: int = 30):
+            pass
+
+        with console.capture() as capture:
+            app.help_print(console=console)
+        return capture.get()
+
+    # Default (True): keyword-only rows show the type-derived metavar.
+    on = render(DefaultFormatter())
+    assert "--config STR" in on
+    assert "--timeout INT" in on
+
+    # Disabled: option names only, no placeholder.
+    off = render(DefaultFormatter(show_metavar=False))
+    assert "--config STR" not in off
+    assert "--timeout INT" not in off
+    assert "--config" in off
+    assert "--timeout" in off
+
+    off_newline = render(DefaultFormatter.with_newline_metadata(show_metavar=False))
+    assert "--config STR" not in off_newline
+    assert "--timeout INT" not in off_newline
+    assert "--config" in off_newline
+
+    # Custom column layouts see the cleared metavar too.
+    off_custom = render(DefaultFormatter(show_metavar=False, column_specs=(NameColumn, DescriptionColumn)))
+    assert "--config STR" not in off_custom
+    assert "--config" in off_custom
+
+
 def test_default_formatter_regular_inline(console: Console):
     """Test that regular DefaultFormatter still shows metadata inline."""
     app = App(help_formatter=DefaultFormatter())
@@ -1544,3 +1590,303 @@ def test_description_renderer_no_extra_whitespace():
         if line.strip():  # Skip empty lines
             # The line should start with "[metadata...]" with no indentation
             assert line.startswith("["), f"Line should not be indented: {repr(line)}"
+
+
+def test_default_styles_theme_gap_fill():
+    """default_styles_theme supplies only the cyclopts.* keys the console lacks."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    from cyclopts.help.specs import DEFAULT_STYLES, default_styles_theme
+
+    # No user theme -> every default is supplied.
+    plain = default_styles_theme(Console())
+    assert set(plain.styles) >= set(DEFAULT_STYLES)
+    assert str(plain.styles["cyclopts.required"]) == "red"
+
+    # User defines a key -> it is omitted (so the user's value wins downstream).
+    themed = default_styles_theme(Console(theme=Theme({"cyclopts.required": "green"})))
+    assert "cyclopts.required" not in themed.styles
+    assert "cyclopts.default" in themed.styles
+
+
+def test_description_renderer_theme_override():
+    """Under the formatter's theme, a cyclopts.* key restyles its annotation."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    from cyclopts.help.specs import default_styles_theme
+
+    entry = HelpEntry(
+        positive_names=("src",),
+        positive_shorts=("--src",),
+        description="File to compress",
+        required=True,
+    )
+
+    console = Console(
+        theme=Theme({"cyclopts.required": "green"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+    )
+    rendered = DescriptionRenderer()(entry)
+    with console.use_theme(default_styles_theme(console)):
+        with console.capture() as capture:
+            console.print(rendered, end="")
+    output = capture.get()
+
+    assert "[required]" in output
+    assert "\x1b[32m" in output  # override green applied
+    assert "\x1b[31m" not in output  # default red not used
+
+
+def test_help_theme_override_end_to_end():
+    """A theme on the App's console reaches the rendered help page."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.required": "green"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console)
+
+    @app.default
+    def main(src: str):
+        """Compress a file.
+
+        Parameters
+        ----------
+        src: str
+            File to compress.
+        """
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    assert "[required]" in output
+    assert "\x1b[32m" in output  # themed required color reached the page
+
+
+def test_help_default_colors_end_to_end():
+    """With no theme, the built-in cyclopts.* defaults render (no dim)."""
+    from rich.console import Console
+
+    console = Console(
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console)
+
+    @app.default
+    def main(src: str, dst: str = "out.zip"):
+        """Compress a file.
+
+        Parameters
+        ----------
+        src: str
+            File to compress.
+        dst: str
+            Where to write it.
+        """
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    assert "\x1b[31m[required]" in output  # cyclopts.required -> red
+    assert "\x1b[38;5;246m[default:" in output  # cyclopts.default -> gray58
+    assert "\x1b[2m" not in output  # no dim styling anywhere
+
+
+def test_help_column_style_override_end_to_end():
+    """A theme override of the cyclopts.name column style reaches the page."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.name": "magenta"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console)
+
+    @app.default
+    def main(src: str):
+        """Compress a file.
+
+        Parameters
+        ----------
+        src: str
+            File to compress.
+        """
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    # The name column is a Table column style; it only resolves through the
+    # DefaultStyled wrapper, so this also guards that path.
+    assert "\x1b[35mSRC --src" in output  # cyclopts.name -> magenta
+
+
+def test_help_border_style_override_end_to_end():
+    """A theme override of cyclopts.border restyles the help panel border."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.border": "magenta"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console)
+
+    @app.default
+    def main(src: str):
+        """Compress a file.
+
+        Parameters
+        ----------
+        src: str
+            File to compress.
+        """
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    # The rounded panel border is drawn in magenta.
+    assert "\x1b[35m╭" in output  # cyclopts.border -> magenta
+
+
+def test_help_usage_default_style_end_to_end():
+    """With no theme, the Usage line defaults to bold."""
+    from rich.console import Console
+
+    console = Console(
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console, name="mytool")
+
+    @app.default
+    def main(src: str):
+        """Compress a file."""
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    assert "\x1b[1mUsage:" in output  # cyclopts.usage -> bold
+
+
+def test_help_usage_style_override_end_to_end():
+    """A theme override of cyclopts.usage restyles the Usage line."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.usage": "magenta"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console, name="mytool")
+
+    @app.default
+    def main(src: str):
+        """Compress a file."""
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    # The Usage line is printed outside the panel's DefaultStyled wrapper, so
+    # this also guards that render_usage applies the theme.
+    assert "\x1b[35mUsage:" in output  # cyclopts.usage -> magenta
+
+
+def test_group_theme_does_not_affect_equality():
+    """Group.theme is excluded from equality (presentation, not identity)."""
+    from cyclopts import Group
+
+    assert Group("X") == Group("X")
+    assert Group("X", theme={"cyclopts.border": "red"}) == Group("X")
+
+
+def test_help_group_theme_end_to_end():
+    """Group.theme restyles only its own panel; both dict and Theme forms work."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    from cyclopts import Group
+
+    console = Console(
+        width=70,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console, name="demo")
+    danger = Group("Danger Zone", theme={"cyclopts.border": "red", "cyclopts.name": "bright_red"})
+    safe = Group("Safe Zone", theme=Theme({"cyclopts.border": "green"}))
+
+    @app.command(group=danger)
+    def delete():
+        """Delete everything."""
+
+    @app.command(group=safe)
+    def keep():
+        """Keep things."""
+
+    with console.capture() as capture:
+        app.help_print([])
+    lines = capture.get().splitlines()
+
+    danger_border = next(x for x in lines if "Danger Zone" in x)
+    safe_border = next(x for x in lines if "Safe Zone" in x)
+    danger_row = next(x for x in lines if "delete" in x)
+    safe_row = next(x for x in lines if "keep" in x)
+
+    assert "\x1b[31m╭" in danger_border  # border -> red (dict form)
+    assert "\x1b[91mdelete" in danger_row  # name -> bright_red (reaches the cell)
+    assert "\x1b[32m╭" in safe_border  # border -> green (Theme form)
+    # Safe Zone only overrode its border; its names fall back to the base cyan.
+    assert "\x1b[36mkeep" in safe_row
+
+
+def test_specs_render_outside_default_formatter():
+    """PanelSpec/TableSpec defaults are bare cyclopts.* names; they must still resolve on a plain console."""
+    from rich.text import Text
+
+    console = Console(width=40, force_terminal=True, color_system="truecolor", legacy_windows=False, highlight=False)
+    entries = [HelpEntry(positive_names=("--alpha",), description="A")]
+    with console.capture() as capture:
+        console.print(PanelSpec().build(Text("x")))
+        console.print(TableSpec().build((NameColumn, DescriptionColumn), entries))
+    output = capture.get()
+    assert "╭" in output
+    assert "\x1b[36m--alpha" in output  # cyclopts.name -> cyan

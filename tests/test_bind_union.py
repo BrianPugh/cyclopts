@@ -54,7 +54,7 @@ def test_union_coercion_cannot_coerce_error(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value for A: unable to convert "foo" into int|float.       │
+        │ Invalid value for A: unable to convert "foo" into None|int|float.  │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -202,3 +202,35 @@ def test_union_of_dataclasses_ambiguous_fields_error(app):
             print_error=False,
             exit_on_error=False,
         )
+
+
+def test_union_scalar_and_consume_all_member_multiple_tokens(app, assert_parse_args):
+    """A union of a scalar and a list type must convert repeated tokens as ONE
+    list value (a member of the union), not element-wise into a list of scalars.
+    """
+
+    @app.default
+    def default(*, a: str | list[int] = "d"):
+        pass
+
+    assert_parse_args(default, "--a 1 --a 2", a=[1, 2])
+
+
+def test_union_member_order_is_per_parameter(app, assert_parse_args):
+    """``int | str`` and ``str | int`` compare equal but convert differently; each
+    parameter must get its own order-respecting conversion for the same token.
+    """
+
+    @app.default
+    def default(a: int | str = 0, b: str | int = "", y: None | str = "d", z: str | None = "d"):
+        pass
+
+    assert_parse_args(default, "--a 5 --b 5 --y none --z none", 5, "5", None, "none")
+
+
+def test_same_type_same_tokens_do_not_alias(app):
+    @app.default
+    def default(a: list[int], b: list[int]):
+        return a is b
+
+    assert app("--a 1 --a 2 --b 1 --b 2") is False

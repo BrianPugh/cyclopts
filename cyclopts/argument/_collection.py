@@ -1,5 +1,6 @@
 """ArgumentCollection class and related functionality."""
 
+import copy as copy_module
 import inspect
 import itertools
 import json
@@ -9,7 +10,7 @@ from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
 if TYPE_CHECKING:
     from cyclopts.core import App
 
-from cyclopts.annotations import get_hint_name, is_typeddict, is_unpack, resolve_unpack
+from cyclopts.annotations import get_hint_name, is_typeddict, is_unpack, resolve, resolve_unpack
 from cyclopts.exceptions import (
     UnknownOptionError,
 )
@@ -43,9 +44,30 @@ class ArgumentCollection(list[Argument]):
     def __init__(self, *args):
         super().__init__(*args)
 
-    def copy(self) -> "ArgumentCollection":
-        """Returns a shallow copy of the :class:`ArgumentCollection`."""
-        return type(self)(self)
+    def copy(self, *, reset_tokens: bool = False) -> "ArgumentCollection":
+        """Returns a copy of the :class:`ArgumentCollection`.
+
+        Parameters
+        ----------
+        reset_tokens: bool
+            If ``True``, each :class:`Argument` is shallow-copied and given
+            a fresh empty ``tokens`` list. All other fields (``field_info``,
+            ``parameter``, lookup tables, etc.) are shared with the original.
+            This is useful for running a parse pass without mutating the
+            original collection.
+
+            If ``False`` (default), returns a shallow copy where the same
+            :class:`Argument` objects are shared.
+        """
+        if reset_tokens:
+            ac = type(self)()
+            for arg in self:
+                arg_copy = copy_module.copy(arg)
+                arg_copy.tokens = []
+                ac.append(arg_copy)
+        else:
+            ac = type(self)(self)
+        return ac
 
     @overload
     def __getitem__(self, term: SupportsIndex, /) -> Argument: ...
@@ -219,6 +241,22 @@ class ArgumentCollection(list[Argument]):
 
         return best_match_argument, best_match_keys, best_implicit_value
 
+    def _match_explicit(self, term: str) -> "Argument | None":
+        """Match ``term`` against explicitly-declared parameters.
+
+        Like :meth:`match`, but returns ``None`` instead of raising when there
+        is no match, and does not count a ``**kwargs`` (VAR_KEYWORD) catch-all
+        as a match — a catch-all matches ANY keyword, which is not evidence
+        that the option was explicitly declared.
+        """
+        try:
+            argument, _, _ = self.match(term)
+        except ValueError:
+            return None
+        if argument.field_info.kind is argument.field_info.VAR_KEYWORD:
+            return None
+        return argument
+
     def _set_marks(self, val: bool):
         for argument in self:
             argument._marked = val
@@ -257,7 +295,10 @@ class ArgumentCollection(list[Argument]):
         cyclopts_parameters_no_group = []
 
         hint = field_info.hint
+        # ``get_parameters`` resolves Annotated/NewType/type-aliases (including those nested
+        # inside an ``Optional``, which ``resolve`` does not recurse into) while preserving Optional.
         hint, hint_parameters = get_parameters(hint)
+        hint = resolve(hint, optional=False)  # Strip any remaining Annotated/Required, keep Optional
         cyclopts_parameters_no_group.extend(hint_parameters)
 
         if not keys:
@@ -390,7 +431,8 @@ class ArgumentCollection(list[Argument]):
 
         out.append(argument)
         if argument._accepts_keywords:
-            hint_docstring_lookup = extract_docstring_help(argument.hint) if parse_docstring else {}
+            # Use resolved_hint for extracting docstrings (needs a class, not Optional[class])
+            hint_docstring_lookup = extract_docstring_help(argument.resolved_hint) if parse_docstring else {}
             hint_docstring_lookup.update(docstring_lookup)
 
             for sub_field_name, sub_field_info in argument._lookup.items():

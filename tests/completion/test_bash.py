@@ -833,7 +833,8 @@ def test_choice_with_whitespace(bash_tester):
     tester = bash_tester(app, "ws")
     assert tester.validate_script_syntax()
     completions = tester.get_completions("ws ")
-    assert "hello world" in completions
+    # ``%q``-escaped so readline inserts it as one word.
+    assert "hello\\ world" in completions
     assert "hello" not in completions
     assert "world" not in completions
 
@@ -849,7 +850,7 @@ def test_choice_with_single_quote(bash_tester):
     tester = bash_tester(app, "sq")
     assert tester.validate_script_syntax()
     completions = tester.get_completions("sq ")
-    assert "a'b" in completions
+    assert "a\\'b" in completions
 
 
 def test_choice_with_backtick(bash_tester):
@@ -868,7 +869,7 @@ def test_choice_with_backtick(bash_tester):
     tester = bash_tester(app, "btk")
     assert tester.validate_script_syntax()
     completions = tester.get_completions("btk ")
-    assert "a`b" in completions
+    assert "a\\`b" in completions
 
 
 def test_choice_with_dollar(bash_tester):
@@ -882,7 +883,7 @@ def test_choice_with_dollar(bash_tester):
     tester = bash_tester(app, "dol")
     assert tester.validate_script_syntax()
     completions = tester.get_completions("dol ")
-    assert "$home" in completions
+    assert "\\$home" in completions
 
 
 def test_choice_value_after_option(bash_tester):
@@ -896,7 +897,7 @@ def test_choice_value_after_option(bash_tester):
     tester = bash_tester(app, "optchoice")
     assert tester.validate_script_syntax()
     completions = tester.get_completions("optchoice --env ")
-    assert {"a b", "c'd", "e`f"} <= set(completions)
+    assert {"a\\ b", "c\\'d", "e\\`f"} <= set(completions)
 
 
 # --- --opt=value form -------------------------------------------------------

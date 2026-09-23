@@ -1,12 +1,6 @@
 """InlineText class for rich text rendering with appended metadata."""
 
-import sys
-from typing import TYPE_CHECKING
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
+from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
@@ -43,10 +37,7 @@ class InlineText:
         elif format in ("restructuredtext", "rst"):
             from rich_rst import RestructuredText
 
-            from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
-            processed_content = process_sphinx_directives(content)
-            primary_renderable = RestructuredText(processed_content, show_errors=show_errors)
+            primary_renderable = RestructuredText(content, show_errors=show_errors, admonition_style="compact")
         elif format == "rich":
             from rich.text import Text
 

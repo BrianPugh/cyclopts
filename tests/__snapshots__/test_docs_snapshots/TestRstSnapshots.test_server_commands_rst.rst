@@ -21,7 +21,7 @@ Complex CLI application for comprehensive documentation testing.
 ``--quiet, -q, --no-quiet``
     Suppress non-essential output. [Default: ``False``]
 
-``--log-level``
+``--log-level CHOICE``
     Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
 
 ``--no-color, --no-no-color``
@@ -65,31 +65,31 @@ Demonstrates Pydantic model support for CLI parameters.
 
 **Parameters:**
 
-``--server.host``
+``--server.host STR``
     Server bind address. [Default: ``0.0.0.0``]
 
-``--server.port``
+``--server.port INT``
     Server port number. [Default: ``8000``]
 
-``--server.workers``
+``--server.workers INT``
     Number of worker processes. [Default: ``4``]
 
-``--server.timeout``
+``--server.timeout FLOAT``
     Request timeout in seconds. [Default: ``30.0``]
 
 ``--server.debug, --server.no-debug``
     Enable debug mode. [Default: ``False``]
 
-``--auth.provider``
+``--auth.provider CHOICE``
     Authentication provider type. [Choices: ``oauth2``, ``jwt``, ``basic``, ``none``, Default: ``jwt``]
 
-``--auth.token-expiry``
+``--auth.token-expiry INT``
     Token expiration time in seconds. [Default: ``3600``]
 
 ``--auth.refresh-enabled, --auth.no-refresh-enabled``
     Enable token refresh. [Default: ``True``]
 
-``--auth.allowed-origins, --auth.empty-allowed-origins``
+``--auth.allowed-origins STR..., --auth.empty-allowed-origins``
     List of allowed CORS origins. [Default: ``['*']``]
 
 .. _cyclopts-complex-cli-server-stop:
@@ -108,7 +108,7 @@ Stop the server.
 ``--graceful, --no-graceful``
     Perform graceful shutdown. [Default: ``True``]
 
-``--timeout``
+``--timeout INT``
     Shutdown timeout in seconds. [Default: ``30``]
 
 ``--force, -f, --no-force``

@@ -5,6 +5,7 @@ from typing import (  # noqa: F401
     Any,
     ClassVar,
     Optional,
+    Self,
     get_args,
     get_origin,
     get_type_hints,
@@ -12,11 +13,6 @@ from typing import (  # noqa: F401
 
 import attrs
 from attrs import field
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 from cyclopts.annotations import (
     NotRequired,
@@ -32,7 +28,6 @@ from cyclopts.annotations import (
     is_typeddict,
     resolve,
     resolve_annotated,
-    resolve_optional,
 )
 from cyclopts.utils import UNSET, is_builtin
 
@@ -96,13 +91,12 @@ class FieldInfo:
 
     @property
     def hint(self):
-        """Annotation with Optional-removed and cyclopts type-inferring."""
+        """Annotation with cyclopts type-inferring."""
         hint = self.annotation
         if hint is inspect.Parameter.empty or resolve(hint) is Any:
             hint = _replace_annotated_type(
                 hint, str if self.default is inspect.Parameter.empty or self.default is None else type(self.default)
             )
-        hint = resolve_optional(hint)
         return hint
 
     @property

@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
+from attrs import evolve
+
 from cyclopts.command_spec import CommandSpec
 from cyclopts.group import Group
 from cyclopts.utils import frozen
@@ -22,6 +24,9 @@ class RegisteredCommand:
 
     names: tuple[str, ...]
     app: "App | CommandSpec"
+
+    def evolve(self, **kwargs) -> "RegisteredCommand":
+        return evolve(self, **kwargs)
 
 
 def _create_or_append(

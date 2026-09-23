@@ -272,8 +272,9 @@ API
       :type: Optional[bool]
       :value: None
 
-      If there is an error parsing the CLI tokens, invoke :func:`sys.exit(1) <sys.exit>`.
+      If there is an error parsing the CLI tokens, invoke :func:`sys.exit(2) <sys.exit>`.
       Otherwise, continue to raise the exception.
+      Only applies to Cyclopts parsing/validation errors; exceptions raised by the command function itself always propagate.
       If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :obj:`True`.
 
    .. attribute:: verbose
@@ -579,6 +580,24 @@ API
       All tokens after this delimiter will be force-interpreted as positional arguments.
       If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to POSIX-standard ``"--"``.
       Set to an empty string to disable.
+
+   .. attribute:: parse_mode
+      :type: Optional[Literal["fallthrough", "strict"]]
+      :value: None
+
+      Controls how parameters are scoped across command levels in :ref:`Meta App` patterns.
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to ``"fallthrough"``.
+
+      - ``"fallthrough"``: Unmatched parameters fall through to parent levels. When both a parent and child define the same flag, the child wins.
+      - ``"strict"``: Parameters only bind to the command level where they appear. A parent-level parameter placed after a subcommand is rejected with a helpful error message.
+
+      See :ref:`Parse Mode` for detailed documentation and examples.
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(parse_mode="strict")
 
    .. attribute:: suppress_keyboard_interrupt
       :type: bool
@@ -1082,6 +1101,67 @@ API
                  if value.bold and value.italic:
                      raise ValueError("Cannot use both --bold and --italic together.")
 
+   .. attribute:: completer
+      :type: Optional[Callable]
+      :value: None
+
+      A callback invoked at shell-completion time to produce dynamic candidate values
+      for this parameter. Use it when the valid values cannot be baked into a static
+      completion script (e.g. usernames from a database, or resources fetched from a
+      remote service).
+
+      The callback is always invoked as ``completer(context)``, where ``context`` is a
+      :class:`~cyclopts.completion.CompletionContext`. It may return a single ``str``,
+      an iterable of ``str`` values and/or ``(value, description)`` tuples, or a
+      ``{value: description}`` mapping. Return the
+      full candidate set; the shell prefix-matches candidates against the word being
+      completed, so there is no need to filter by prefix in the callback (and substring
+      or fuzzy matching is not possible). Use ``ctx.incomplete`` to narrow expensive
+      lookups rather than to filter the result.
+
+      .. code-block:: python
+
+          def complete_user(ctx) -> list[str]:
+              return fetch_users()
+
+
+          @app.command
+          def grant(user: Annotated[str, Parameter(completer=complete_user)]): ...
+
+      The context also lets a completer base its candidates on the *other* arguments
+      already typed on the command line. It exposes:
+
+      * ``ctx.incomplete`` - the partial word being completed.
+      * ``ctx[name]`` - an argument looked up by option name (``"--region"`` or
+        ``"region"``) or field name, returning an
+        :class:`~cyclopts.completion.ArgumentValue` with ``.raw`` (the typed string, or
+        :obj:`None`), ``.value`` (best-effort coerced value, :obj:`~cyclopts.UNSET` if
+        unavailable), and ``.provided`` (whether it was supplied).
+        ``ctx.get(name, default)`` returns ``default`` for an unknown name instead of
+        raising.
+      * ``ctx.argument`` / ``ctx.parameter`` - the argument (and its
+        :class:`Parameter`) currently being completed.
+
+      .. code-block:: python
+
+          def complete_cluster(ctx) -> list[str]:
+              return clusters_in(ctx["--region"].value)  # depends on --region
+
+
+          @app.command
+          def deploy(
+              *,
+              region: str = "us-west",
+              cluster: Annotated[str, Parameter(completer=complete_cluster)] = "",
+          ): ...
+
+      From a generated bash/zsh/fish script, completing a completer-backed value launches
+      your Python program in a fresh process to run the completer, paying interpreter startup
+      plus every module-load import before the callback runs (other completions stay
+      in-shell; :meth:`App.interactive_shell` runs completers in-process). Keep the callback and your
+      top-level imports fast, importing heavy dependencies lazily, and see
+      :ref:`Lazy Loading` for commands with heavy dependencies.
+
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]
       :value: None
@@ -1431,6 +1511,56 @@ API
 
       Help string to be displayed on the help page.
       If not specified, defaults to the docstring.
+
+   .. attribute:: metavar
+      :type: Optional[str]
+      :value: None
+
+      Placeholder text representing this parameter's **value**, e.g. the ``DIR`` in ``--output DIR``.
+      Purely cosmetic; it has no effect on parsing.
+
+      If not specified, defaults to the parameter's **type** in uppercase (:class:`~pathlib.Path` becomes ``PATH``, :class:`str` becomes ``STR``).
+      ``Literal`` and ``Enum`` types default to ``CHOICE``.
+      Boolean flags, :attr:`count` parameters, and ``dict`` parameters (populated via ``--name.KEY VALUE``) have no metavar, since they consume no value.
+      Setting an empty string suppresses it.
+
+      This is *not* how a positional parameter is displayed — that identifier comes from :attr:`name`. ``metavar`` never changes it.
+
+      .. code-block:: python
+
+         from typing import Annotated
+         from pathlib import Path
+         from cyclopts import App, Parameter
+
+         app = App()
+
+
+         @app.default
+         def main(
+             source: Path,
+             /,
+             *,
+             output: Annotated[Path, Parameter(metavar="DIR")],
+         ):
+             pass
+
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         Usage: my-script --output DIR SOURCE
+
+         ╭─ Arguments ────────────────────────────────────────────────────╮
+         │ *  SOURCE  [required]                                          │
+         ╰────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ───────────────────────────────────────────────────╮
+         │ *  --output DIR  [required]                                    │
+         ╰────────────────────────────────────────────────────────────────╯
+
+      The positional ``source`` is identified by its name (``SOURCE``); the keyword-only ``--output`` shows its metavar (``DIR``) in both the usage line and its parameter row.
+      The builtin formatters append the metavar to keyword-only parameters; positional-capable rows show their name-derived identifier instead. It is also available to custom formatters as :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>`. Disable metavars (rows and usage line) with :attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>` set to ``False``.
 
    .. attribute:: show_env_var
       :type: Optional[bool]
@@ -1924,6 +2054,17 @@ API
 
       See :ref:`Help Customization` for detailed examples.
 
+   .. attribute:: theme
+      :type: Union[dict[str, str], rich.theme.Theme, None]
+      :value: None
+
+      Per-group theme overriding ``cyclopts.*`` styles for this group's help panel.
+
+      Accepts a ``{style_name: definition}`` mapping or a :class:`~rich.theme.Theme`, keyed by the
+      same ``cyclopts.*`` names as the app-wide help styles (e.g. ``{"cyclopts.border": "red"}``).
+      These layer on top of the app's styles for just this group's panel; keys the theme doesn't
+      define fall through to the app's styles. See :ref:`Help Customization` for detailed examples.
+
    .. attribute:: sort_key
       :type: Any
       :value: None
@@ -2122,6 +2263,20 @@ API
 .. autofunction:: cyclopts.resolve_returncode
 
 .. autoclass:: cyclopts.CycloptsPanel
+
+.. _API Completion:
+
+----------
+Completion
+----------
+Types for dynamic shell completion, used with :attr:`.Parameter.completer`.
+See the :attr:`.Parameter.completer` documentation for usage.
+
+.. autoclass:: cyclopts.completion.CompletionContext
+   :members:
+
+.. autoclass:: cyclopts.completion.ArgumentValue
+   :members:
 
 .. _API Validators:
 

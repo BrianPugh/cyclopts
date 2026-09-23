@@ -139,19 +139,21 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console, normalize_tra
         Build a car.
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  --license-plate       License plate identifier to give to car.  │
-        │                          [required]                                │
-        │ *  --car.name            The name/model of the car. [required]     │
-        │ *  --car.mileage         How many miles the car has driven.        │
-        │                          [required]                                │
-        │ *  --car.wheel.diameter  Diameter of wheel in inches. [required]   │
-        │    --car.n-axles         Number of axles the car has. [default: 2] │
+        │ *  --license-plate STR       License plate identifier to give to   │
+        │                              car. [required]                       │
+        │ *  --car.name STR            The name/model of the car. [required] │
+        │ *  --car.mileage FLOAT       How many miles the car has driven.    │
+        │                              [required]                            │
+        │ *  --car.wheel.diameter INT  Diameter of wheel in inches.          │
+        │                              [required]                            │
+        │    --car.n-axles INT         Number of axles the car has.          │
+        │                              [default: 2]                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Engine ───────────────────────────────────────────────────────────╮
-        │ *  --car.cylinders           Number of cylinders the engine has.   │
+        │ *  --car.cylinders INT       Number of cylinders the engine has.   │
         │                              [required]                            │
         │ *  --car.horsepower --car.p  Amount of horsepower the engine can   │
-        │                              generate. [required]                  │
+        │      FLOAT                   generate. [required]                  │
         │    --car.diesel              If this engine consumes diesel,       │
         │      --car.no-diesel         instead of gasoline. [default: False] │
         ╰────────────────────────────────────────────────────────────────────╯

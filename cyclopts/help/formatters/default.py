@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from attrs import define
+from attrs import define, evolve
 
 from cyclopts.help.silent import SILENT
 
@@ -68,6 +68,14 @@ class DefaultFormatter:
     column_specs: Union[tuple["ColumnSpec", ...], "ColumnSpecBuilder"] | None = None
     """Column specifications or builder function for table columns (width, style, alignment, etc)."""
 
+    show_metavar: bool = True
+    """Show each parameter's value placeholder (the ``PATH`` in ``--config PATH``).
+
+    When False, the usage line omits placeholders and
+    :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` is cleared on every entry
+    before the columns render, so custom ``column_specs`` honor it too.
+    """
+
     @classmethod
     def with_newline_metadata(cls, **kwargs):
         """Create formatter with metadata on separate lines.
@@ -107,12 +115,14 @@ class DefaultFormatter:
             name_column = ColumnSpec(
                 renderer=NameRenderer(max_width=max_width),
                 header="Option",
-                style="cyan",
+                style="cyclopts.name",
                 max_width=max_width,
             )
 
             description_column = ColumnSpec(
-                renderer=DescriptionRenderer(newline_metadata=True), header="Description", overflow="fold"
+                renderer=DescriptionRenderer(newline_metadata=True),
+                header="Description",
+                overflow="fold",
             )
 
             if any(x.required for x in entries):
@@ -151,17 +161,21 @@ class DefaultFormatter:
         if usage:
             from rich.text import Text
 
+            from cyclopts.help.specs import DefaultStyled
+
             # Add "Usage:" prefix if not already present (for custom usage strings)
             usage_str = str(usage)
             if not usage_str.strip().startswith("Usage:"):
                 if isinstance(usage, Text):
-                    usage_with_label = Text("Usage: ", style="bold") + usage
+                    usage_with_label = Text("Usage: ", style="cyclopts.usage") + usage
                 else:
-                    usage_with_label = Text(f"Usage: {usage}", style="bold")
+                    usage_with_label = Text(f"Usage: {usage}", style="cyclopts.usage")
             else:
                 # Custom usage already has "Usage:", use as-is
-                usage_with_label = usage if isinstance(usage, Text) else Text(str(usage), style="bold")
-            console.print(usage_with_label)
+                usage_with_label = usage if isinstance(usage, Text) else Text(str(usage), style="cyclopts.usage")
+            # Wrap so the bare cyclopts.usage style name resolves (defaults to bold);
+            # render_usage prints outside the panel's DefaultStyled wrapper.
+            console.print(DefaultStyled(usage_with_label))
 
     def render_description(self, console: "Console", options: "ConsoleOptions", description: Any) -> None:
         """Render the description.
@@ -182,12 +196,15 @@ class DefaultFormatter:
         """Render a single help panel."""
         if not help_panel.entries:
             return SILENT
+        if not self.show_metavar:
+            help_panel = help_panel.copy(entries=[evolve(e, metavar=None) for e in help_panel.entries])
 
         from rich.console import Group as RichGroup
         from rich.console import NewLine
         from rich.text import Text
 
         from cyclopts.help.specs import (
+            DefaultStyled,
             PanelSpec,
             TableSpec,
             get_default_command_columns,
@@ -227,4 +244,7 @@ class DefaultFormatter:
         else:
             panel = panel_spec.build(RichGroup(panel_description, table))
 
-        return panel
+        # Wrap so the bare cyclopts.* style names resolve on whatever console
+        # prints this, regardless of the print path; the group's theme (if any)
+        # is layered on top to restyle just this panel.
+        return DefaultStyled(panel, theme=help_panel.theme)

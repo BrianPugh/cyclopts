@@ -304,10 +304,10 @@ def test_generate_docs_consistent_whitespace_after_param_colon():
 
     actual = app.generate_docs()
 
-    assert "* `--has-help`: Some help text.\n" in actual
-    assert "* `--has-metadata`: **[required]**\n" in actual
-    assert "* `--has-no-help`:\n" in actual
-    assert "* `--is-last`:\n" in actual
+    assert "* `--has-help STR`: Some help text.\n" in actual
+    assert "* `--has-metadata STR`: **[required]**\n" in actual
+    assert "* `--has-no-help STR`:\n" in actual
+    assert "* `--is-last STR`:\n" in actual
 
     # No line should have trailing whitespace.
     for line in actual.splitlines():

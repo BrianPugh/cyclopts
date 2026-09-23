@@ -62,7 +62,7 @@ def test_interactive_shell_async_command(mocker, console):
     app = App(backend="trio")
 
     mocker.patch(
-        "cyclopts.core.input",
+        "builtins.input",
         side_effect=[
             "start",
             "quit",

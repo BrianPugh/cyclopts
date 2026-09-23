@@ -110,8 +110,8 @@ Output:
    │ <span style="color: #0088cc">--version</span>  Display application version.                                      │
    ╰──────────────────────────────────────────────────────────────────────────────╯
    ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
-   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">NAME --name</span>    Person to greet. <span style="color: #cc3333; opacity: 0.7">[required]</span>                                │
-   │    <span style="color: #0088cc">COUNT --count</span>  Number of times to greet. <span style="opacity: 0.7">[default: 1]</span>                     │
+   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">NAME --name</span>    Person to greet. <span style="color: #cc3333">[required]</span>                                │
+   │    <span style="color: #0088cc">COUNT --count</span>  Number of times to greet. <span style="color: #949494">[default: 1]</span>                     │
    ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
    </div>
 
@@ -215,8 +215,8 @@ Output:
    <span style="color: #0088cc">╚══════════════════════════════════════════════════════════════════════╝</span>
    <span style="color: #0088cc">╔═ Parameters ═════════════════════════════════════════════════════════╗</span>
    <span style="color: #0088cc">║                                                                      ║</span>
-   <span style="color: #0088cc">║  </span><span style="color: #cc3333; font-weight: bold">*  </span><span style="color: #0088cc">PATH --path                   </span>  <span style="color: #cc3333; opacity: 0.7">[required]</span>                       <span style="color: #0088cc">║</span>
-   <span style="color: #0088cc">║     </span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="opacity: 0.7">[default: False]</span>                              <span style="color: #0088cc">║</span>
+   <span style="color: #0088cc">║  </span><span style="color: #cc3333; font-weight: bold">*  </span><span style="color: #0088cc">PATH --path                   </span>  <span style="color: #cc3333">[required]</span>                       <span style="color: #0088cc">║</span>
+   <span style="color: #0088cc">║     </span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="color: #949494">[default: False]</span>                              <span style="color: #0088cc">║</span>
    <span style="color: #0088cc">║       </span><span style="color: #0088cc">--no-verbose   </span>                                                <span style="color: #0088cc">║</span>
    <span style="color: #0088cc">║                                                                      ║</span>
    <span style="color: #0088cc">╚══════════════════════════════════════════════════════════════════════╝</span></pre>
@@ -273,9 +273,9 @@ Output:
    ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
    │    <span style="color: #00aa00">│</span>Option             <span style="color: #00aa00">│</span>Description                                          │
    │ <span style="color: #00aa00">───┼───────────────────┼────────────────────────────────────────────────────</span> │
-   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #00aa00">│</span><span style="color: #0088cc">PATH --path</span>        <span style="color: #00aa00">│</span><span style="color: #cc3333; opacity: 0.7">[required]</span>                                           │
+   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #00aa00">│</span><span style="color: #0088cc">PATH --path</span>        <span style="color: #00aa00">│</span><span style="color: #cc3333">[required]</span>                                           │
    │ <span style="color: #00aa00">───┼───────────────────┼────────────────────────────────────────────────────</span> │
-   │    <span style="color: #00aa00">│</span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="color: #00aa00">│</span><span style="opacity: 0.7">[default: False]</span>                                     │
+   │    <span style="color: #00aa00">│</span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="color: #00aa00">│</span><span style="color: #949494">[default: False]</span>                                     │
    │    <span style="color: #00aa00">│</span><span style="color: #0088cc">  --no-verbose</span>     <span style="color: #00aa00">│</span>                                                     │
    ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
    </div>
@@ -283,13 +283,45 @@ Output:
 Color Styles
 ^^^^^^^^^^^^
 
-Cyclopts renders the inline metadata annotations (``[default: ...]``,
-``[choices: ...]``, ``[env var: ...]``) with Rich's ``dim`` style, and
-``[required]`` with ``dim red``. On some dark terminal color schemes ``dim``
-text can be hard to read. Because Rich resolves a style string against the
-console's theme *before* parsing it, you can remap these annotations by
-redefining those style strings in a :class:`~rich.theme.Theme` and passing the
-themed :class:`~rich.console.Console` to your :class:`~cyclopts.App`:
+Every color Cyclopts renders in help output is routed through a named
+`Rich style <https://rich.readthedocs.io/en/stable/style.html#style-themes>`_.
+Define any of these keys in your :class:`~rich.theme.Theme` and pass the themed
+:class:`~rich.console.Console` to your :class:`~cyclopts.App` to restyle that
+element; keys you don't define fall back to the built-in default.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 50 20
+
+   * - Style name
+     - Applies to
+     - Default
+   * - ``"cyclopts.name"``
+     - parameter and command names
+     - ``"cyan"``
+   * - ``"cyclopts.required_marker"``
+     - the asterisk marker for required parameters
+     - ``"red bold"``
+   * - ``"cyclopts.required"``
+     - the "[required]" annotation
+     - ``"red"``
+   * - ``"cyclopts.default"``
+     - the "[default: ...]" annotation
+     - ``"gray58"``
+   * - ``"cyclopts.choices"``
+     - the "[choices: ...]" annotation
+     - ``"gray58"``
+   * - ``"cyclopts.env_var"``
+     - the "[env var: ...]" annotation
+     - ``"gray58"``
+   * - ``"cyclopts.border"``
+     - the help panel border
+     - ``"none"``
+   * - ``"cyclopts.usage"``
+     - the "Usage:" line
+     - ``"bold"``
+
+Override any key to match your own palette:
 
 .. code-block:: python
 
@@ -300,7 +332,13 @@ themed :class:`~rich.console.Console` to your :class:`~cyclopts.App`:
 
    from cyclopts import App
 
-   theme = Theme({"dim": "grey58", "dim red": "bright_red"})
+   theme = Theme(
+       {
+           "cyclopts.default": "blue",
+           "cyclopts.required": "bright_red",
+           "cyclopts.name": "bright_cyan",
+       }
+   )
    app = App(console=Console(theme=theme))
 
    @app.default
@@ -310,9 +348,74 @@ themed :class:`~rich.console.Console` to your :class:`~cyclopts.App`:
    if __name__ == "__main__":
        app()
 
-Note that redefining ``dim`` affects **all** text Cyclopts styles as ``dim``,
-not just parameter metadata. This is usually what you want for readability, but
-it is not a per-annotation override.
+Output:
+
+.. raw:: html
+
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: demo.py SRC [ARGS]</span>
+
+   Compress a file.
+
+   ╭─ Commands ───────────────────────────────────────────────────────────╮
+   │ <span style="color: #00cccc">--help (-h)  </span>Display this message and exit.                          │
+   │ <span style="color: #00cccc">--version    </span>Display application version.                            │
+   ╰──────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ─────────────────────────────────────────────────────────╮
+   │ <span style="color: #cc3333; font-weight: bold">*  </span><span style="color: #00cccc">SRC --src  </span><span style="color: #ff3333">[required]</span>                                             │
+   │ <span style="color: #cc3333; font-weight: bold">   </span><span style="color: #00cccc">DST --dst  </span><span style="color: #3333cc">[default: out.zip]</span>                                     │
+   ╰──────────────────────────────────────────────────────────────────────╯</pre>
+   </div>
+
+Because the console is resolved through the app hierarchy, a theme set on a
+parent :class:`~cyclopts.App` is inherited by its subcommands' help output.
+
+Per-Group Styles
+^^^^^^^^^^^^^^^^
+
+To restyle a single panel, give its :class:`~cyclopts.Group` a
+:attr:`~cyclopts.Group.theme`. It accepts the same ``"cyclopts."``-prefixed keys as
+the app-wide styles (as a mapping or a :class:`~rich.theme.Theme`) and layers them on
+top for just that group's panel, leaving every other panel on the app's styles:
+
+.. code-block:: python
+
+   from cyclopts import App, Group
+
+   app = App()
+
+   danger = Group("Danger Zone", theme={"cyclopts.border": "red", "cyclopts.name": "bright_red"})
+
+   @app.command
+   def build():
+       """Build the project."""
+
+   @app.command(group=danger)
+   def destroy():
+       """Tear down all infrastructure."""
+
+   if __name__ == "__main__":
+       app()
+
+Output:
+
+.. raw:: html
+
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: demo.py COMMAND</span>
+
+   ╭─ Commands ───────────────────────────────────────────────────────────╮
+   │ <span style="color: #0088cc">build        </span>Build the project.                                      │
+   │ <span style="color: #0088cc">--help (-h)  </span>Display this message and exit.                          │
+   │ <span style="color: #0088cc">--version    </span>Display application version.                            │
+   ╰──────────────────────────────────────────────────────────────────────╯
+   <span style="color: #cc3333">╭─ Danger Zone ────────────────────────────────────────────────────────╮</span>
+   <span style="color: #cc3333">│</span> <span style="color: #ff3333">destroy  </span>Tear down all infrastructure.                               <span style="color: #cc3333">│</span>
+   <span style="color: #cc3333">╰──────────────────────────────────────────────────────────────────────╯</span></pre>
+   </div>
+
+Keys the group's theme doesn't define fall through to the app's styles, so a
+group can override just its border while inheriting every other color.
 
 Combining Customizations
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -362,8 +465,8 @@ Output:
    <span style="color: #00aaaa">│ </span><span style="color: #0088cc">--version</span>  Display application version.                             <span style="color: #00aaaa">│</span>
    <span style="color: #00aaaa">╰─────────────────────────────────────────────────────────────────────╯</span>
    <span style="color: #00aaaa">╭─ Parameters ────────────────────────────────────────────────────────╮</span>
-   <span style="color: #00aaaa">│ </span><span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">PATH --path</span>       <span style="color: #cc3333; opacity: 0.7">[required]</span>                                     <span style="color: #00aaaa">│</span>
-   <span style="color: #00aaaa">│    </span><span style="color: #0088cc">VERBOSE --verbose</span> <span style="opacity: 0.7">[default: False]</span>                               <span style="color: #00aaaa">│</span>
+   <span style="color: #00aaaa">│ </span><span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">PATH --path</span>       <span style="color: #cc3333">[required]</span>                                     <span style="color: #00aaaa">│</span>
+   <span style="color: #00aaaa">│    </span><span style="color: #0088cc">VERBOSE --verbose</span> <span style="color: #949494">[default: False]</span>                               <span style="color: #00aaaa">│</span>
    <span style="color: #00aaaa">╰─────────────────────────────────────────────────────────────────────╯</span></pre>
    </div>
 
@@ -436,13 +539,13 @@ Output:
    │ <span style="color: #0088cc">--version</span>  Display application version.                                      │
    ╰──────────────────────────────────────────────────────────────────────────────╯
    <span style="color: #00aa00">   Optional Settings                                                            </span>
-   <span style="color: #00aa00"> </span> <span style="color: #0088cc">VERBOSE --verbose</span>  <span style="opacity: 0.7">[default: False]</span>                                          <span style="color: #00aa00"> </span>
+   <span style="color: #00aa00"> </span> <span style="color: #0088cc">VERBOSE --verbose</span>  <span style="color: #949494">[default: False]</span>                                          <span style="color: #00aa00"> </span>
    <span style="color: #00aa00"> </span> <span style="color: #0088cc">  --no-verbose</span>     <span style="opacity: 0.7"></span>                                                          <span style="color: #00aa00"> </span>
-   <span style="color: #00aa00"> </span> <span style="color: #0088cc">THREADS --threads</span>  <span style="opacity: 0.7">[default: 4]</span>                                              <span style="color: #00aa00"> </span>
+   <span style="color: #00aa00"> </span> <span style="color: #0088cc">THREADS --threads</span>  <span style="color: #949494">[default: 4]</span>                                              <span style="color: #00aa00"> </span>
    <span style="color: #00aa00">                                                                                </span>
    <span style="color: #cc3333; font-weight: bold">╔═ Required Options ═══════════════════════════════════════════════════════════╗</span>
-   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">INPUT-FILE --input-file</span>  <span style="color: #cc3333; opacity: 0.7">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
-   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">OUTPUT-DIR --output-dir</span>  <span style="color: #cc3333; opacity: 0.7">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
+   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">INPUT-FILE --input-file</span>  <span style="color: #cc3333">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
+   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">OUTPUT-DIR --output-dir</span>  <span style="color: #cc3333">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
    <span style="color: #cc3333; font-weight: bold">╚══════════════════════════════════════════════════════════════════════════════╝</span></pre>
    </div>
 
@@ -461,10 +564,8 @@ using :class:`~cyclopts.help.ColumnSpec`:
 
    # Define custom column renderers
    def names_renderer(entry):
-       """Combine parameter names and shorts."""
-       names = " ".join(entry.names) if entry.names else ""
-       shorts = " ".join(entry.shorts) if entry.shorts else ""
-       return f"{names} {shorts}".strip()
+       """Combine the positional label (if any) with the option names."""
+       return " ".join(entry.display_labels)
 
    def type_renderer(entry):
        """Show the parameter type."""
@@ -566,7 +667,7 @@ conditions:
        # Adjust name column width based on console size
        max_width = min(40, int(console.width * 0.3))
        columns.append(ColumnSpec(
-           renderer=lambda e: " ".join(e.names + e.shorts),
+           renderer=lambda e: " ".join(e.display_labels),
            header="Option",
            max_width=max_width,
            style="cyan",
@@ -623,6 +724,118 @@ Output (adjusts based on terminal width):
    ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
    </div>
 
+--------
+Metavars
+--------
+
+A **metavar** is the placeholder standing in for a parameter's *value*, e.g. the ``PATH`` in ``--config PATH``.
+:attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` carries it for every parameter that consumes a value;
+it is :obj:`None` for boolean flags, :attr:`count <cyclopts.Parameter.count>` parameters, and ``dict`` parameters
+(populated only through ``--name.KEY VALUE``), which consume none.
+The default derives from the parameter's **type** (:class:`~pathlib.Path` → ``PATH``, :class:`str` → ``STR``,
+``Literal``/``Enum`` → ``CHOICE``); an explicit :attr:`Parameter.choices <cyclopts.Parameter.choices>` also yields
+``CHOICE`` regardless of the underlying type, since the choice list describes the value.
+:attr:`Parameter.metavar <cyclopts.Parameter.metavar>` overrides it. For an optional type the ``None`` is
+stripped, so ``Path | None`` yields ``PATH`` rather than ``PATH|NONE`` (the value you provide is always a
+:class:`~pathlib.Path`; its absence is conveyed by the parameter being optional). Tuples render one placeholder
+per token, the way the values are typed on the command line: ``tuple[int, int]`` → ``INT INT`` and
+``tuple[int, ...]`` → ``INT...``. Variadic collections (``list``, ``set``, ``Sequence``, ...) consume one element
+per token, so a single-element type renders the same way: ``list[str]`` → ``STR...``, ``set[int]`` → ``INT...``.
+
+This is distinct from a positional parameter's *identifier* — the ``SRC`` in ``SRC --src`` — which is its
+:attr:`HelpEntry.positional_label <cyclopts.help.HelpEntry.positional_label>`, derived from the parameter's **name** (change it via
+:attr:`Parameter.name <cyclopts.Parameter.name>`). ``metavar`` never affects the identifier.
+
+Every builtin formatter (rich, plain, markdown, rst, html) appends the metavar to **keyword-only** parameters
+(``--config PATH``), and the usage line shows it for required keyword parameters. Positional-capable rows show
+their identifier instead (the ``CONFIG`` in ``CONFIG --config``, since it already stands in for the value).
+Parameters that consume no value (boolean flags, counters) never show a metavar, explicit or not. Disable metavars entirely with
+:attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>`, which drops them from the
+usage line and clears :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` on every entry before the
+columns render, so it also applies to custom ``column_specs``:
+
+.. code-block:: python
+
+   from cyclopts import App
+   from cyclopts.help import DefaultFormatter
+
+   app = App(help_formatter=DefaultFormatter(show_metavar=False))
+
+A custom column can instead render the metavar next to *every* option, positional-capable rows included:
+
+.. code-block:: python
+
+   from pathlib import Path
+   from typing import Annotated
+
+   from cyclopts import App, Group, Parameter
+   from cyclopts.help import ColumnSpec, DefaultFormatter
+
+
+   def names_renderer(entry):
+       """Render ``LABEL --option -o METAVAR``."""
+       return " ".join(entry.display_labels_with_metavar)
+
+
+   options = Group(
+       "Options",
+       help_formatter=DefaultFormatter(
+           column_specs=(
+               ColumnSpec(renderer=names_renderer, style="cyan"),
+               ColumnSpec(renderer="description", overflow="fold"),
+           )
+       ),
+   )
+
+   app = App(name="my-script")
+
+
+   @app.default
+   def main(
+       *,
+       config: Annotated[
+           Path | None,
+           Parameter(name=["--config", "-c"], metavar="FILE", group=options, help="Configuration file."),
+       ] = None,
+       output_directory: Annotated[Path, Parameter(group=options, help="Where to write results.")] = Path(),
+       verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], group=options, help="Increase output.")] = False,
+   ):
+       pass
+
+
+   if __name__ == "__main__":
+       app()
+
+Output:
+
+.. code-block:: console
+
+   $ my-script --help
+   Usage: my-script [OPTIONS]
+
+   ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+   │ --help (-h)  Display this message and exit.                                  │
+   │ --version    Display application version.                                    │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Options ────────────────────────────────────────────────────────────────────╮
+   │ --config -c FILE           Configuration file.                               │
+   │ --output-directory PATH    Where to write results.                           │
+   │ --verbose -v --no-verbose  Increase output.                                  │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+
+``--config`` uses an explicit :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`, ``--output-directory``
+falls back to its type name (``PATH``), and ``--verbose`` has no metavar at all because a flag consumes no value.
+
+.. note::
+
+   :attr:`all_options <cyclopts.help.HelpEntry.all_options>` (and
+   :attr:`names <cyclopts.help.HelpEntry.names>`) contain option names only.
+   Use :attr:`display_labels <cyclopts.help.HelpEntry.display_labels>` to
+   reproduce the builtin layout, which prefixes the
+   :attr:`positional_label <cyclopts.help.HelpEntry.positional_label>` for positional parameters, or
+   :attr:`display_labels_with_metavar <cyclopts.help.HelpEntry.display_labels_with_metavar>` to also
+   include the metavar exactly as the builtin formatters do.
+
 --------------------------
 Creating Custom Formatters
 --------------------------
@@ -653,7 +866,7 @@ receive the console and options first, followed by the content to render:
            table.add_column("Description", style="white")
 
            for entry in panel.entries:
-               name = " ".join(entry.names + entry.shorts)
+               name = " ".join(entry.display_labels)
                # Extract plain text from description (handles InlineText, etc)
                desc = ""
                if entry.description:

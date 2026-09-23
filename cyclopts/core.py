@@ -4,9 +4,9 @@ import os
 import sys
 import traceback
 from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
-from contextlib import suppress
+from contextlib import nullcontext, suppress
 from copy import copy
-from enum import Enum
+from enum import StrEnum
 from functools import lru_cache, partial
 from itertools import chain
 from pathlib import Path
@@ -25,12 +25,19 @@ from typing import (
 )
 
 from attrs import Factory, define, field
+from attrs import validators as attrs_validators
 
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
 from cyclopts.argument.utils import is_short_flag
-from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
+from cyclopts.bind import (
+    _parse_kw_and_flags,
+    _scope_tokens_for_meta,
+    create_bound_arguments,
+    is_option_like,
+    normalize_tokens,
+)
 from cyclopts.command_spec import CommandSpec
 from cyclopts.config._env import Env
 from cyclopts.exceptions import (
@@ -58,13 +65,6 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
-try:
-    # By importing, makes things like the arrow-keys work.
-    import readline
-except ImportError:  # pragma: no cover
-    # Not available on windows
-    readline = None
-
 if TYPE_CHECKING:
     from rich.console import Console
     from rich.tree import Tree
@@ -73,13 +73,23 @@ if TYPE_CHECKING:
     from cyclopts.help import HelpPanel
     from cyclopts.help.protocols import HelpFormatter
 
-from cyclopts._result_action import ResultAction, ResultActionSingle
+from cyclopts._result_action import ResultAction, ResultActionSingle, validate_result_action
 from cyclopts._run import _run_maybe_async_command
 
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
 DEFAULT_FORMAT = "markdown"
+DEFAULT_SHELL_INTRO = (
+    "Interactive shell. Press Ctrl-D to exit."
+    if os.name == "posix"
+    else "Interactive shell. Press Ctrl-Z followed by Enter to exit."
+)
+
+#: Reserved first token the generated shell-completion script uses to request
+#: dynamic completions (see :meth:`App._run_complete`). Shared by the sync and
+#: async entrypoints so their interception guards can't drift apart.
+_COMPLETE_COMMAND = "__complete"
 
 
 def _result_action_converter(
@@ -97,6 +107,9 @@ def _result_action_converter(
 
     if not result:
         raise ValueError("result_action cannot be an empty sequence")
+
+    for action in result:
+        validate_result_action(action)
 
     return result
 
@@ -150,6 +163,8 @@ def _apply_parent_defaults_to_app(app: "App", parent_app: "App") -> None:
         app._group_arguments = copy(parent_app._group_arguments)
     if app.version is None and parent_app.version is not None:
         app.version = parent_app.version
+    if app.parse_mode is None and parent_app.parse_mode is not None:
+        app.parse_mode = parent_app.parse_mode
 
 
 def _apply_parent_groups_to_kwargs(kwargs: dict[str, Any], parent_app: "App") -> None:
@@ -168,31 +183,6 @@ def _apply_parent_groups_to_kwargs(kwargs: dict[str, Any], parent_app: "App") ->
         kwargs["group_parameters"] = copy(parent_app._group_parameters)
     if "group_arguments" not in kwargs:
         kwargs["group_arguments"] = copy(parent_app._group_arguments)
-
-
-def _normalize_for_matching(s: str) -> str:
-    """Normalize a string for fuzzy command matching.
-
-    Removes hyphens, underscores, and converts to lowercase (e.g.,
-    'mycommand' matches 'my-command').
-
-    .. warning::
-        This fuzzy matching is primarily for backward compatibility with the
-        introduction of ``_pascal_to_snake`` in ``default_name_transform``.
-        It should **probably be removed in v5** once users have migrated their
-        camelCase command names.
-
-    Parameters
-    ----------
-    s : str
-        String to normalize.
-
-    Returns
-    -------
-    str
-        Normalized string with hyphens/underscores removed and lowercased.
-    """
-    return s.replace("-", "").replace("_", "").lower()
 
 
 def _combined_meta_command_mapping(
@@ -245,6 +235,87 @@ def _walk_metas(app: "App"):
     while (meta := meta._meta) and meta.default_command:
         meta_list.append(meta)
     yield from reversed(meta_list)
+
+
+def _count_chain_without_trailing_help_version(
+    chain: Sequence[str],
+    command_apps: Sequence["App"],
+    root_app: "App",
+) -> tuple[int, list[str]]:
+    """Length of ``chain`` once trailing help/version pseudo-commands are stripped.
+
+    When users provide help/version flags after a command (e.g. ``myapp cmd
+    --help --help``), command parsing may treat them as commands in the chain;
+    they must be stripped so downstream logic sees the real command target.
+
+    Parameters
+    ----------
+    chain: Sequence[str]
+        The parsed command chain.
+    command_apps: Sequence[App]
+        Resolved app per command token, parallel to ``chain`` (excluding the
+        root). Entry ``i``'s parent is ``command_apps[i - 1]``, or
+        ``root_app`` for the first entry.
+    root_app: App
+        Parent of the first chain entry.
+
+    Returns
+    -------
+    keep: int
+        Number of leading chain entries to keep.
+    removed: list[str]
+        The stripped tokens, last-first (LIFO).
+    """
+    keep = len(chain)
+    removed: list[str] = []
+    while keep:
+        parent = command_apps[keep - 2] if keep >= 2 else root_app
+        if chain[keep - 1] not in set(parent.help_flags + parent.version_flags):  # pyright: ignore[reportOperatorIssue]
+            break
+        removed.append(chain[keep - 1])
+        keep -= 1
+    return keep, removed
+
+
+def _safe_assemble_argument_collection(app: "App") -> ArgumentCollection | None:
+    """Assemble an :class:`ArgumentCollection` from ``app``'s default command, tolerating unresolvable signatures.
+
+    Returns ``None`` if the signature cannot be resolved because of a forward
+    reference that doesn't exist at runtime (``NameError``). This is the case
+    for Cyclopts' own internal ``help_print``/``version_print`` handlers, whose
+    signatures reference ``rich.console.Console`` — a ``TYPE_CHECKING``-only
+    import. Callers in ``parse_mode``-handling paths need to inspect these
+    collections without being able to fix the forward reference, so they
+    gracefully fall back when ``None`` is returned.
+
+    Any other exception (``TypeError``, ``ValueError``, etc.) indicates a
+    genuine problem with the command's type hints and is allowed to propagate.
+    """
+    try:
+        return app.assemble_argument_collection()
+    except NameError:
+        return None
+
+
+def _build_strict_parent_info(app_stack: "AppStack") -> list[tuple[str, ArgumentCollection]] | None:
+    """Build parent (app_name, argument_collection) pairs for scope-aware error hints.
+
+    Returns ``None`` if ``parse_mode`` is not ``"strict"``.
+    Walks the full meta chain for each app in the stack.
+    """
+    if app_stack.resolve("parse_mode") != "strict":
+        return None
+    parent_info: list[tuple[str, ArgumentCollection]] = []
+    for stack_apps in app_stack.stack:
+        for stack_app in stack_apps:
+            metas = list(_walk_metas(stack_app))[:-1]  # Exclude the app itself; deepest-first.
+            for meta in reversed(metas):  # Shallowest-first.
+                parent = meta._meta_parent
+                parent_name = parent.name[0] if parent else ""
+                meta_argument_collection = _safe_assemble_argument_collection(meta)
+                if meta_argument_collection is not None:
+                    parent_info.append((parent_name, meta_argument_collection))
+    return parent_info or None
 
 
 def _iter_resolution_argument_collections(
@@ -436,6 +507,12 @@ class App:
     )
 
     end_of_options_delimiter: str | None = field(default=None, kw_only=True)
+
+    parse_mode: Literal["fallthrough", "strict"] | None = field(
+        default=None,
+        kw_only=True,
+        validator=attrs_validators.optional(attrs_validators.in_(("fallthrough", "strict"))),
+    )
 
     print_error: bool | None = field(default=None, kw_only=True)
 
@@ -1028,6 +1105,109 @@ class App:
             self._meta._meta_parent = self
         return self._meta
 
+    def _parse_commands(
+        self,
+        tokens: list[str],
+        *,
+        include_parent_meta: bool = True,
+    ) -> tuple[tuple[str, ...], tuple["App", ...], list[str], list[int], list["App"]]:
+        """Internal command parsing with richer return data.
+
+        Unlike the public :meth:`parse_commands`, this method:
+        - Accepts already-normalized tokens (list[str]).
+        - Returns command indices into the original token list.
+        - Returns the resolved app for each command token.
+
+        Parameters
+        ----------
+        tokens: list[str]
+            Already-normalized token list.
+        include_parent_meta: bool
+            Controls whether parent meta apps are included in the execution path.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Strings that are interpreted as a valid command chain.
+        tuple[App, ...]
+            The execution path - apps that will be invoked in order.
+        list[str]
+            The remaining non-command tokens.
+        list[int]
+            Index (into the original token list) of each command token found.
+        list[App]
+            The resolved app for each command token (parallel to the chain).
+        """
+        command_chain = []
+        app = self
+        apps: list[App] = []
+        unused_tokens = tokens
+        command_indices: list[int] = []
+        command_apps: list[App] = []
+        # Track the current offset into the original token list.
+        # This is needed because _consume_leading_meta_options can
+        # remove tokens, shifting the relationship between unused_tokens
+        # and the original token indices.
+        token_offset = 0
+
+        def add_parent_metas(app):
+            """If ``app`` is a meta-app, also add it's "normal" app.
+
+            We assume that ``app._meta`` will always invoke the ``app``.
+            """
+            if not include_parent_meta:
+                return
+            meta_parents = []
+            meta_parent = app
+            while (meta_parent := meta_parent._meta_parent) is not None:
+                meta_parents.append(meta_parent)
+            # The "root" non-meta app gets highest priority (first)
+            apps.extend(meta_parents[::-1])
+
+        add_parent_metas(app)
+        apps.append(app)
+        command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
+
+        unused_tokens = tokens
+        while unused_tokens:
+            token = unused_tokens[0]
+            app_or_spec = command_mapping.get(token)
+
+            if app_or_spec is None:
+                # Token is not a command. Try to consume it as a meta app parameter.
+                # This is only relevant when ``include_parent_meta==True``, because
+                # otherwise it will be handled by the natural parsing process.
+                if include_parent_meta:
+                    remaining = self._consume_leading_meta_options(apps, unused_tokens)
+                    if len(remaining) < len(unused_tokens):
+                        # Some meta parameters were consumed, continue looking for commands
+                        token_offset += len(unused_tokens) - len(remaining)
+                        unused_tokens = remaining
+                        continue
+                # Not a command or meta parameter, stop parsing commands
+                break
+
+            # Resolve CommandSpec if needed (lazy loading)
+            # Note: CommandSpec.resolve() has built-in caching via its _resolved field
+            # Pass the current app as parent to inherit its defaults
+            if isinstance(app_or_spec, CommandSpec):
+                parent_app = app  # Save parent before overwriting
+                app = app_or_spec.resolve(parent_app)
+            else:
+                app = app_or_spec
+
+            # Found a command - add it to the chain
+            add_parent_metas(app)
+            apps.append(app)
+            command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
+            command_chain.append(token)
+            command_indices.append(token_offset)
+            command_apps.append(app)
+            token_offset += 1
+            unused_tokens = unused_tokens[1:]
+
+        return tuple(command_chain), tuple(apps), unused_tokens, command_indices, command_apps
+
     def parse_commands(
         self,
         tokens: None | str | Iterable[str] = None,
@@ -1066,96 +1246,21 @@ class App:
         list[str]
             The remaining non-command tokens.
         """
-        tokens = normalize_tokens(tokens)
-
-        command_chain = []
-        app = self
-        apps: list[App] = []
-        unused_tokens = tokens
-
-        def add_parent_metas(app):
-            """If ``app`` is a meta-app, also add it's "normal" app.
-
-            We assume that ``app._meta`` will always invoke the ``app``.
-            """
-            if not include_parent_meta:
-                return
-            meta_parents = []
-            meta_parent = app
-            while (meta_parent := meta_parent._meta_parent) is not None:
-                meta_parents.append(meta_parent)
-            # The "root" non-meta app gets highest priority (first)
-            apps.extend(meta_parents[::-1])
-
-        add_parent_metas(app)
-        apps.append(app)
-        command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
-
-        unused_tokens = tokens
-        while unused_tokens:
-            token = unused_tokens[0]
-            app_or_spec = None
-
-            # Try exact match first; O(1)
-            if token in command_mapping:
-                app_or_spec = command_mapping[token]
-            # Don't apply fuzzy matching to option-like tokens (starting with -)
-            # Fuzzy matching is for camelCase command names, not for flags like --h matching -h
-            # Issue #698
-            elif not token.startswith("-"):
-                # Try fuzzy match (backward compatibility for camelCase commands) O(n).
-                # NOTE: This fuzzy matching is for v4 backward compatibility with
-                # _pascal_to_snake introduction. Consider removing in v5.
-                normalized_token = _normalize_for_matching(token)
-                # Also exclude option-like commands (--help, --version, etc.) from fuzzy matching.
-                # Prevents "version" from matching to "--version"
-                matches = [
-                    cmd_name
-                    for cmd_name in command_mapping
-                    if not cmd_name.startswith("-") and _normalize_for_matching(cmd_name) == normalized_token
-                ]
-
-                if len(matches) == 1:
-                    # Single fuzzy match found
-                    app_or_spec = command_mapping[matches[0]]
-                elif len(matches) > 1:
-                    # Ambiguous match - multiple commands match after normalization
-                    raise ValueError(f"Ambiguous command '{token}'. Could match: {', '.join(sorted(matches))}.")
-
-            if app_or_spec is None:
-                # Token is not a command. Try to consume it as a meta app parameter.
-                # This is only relevant when ``include_parent_meta==True``, because
-                # otherwise it will be handled by the natural parsing process.
-                if include_parent_meta:
-                    remaining = self._consume_leading_meta_options(apps, unused_tokens)
-                    if len(remaining) < len(unused_tokens):
-                        # Some meta parameters were consumed, continue looking for commands
-                        unused_tokens = remaining
-                        continue
-                # Not a command or meta parameter, stop parsing commands
-                break
-
-            # Resolve CommandSpec if needed (lazy loading)
-            # Note: CommandSpec.resolve() has built-in caching via its _resolved field
-            # Pass the current app as parent to inherit its defaults
-            if isinstance(app_or_spec, CommandSpec):
-                parent_app = app  # Save parent before overwriting
-                app = app_or_spec.resolve(parent_app)
-            else:
-                app = app_or_spec
-
-            add_parent_metas(app)
-            apps.append(app)
-            command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
-            command_chain.append(token)
-            unused_tokens = unused_tokens[1:]
-
-        return tuple(command_chain), tuple(apps), unused_tokens
+        command_chain, apps, unused_tokens, _, _ = self._parse_commands(
+            normalize_tokens(tokens),
+            include_parent_meta=include_parent_meta,
+        )
+        return command_chain, apps, unused_tokens
 
     def _get_resolution_context(self, execution_path: Sequence["App"]) -> list["App"]:
         """Get all apps that contribute to parameter resolution for the given execution path.
 
         This includes parent meta apps and the meta app of the final command app.
+
+        In ``"strict"`` parse mode, parent meta apps are excluded: their flags are
+        rejected at this command's level, so they must not contribute parameters
+        here either. Keeping the exclusion inside this method keeps parsing, help,
+        completion, and docs generation consistent with each other.
 
         Parameters
         ----------
@@ -1187,6 +1292,10 @@ class App:
                         if not is_meta_command:
                             apps.append(app._meta)
 
+            if last_app.app_stack.resolve("parse_mode") == "strict":
+                # Meta apps whose _meta_parent is the command itself are retained.
+                apps = [a for a in apps if a._meta_parent is None or a._meta_parent is last_app]
+
         return apps
 
     def _consume_leading_meta_options(self, apps: list["App"], tokens: list[str]) -> list[str]:
@@ -1213,8 +1322,6 @@ class App:
         if not apps or not tokens:
             return tokens
 
-        from cyclopts.bind import _parse_kw_and_flags
-
         # Resolve end_of_options_delimiter from the partially-resolved app stack
         with self.app_stack(apps):
             end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
@@ -1232,19 +1339,24 @@ class App:
         # Try to parse with each meta app's parameters
         unused_tokens = tokens
         for meta_app in meta_apps_to_try:
+            argument_collection = _safe_assemble_argument_collection(meta_app)
+            if argument_collection is None:
+                # Unresolvable forward reference (e.g. cyclopts' own internal
+                # help/version handlers); genuine annotation errors propagate.
+                continue
             try:
-                argument_collection = meta_app.assemble_argument_collection()
-
-                # Try to consume tokens with this meta app's parameters
-                # stop_at_first_unknown=True ensures we only consume contiguous leading options
-                unused_tokens, _ = _parse_kw_and_flags(
+                # Try to consume tokens with this meta app's parameters.
+                # stop_at_first_unknown=True ensures we only consume contiguous leading options.
+                unused_tokens, _, _, _ = _parse_kw_and_flags(
                     argument_collection,
                     unused_tokens,
                     end_of_options_delimiter=end_of_options_delimiter,
                     stop_at_first_unknown=True,
                 )
-            except Exception:
-                # If parsing fails, try next meta app
+            except CycloptsError:
+                # The leading region is malformed for this meta (e.g. an option
+                # missing its value); leave the tokens for the real parse (or the
+                # next meta) to handle so the proper user-facing error surfaces.
                 continue
 
         return unused_tokens
@@ -1619,31 +1731,46 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
+        # Reserved command: the generated shell-completion script calls back into
+        # the application as ``<prog> __complete <words...>`` to obtain dynamic
+        # completions from ``Parameter.completer`` callbacks. Intercepted here —
+        # like the help/version pseudo-commands — so every entry point
+        # (``__call__``, ``run_async``, ``parse_args``, ``parse_known_args``)
+        # handles it and it never collides with user commands.
+        if tokens and tokens[0] == _COMPLETE_COMMAND:
+            command = self._run_complete
+            bound = inspect.signature(command).bind(tokens[1:])
+            return command, bound, [], {}, ArgumentCollection()
+
         meta_parent = self
 
         # We need both versions of the apps list:
         # 1. apps_for_context (with parent metas) - for setting up the app_stack context
+        #    and, in meta dispatch, for hierarchical token scoping.
         # 2. execution_apps (without parent metas) - for determining the actual execution command
         # These can differ when parse_commands is called from a meta app, so we must
         # call parse_commands twice. This is not inefficient since the parsing is fast.
-        _, apps_for_context, _ = self.parse_commands(tokens, include_parent_meta=True)
-        command_chain, execution_apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
+        full_chain, apps_for_context, _, full_command_indices, full_command_apps = self._parse_commands(
+            tokens, include_parent_meta=True
+        )
+        command_chain, execution_apps, unused_tokens, _, _ = self._parse_commands(tokens, include_parent_meta=False)
 
-        # We don't want the command_app to be the version/help handler; we handle those specially
-        command_app = execution_apps[-1]
-        with suppress(IndexError):
-            # Remove trailing help/version commands from the execution chain.
-            # When users provide multiple flags (e.g., "myapp cmd --help --help"), the parser
-            # may treat trailing help/version flags as commands in the chain. We must remove ALL
-            # such trailing commands and keep command_chain synchronized with execution_apps.
-            while command_chain and command_chain[-1] in set(
-                execution_apps[-2].help_flags + execution_apps[-2].version_flags  # pyright: ignore[reportOperatorIssue]
-            ):
-                execution_apps = execution_apps[:-1]
-                command_chain = command_chain[:-1]
-
-        command_app = execution_apps[-1]
+        # We don't want the command_app to be the version/help handler; we handle those specially.
+        # ``execution_apps`` is ``[self]`` followed by one resolved app per command token.
+        keep, removed_help_version_tokens = _count_chain_without_trailing_help_version(
+            command_chain, execution_apps[1:], execution_apps[0]
+        )
+        command_chain = command_chain[:keep]
+        command_app = execution_apps[keep]
         del execution_apps  # Always use AppStack from here-on.
+
+        # Analogously strip trailing help/version pseudo-commands from the
+        # meta-aware parse so they don't masquerade as subcommands for
+        # hierarchical token scoping (e.g. ``myapp --version`` where a user
+        # parameter shadows ``--version``).
+        keep, _ = _count_chain_without_trailing_help_version(full_chain, full_command_apps, self)
+        hier_command_indices = list(full_command_indices[:keep])
+        hier_command_apps = list(full_command_apps[:keep])
 
         ignored: dict[str, Any] = {}
 
@@ -1652,10 +1779,70 @@ class App:
             config = tuple(partial(x, command_app, command_chain) for x in config)
             end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
 
+            # Assemble the resolved command's argument collection once (inside the
+            # app_stack context so stack-resolved defaults apply); it powers the
+            # trailing-flag restoration below, the help/version shadowing checks,
+            # and the main binding pass.
+            command_argument_collection = (
+                _safe_assemble_argument_collection(command_app) if command_app.default_command else None
+            )
+
+            # In meta dispatch (the flat parse resolved no commands, but the
+            # meta-aware parse finds subcommands the meta will forward tokens to),
+            # the deepest resolved command also participates: its parameters can
+            # shadow help/version flags and claim post-command tokens.
+            hier_child_app: App | None = None
+            if not command_chain and hier_command_indices:
+                hier_child_app = hier_command_apps[-1]
+            child_argument_collection = (
+                _safe_assemble_argument_collection(hier_child_app)
+                if hier_child_app is not None and hier_child_app.default_command
+                else None
+            )
+
+            def _flag_shadowed_by_user_param(flag: str) -> bool:
+                # A flag that never appears in the input can neither be
+                # intercepted nor restored, so its shadow status is irrelevant;
+                # skip the collection match scans on the common no-flag path.
+                # (Interception/restoration match flag tokens exactly, so exact
+                # membership is the right gate.)
+                if flag not in tokens:
+                    return False
+                # A ``**kwargs`` catch-all doesn't count (see _match_explicit).
+                return any(
+                    collection._match_explicit(flag) is not None
+                    for collection in (command_argument_collection, child_argument_collection)
+                    if collection is not None
+                )
+
+            # If a removed trailing help/version "command" is actually shadowed by a
+            # parameter on the resolved command (e.g. ``def sub(version: bool = False)``),
+            # restore it to ``unused_tokens`` so normal binding can claim it.
+            #
+            # Order invariant: ``_parse_commands`` consumes command tokens
+            # left-to-right and stops at the first non-command, so any token that
+            # ended up in the chain originally appeared *before* every token still
+            # in ``unused_tokens``. Prepending the restored flags (in original
+            # order; ``removed_help_version_tokens`` was filled LIFO so we reverse)
+            # therefore reproduces the input order for the suffix.
+            if removed_help_version_tokens:
+                restored: list[str] = []
+                for flag in reversed(removed_help_version_tokens):
+                    if _flag_shadowed_by_user_param(flag):
+                        restored.append(flag)
+                if restored:
+                    unused_tokens = restored + unused_tokens
+
             # Special flags (help/version) get intercepted by the root app.
             # Special flags are allows to be **anywhere** in the token stream.
 
-            help_flag_index = _get_help_flag_index(tokens, command_app.help_flags, end_of_options_delimiter)
+            # If the resolved command defines its own parameter that shadows one of the
+            # auto-registered help/version flags (e.g. ``def sub(version: bool = False)``),
+            # let normal binding handle that flag instead of triggering the auto-handler.
+            active_help_flags = tuple(f for f in command_app.help_flags if not _flag_shadowed_by_user_param(f))
+            active_version_flags = tuple(f for f in command_app.version_flags if not _flag_shadowed_by_user_param(f))
+
+            help_flag_index = _get_flag_index(tokens, active_help_flags, end_of_options_delimiter)
 
             try:
                 if help_flag_index is not None:
@@ -1663,6 +1850,9 @@ class App:
                     # Users can provide multiple flags (e.g., "myapp --help --help --version").
                     # When help is requested, it takes priority over version, so we remove all
                     # occurrences of both flag types to prevent downstream parsing errors.
+                    # Shadowed flags are removed too: normal binding never runs on this path,
+                    # and a leftover shadowed flag (e.g. ``--version``) would be re-parsed by
+                    # ``help_print``'s command resolution as a help/version pseudo-command.
                     flags_to_remove = set(command_app.help_flags + command_app.version_flags)  # pyright: ignore[reportOperatorIssue]
                     tokens[:] = [t for t in tokens if t not in flags_to_remove]
                     unused_tokens[:] = [t for t in unused_tokens if t not in flags_to_remove]
@@ -1673,7 +1863,7 @@ class App:
                     bound = inspect.signature(command).bind(tokens, console=command_app.console)
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
-                elif any(flag in tokens for flag in command_app.version_flags):
+                elif _get_flag_index(tokens, active_version_flags, end_of_options_delimiter) is not None:
                     command = _get_version_command(command_app)
                     while meta_parent := meta_parent._meta_parent:
                         command = _get_version_command(meta_parent)
@@ -1685,19 +1875,69 @@ class App:
                     if command_app.default_command:
                         command = command_app.default_command
                         validate_command(command)
-                        argument_collection = command_app.assemble_argument_collection()
+                        # Reuse the collection assembled for the shadowing checks;
+                        # re-assemble directly only if the safe assembly swallowed a
+                        # NameError, so the genuine annotation error propagates here.
+                        argument_collection = (
+                            command_argument_collection
+                            if command_argument_collection is not None
+                            else command_app.assemble_argument_collection()
+                        )
                         ignored: dict[str, Any] = {
                             argument.field_info.name: resolve_annotated(argument.field_info.annotation)
                             for argument in argument_collection.filter_by(parse=False)
                         }
 
-                        bound, unused_tokens = create_bound_arguments(
-                            command_app.default_command,
-                            argument_collection,
-                            unused_tokens,
-                            config,
-                            end_of_options_delimiter=end_of_options_delimiter,
-                        )
+                        # Hierarchical token scoping applies in meta dispatch: the
+                        # flat parse resolved no commands (command_app is the meta
+                        # level itself) but the meta-aware parse found subcommands
+                        # that this level will forward tokens to.
+                        parse_mode = self.app_stack.resolve("parse_mode", fallback="fallthrough")
+                        scoped: tuple[list[str], list[str], int | None] | None = None
+                        if hier_child_app is not None:
+                            if hier_child_app.default_command and child_argument_collection is None:
+                                # The child's signature couldn't be assembled
+                                # (unresolvable forward reference). Fall back to flat
+                                # parsing so the genuine error surfaces when the
+                                # forwarded tokens reach the child's own parse.
+                                pass
+                            else:
+                                scoped = _scope_tokens_for_meta(
+                                    argument_collection,
+                                    child_argument_collection,
+                                    tokens,
+                                    hier_command_indices,
+                                    parse_mode=parse_mode,
+                                    end_of_options_delimiter=end_of_options_delimiter,
+                                )
+
+                        # A meta level's captured tokens are forwarded to
+                        # another parse (``app(tokens)``); keep the
+                        # end-of-options delimiter in the captured values so
+                        # the downstream parse still sees the trailing tokens
+                        # as protected.
+                        preserve_delimiter = command_app._meta_parent is not None
+                        if scoped is not None:
+                            meta_kw_tokens, positional_tokens, positional_contiguous_count = scoped
+                            bound, unused_tokens = create_bound_arguments(
+                                command_app.default_command,
+                                argument_collection,
+                                meta_kw_tokens,
+                                config,
+                                end_of_options_delimiter=end_of_options_delimiter,
+                                positional_tokens=positional_tokens,
+                                positional_contiguous_count=positional_contiguous_count,
+                                preserve_delimiter=preserve_delimiter,
+                            )
+                        else:
+                            bound, unused_tokens = create_bound_arguments(
+                                command_app.default_command,
+                                argument_collection,
+                                unused_tokens,
+                                config,
+                                end_of_options_delimiter=end_of_options_delimiter,
+                                preserve_delimiter=preserve_delimiter,
+                            )
                         try:
                             for validator in command_app.validator:
                                 validator(**bound.arguments)
@@ -1731,6 +1971,7 @@ class App:
                             raise UnknownOptionError(
                                 token=Token(keyword=token, source="cli"),
                                 argument_collection=argument_collection,
+                                parent_apps_with_collections=_build_strict_parent_info(self.app_stack),
                             )
                     raise UnusedCliTokensError(target=command, unused_tokens=unused_tokens)
             except CycloptsError as e:
@@ -1740,6 +1981,10 @@ class App:
                     e.command_chain = command_chain
                 if e.console is None:
                     e.console = command_app.error_console
+                # Add parent scope info to UnknownOptionError for
+                # helpful "did you mean to place it after ..." hints.
+                if isinstance(e, UnknownOptionError) and e.parent_apps_with_collections is None:
+                    e.parent_apps_with_collections = _build_strict_parent_info(self.app_stack)
                 raise
 
         return command, bound, unused_tokens, ignored, argument_collection
@@ -1779,7 +2024,7 @@ class App:
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
         exit_on_error: bool | None
-            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            If there is an error parsing the CLI tokens invoke ``sys.exit(2)``.
             Otherwise, continue to raise the exception.
             If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
         help_on_error: bool | None
@@ -1872,7 +2117,7 @@ class App:
             else:
                 e.console.print(CycloptsPanel(e))
         if exit_on_error if exit_on_error is not None else True:
-            sys.exit(1)
+            sys.exit(2)
         raise
 
     def _is_nested_call(self) -> bool:
@@ -1913,7 +2158,7 @@ class App:
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
         exit_on_error: bool | None
-            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            If there is an error parsing the CLI tokens invoke ``sys.exit(2)``.
             Otherwise, continue to raise the exception.
             If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
         help_on_error: bool | None
@@ -1933,7 +2178,7 @@ class App:
         result_action: ResultAction | None
             Controls how command return values are handled. Can be a predefined literal string
             or a custom callable that takes the result and returns a processed value.
-            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_return_int_as_exit_code".
+            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_sys_exit".
             See :attr:`App.result_action` for available modes.
 
         Returns
@@ -1954,7 +2199,7 @@ class App:
                 "help_on_error": help_on_error,
                 "verbose": verbose,
                 "backend": backend,
-                "result_action": result_action,
+                "result_action": _result_action_converter(result_action),
                 "error_formatter": error_formatter,
             }.items()
             if v is not None
@@ -2019,7 +2264,7 @@ class App:
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
         exit_on_error: bool | None
-            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            If there is an error parsing the CLI tokens invoke ``sys.exit(2)``.
             Otherwise, continue to raise the exception.
             If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
         help_on_error: bool | None
@@ -2039,7 +2284,7 @@ class App:
         result_action: ResultAction | None
             Controls how command return values are handled. Can be a predefined literal string
             or a custom callable that takes the result and returns a processed value.
-            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_return_int_as_exit_code".
+            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_sys_exit".
             See :attr:`App.result_action` for available modes.
 
         Returns
@@ -2084,7 +2329,7 @@ class App:
                 "help_on_error": help_on_error,
                 "verbose": verbose,
                 "backend": backend,
-                "result_action": result_action,
+                "result_action": _result_action_converter(result_action),
                 "error_formatter": error_formatter,
             }.items()
             if v is not None
@@ -2228,7 +2473,7 @@ class App:
                 try:
                     _, command_panel = panels[group.name]
                 except KeyError:
-                    command_panel = HelpPanel(title=group.name, format="command")
+                    command_panel = HelpPanel(title=group.name, theme=group.theme, format="command")
                     panels[group.name] = (group, command_panel)
 
                 if group.help:
@@ -2238,6 +2483,14 @@ class App:
                         command_panel.description = RichGroup(command_panel.description, NewLine(), group_help)
                     else:
                         command_panel.description = group_help
+
+                if command_app is self and self.app_stack.overrides.get("remap_flags"):
+                    # ``interactive_shell`` accepts ``help`` for ``--help`` at the root; list it that
+                    # way so it sorts alongside the other commands.
+                    apps_with_names = [
+                        x.evolve(names=(*(n[2:] for n in x.names if subapp._is_remappable_flag(n)), *x.names))
+                        for x in apps_with_names
+                    ]
 
                 # Add the command to the group's help panel.
                 command_panel.entries.extend(format_command_entries(apps_with_names, format=help_format))
@@ -2470,6 +2723,57 @@ class App:
         build(tree, self, 1)
         return tree
 
+    def _run_complete(self, words: Iterable[str]) -> None:
+        r"""Handle the reserved ``__complete`` command: print the engine's candidates as tab-delimited records.
+
+        Errors are swallowed (a broken completer must never surface a traceback
+        into the shell); ``CYCLOPTS_COMPLETION_DEBUG`` reveals them on stderr.
+
+        Wire protocol (kept forward-compatible so a later cyclopts can extend it
+        without breaking an already-installed completion script):
+
+        * Each candidate is one line: ``value<TAB>description``. Generated scripts
+          read only these two fields and ignore any further ``<TAB>``-delimited
+          fields, which are reserved for future per-candidate metadata (e.g. a
+          no-space hint or a display style), mirroring carapace's tab records.
+        * A line whose first character is ``\x1f`` (ASCII Unit Separator) is a
+          reserved *global* control-directive channel; generated scripts skip it.
+        * The first directive, ``\x1fbegin``, opens the record stream: readers
+          discard anything before it, so a program that prints during import (a
+          banner, a chatty dependency) can't pollute the candidates.
+
+        To keep those field/line delimiters unambiguous, tabs and newlines in the
+        value and description are flattened to spaces, and a leading ``\x1f`` is
+        stripped, so completer-supplied data can never forge a field or directive.
+        """
+        from cyclopts.completion._engine import completion_debug_enabled, compute_completions, stdout_to_stderr
+
+        def sanitize(text: str) -> str:
+            return text.replace("\t", " ").replace("\n", " ").replace("\r", " ").lstrip("\x1f")
+
+        # Leading newline: import-time output that ended without one would
+        # otherwise glue onto the marker and hide it from the shell readers.
+        print("\n\x1fbegin")
+        try:
+            # Completers are user code; anything they (or their subprocesses) print
+            # must not be parsed as a record.
+            with stdout_to_stderr():
+                completions = compute_completions(self, list(words))
+        except Exception:
+            if completion_debug_enabled():
+                import traceback
+
+                traceback.print_exc()
+            return None
+        for completion in completions:
+            value = sanitize(completion.value)
+            help = sanitize(completion.help)
+            if help:
+                print(f"{value}\t{help}")
+            else:
+                print(value)
+        return None
+
     def generate_completion(
         self,
         *,
@@ -2510,10 +2814,17 @@ class App:
         ShellDetectionError
             If shell is None and auto-detection fails.
         """
+        # A meta app forwards its tokens to the root app, so ``app.meta`` and
+        # ``app`` describe the same command line; always generate from the root
+        # (the runtime ``__complete`` engine resolves from there too).
+        app = self
+        while app._meta_parent is not None:
+            app = app._meta_parent
+
         if prog_name is None:
-            if not self.name:
+            if not app.name:
                 raise ValueError("App must have a name to generate completion script")
-            prog_name = self.name[0] if isinstance(self.name, tuple) else self.name
+            prog_name = app.name[0] if isinstance(app.name, tuple) else app.name
 
         if shell is None:
             from cyclopts.completion import detect_shell
@@ -2523,15 +2834,15 @@ class App:
         if shell == "zsh":
             from cyclopts.completion.zsh import generate_completion_script
 
-            return generate_completion_script(self, prog_name)
+            return generate_completion_script(app, prog_name)
         elif shell == "bash":
             from cyclopts.completion.bash import generate_completion_script
 
-            return generate_completion_script(self, prog_name)
+            return generate_completion_script(app, prog_name)
         elif shell == "fish":
             from cyclopts.completion.fish import generate_completion_script
 
-            return generate_completion_script(self, prog_name)
+            return generate_completion_script(app, prog_name)
         else:
             raise ValueError(f"Unsupported shell: {shell}")
 
@@ -2671,12 +2982,16 @@ class App:
     def interactive_shell(
         self,
         prompt: str = "$ ",
+        *,
         quit: None | str | Iterable[str] = None,
         dispatcher: Dispatcher | None = None,
         console: "Console | None" = None,
         exit_on_error: bool = False,
         result_action: ResultAction | None = None,
         error_console: "Console | None" = None,
+        intro: str | None = None,
+        history: bool | str | Path = False,
+        remap_flags: bool = True,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
@@ -2692,7 +3007,7 @@ class App:
             Shell prompt. Defaults to ``"$ "``.
         quit: str | Iterable[str]
             String or list of strings that will cause the shell to exit and this method to return.
-            Defaults to ``["q", "quit"]``.
+            Defaults to ``["q", "quit", "exit"]``. A registered command with the same name takes precedence.
         dispatcher: Dispatcher | None
             Optional function that subsequently invokes the command.
             The ``dispatcher`` function must have signature:
@@ -2717,18 +3032,34 @@ class App:
             If :obj:`None`, inherits from :attr:`App.result_action`.
         error_console: Console | None
             Rich Console to use for error messages and tracebacks. If :obj:`None`, uses :attr:`App.error_console`.
+        intro: str | None
+            Banner printed once when the shell starts; supports Rich markup
+            (e.g. ``"[bold]Welcome[/bold]"``). :obj:`None` uses a default banner;
+            an empty string prints nothing.
+        history: bool | str | Path
+            Persist ``readline`` history across sessions. A path (``~`` expanded) loads history
+            from that file on entry and saves it on exit; :obj:`True` uses ``~/.<app_name>_history``.
+            The file (and parent directories) is created if missing; read/write errors are ignored.
+            Defaults to :obj:`False` (no persistence).
+        remap_flags: bool
+            Treat a bare long-flag word typed as the first token as that flag, so ``help`` and
+            ``version`` behave like ``--help`` and ``--version``, and list them that way in the
+            root help screen. Only the root is affected (``foo help`` is not remapped); short
+            flags are not remapped. The word is left alone if it names a registered command or a
+            parameter of the default command declares the flag itself. Defaults to :obj:`True`.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
-        if os.name == "posix":  # pragma: no cover
-            # Mac/Linux
-            print("Interactive shell. Press Ctrl-D to exit.")
-        else:  # pragma: no cover
-            # Windows
-            print("Interactive shell. Press Ctrl-Z followed by Enter to exit.")
+        try:
+            # Makes arrow keys and history work. Imported here rather than at module level
+            # because ``readline`` alters ``input()`` process-wide and costs startup time;
+            # programs that never open a shell should not pay for it.
+            import readline
+        except ImportError:  # pragma: no cover
+            readline = None
 
         if quit is None:
-            quit = ["q", "quit"]
+            quit = ["q", "quit", "exit"]
         if isinstance(quit, str):
             quit = [quit]
 
@@ -2747,56 +3078,108 @@ class App:
         if error_console is not None:
             overrides["_error_console"] = error_console
         overrides["exit_on_error"] = exit_on_error
+        overrides["remap_flags"] = remap_flags
 
         # libedit (macOS) keeps reporting the previous line from ``get_line_buffer`` until
         # new text is typed, so an interrupted buffer equal to the last seen line means the
         # line was actually empty. GNU readline reports "" directly.
         previous_line = ""
-        with self.app_stack([], overrides):
-            while True:
-                try:
-                    user_input = input(prompt)
-                except EOFError:  # pragma: no cover
-                    break
-                except KeyboardInterrupt:
-                    print()
-                    # typeshed guards ``get_line_buffer`` behind ``sys.platform != "win32"``;
-                    # ``readline`` is ``None`` on Windows anyway, so this branch never runs there.
-                    line_buffer = readline.get_line_buffer() if readline else ""  # pyright: ignore[reportAttributeAccessIssue]
-                    if line_buffer in ("", previous_line):
-                        break
-                    previous_line = line_buffer
-                    continue
-                previous_line = user_input + "\n"
+        if history is True:
+            history_path = Path.home() / f".{Path(self.name[0]).name}_history"
+        elif history:
+            history_path = Path(history).expanduser()
+        else:
+            history_path = None
+        if readline and history_path:
+            # History is process-global; start from the file alone so re-entering the shell
+            # doesn't duplicate entries and unrelated ``input()`` calls don't leak in.
+            readline.clear_history()  # pyright: ignore[reportAttributeAccessIssue]
+            # libedit raises PermissionError (not FileNotFoundError) on its own header-only files.
+            with suppress(OSError):
+                readline.read_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
+        if readline:
+            from cyclopts.completion._readline import readline_completion
 
-                try:
-                    tokens = self._normalize_tokens(user_input)
-                except CycloptsError:
-                    # ``_normalize_tokens`` already reported the error (respecting
-                    # ``exit_on_error``); keep the shell running.
-                    continue
-                if not tokens:
-                    continue
-                if tokens[0] in quit:
-                    break
-
-                # Keep the exception handlers inside the token ``app_stack`` context so that
-                # context-sensitive settings (e.g. ``error_console``) resolve from the invoked
-                # subcommand rather than the root app.
-                with self.app_stack(tokens):
+            completion = readline_completion(self, readline)
+        else:
+            completion = nullcontext()
+        try:
+            with completion, self.app_stack([], overrides):
+                if intro is None:
+                    intro = DEFAULT_SHELL_INTRO
+                if intro:
+                    self.console.print(intro, highlight=False)
+                while True:
                     try:
-                        command, bound, ignored = self.parse_args(tokens, **kwargs)
-                        result = dispatcher(command, bound, ignored)
-                        self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
-                    except CycloptsError:
-                        # Upstream ``parse_args`` already printed the error
-                        pass
+                        user_input = input(prompt)
+                    except EOFError:  # pragma: no cover
+                        break
                     except KeyboardInterrupt:
-                        if not self.suppress_keyboard_interrupt:
-                            raise
                         print()
-                    except Exception:
-                        self.error_console.print(traceback.format_exc(), markup=False, highlight=False, soft_wrap=True)
+                        # typeshed guards ``get_line_buffer`` behind ``sys.platform != "win32"``;
+                        # ``readline`` is ``None`` on Windows anyway, so this branch never runs there.
+                        line_buffer = readline.get_line_buffer() if readline else ""  # pyright: ignore[reportAttributeAccessIssue]
+                        if line_buffer in ("", previous_line):
+                            break
+                        previous_line = line_buffer
+                        continue
+                    previous_line = user_input + "\n"
+
+                    try:
+                        tokens = self._normalize_tokens(user_input)
+                    except CycloptsError:
+                        # ``_normalize_tokens`` already reported the error (respecting
+                        # ``exit_on_error``); keep the shell running.
+                        continue
+                    if not tokens:
+                        continue
+                    if tokens[0] in quit and tokens[0] not in _combined_meta_command_mapping(self):
+                        break
+
+                    # Keep the exception handlers inside the token ``app_stack`` context so that
+                    # context-sensitive settings (e.g. ``error_console``) resolve from the invoked
+                    # subcommand rather than the root app.
+                    with self.app_stack(tokens):
+                        try:
+                            if remap_flags:
+                                tokens = self._remap_bare_flags(tokens)
+                            command, bound, ignored = self.parse_args(tokens, **kwargs)
+                            result = dispatcher(command, bound, ignored)
+                            self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
+                        except CycloptsError:
+                            # Upstream ``parse_args`` already printed the error
+                            pass
+                        except KeyboardInterrupt:
+                            if not self.suppress_keyboard_interrupt:
+                                raise
+                            print()
+                        except Exception:
+                            self.error_console.print(
+                                traceback.format_exc(), markup=False, highlight=False, soft_wrap=True
+                            )
+        finally:
+            if readline and history_path:
+                # An unwritable history location must not turn a clean exit into a traceback.
+                with suppress(OSError):
+                    history_path.parent.mkdir(parents=True, exist_ok=True)
+                    readline.write_history_file(history_path)  # pyright: ignore[reportAttributeAccessIssue]
+
+    def _remap_bare_flags(self, tokens: list[str]) -> list[str]:
+        """Rewrite a leading bare long-flag word into the flag (``help`` -> ``--help``)."""
+        flag = "--" + tokens[0]
+        return [flag, *tokens[1:]] if self._is_remappable_flag(flag) else tokens
+
+    def _is_remappable_flag(self, flag: str) -> bool:
+        """Whether ``remap_flags`` maps the dashless form of ``flag`` (``help`` for ``--help``) onto it for this app."""
+        if not flag.startswith("--") or flag not in (*self.help_flags, *self.version_flags):
+            return False
+        if flag[2:] in _combined_meta_command_mapping(self):
+            return False
+        if self.default_command:
+            collection = _safe_assemble_argument_collection(self)
+            if collection is not None and collection._match_explicit(flag) is not None:
+                return False
+        return True
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.
@@ -2849,15 +3232,16 @@ class App:
         return f"{type(self).__name__}({signature})"
 
 
-def _get_help_flag_index(tokens, help_flags, end_of_options_delimiter) -> int | None:
+def _get_flag_index(tokens, flags, end_of_options_delimiter) -> int | None:
+    """Index of the first of ``flags`` in ``tokens``, ignoring tokens at/after the end-of-options delimiter."""
     delimiter_index = None
     if end_of_options_delimiter:
         with suppress(ValueError):
             delimiter_index = tokens.index(end_of_options_delimiter)
 
-    for help_flag in help_flags:
+    for flag in flags:
         with suppress(ValueError):
-            index = tokens.index(help_flag)
+            index = tokens.index(flag)
             if delimiter_index is None or index < delimiter_index:
                 break
     else:
@@ -2866,7 +3250,7 @@ def _get_help_flag_index(tokens, help_flags, end_of_options_delimiter) -> int | 
     return index
 
 
-class TestFramework(str, Enum):
+class TestFramework(StrEnum):
     UNKNOWN = ""
     PYTEST = "pytest"
 

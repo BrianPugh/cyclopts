@@ -30,7 +30,7 @@ def test_parse_args_prints_and_raises(foo_app, console):
 def test_call_exits(foo_app, console):
     with console.capture(), pytest.raises(SystemExit) as e:
         foo_app('foo "1')
-    assert e.value.code == 1
+    assert e.value.code == 2
 
 
 def test_call_uses_error_formatter(console):
@@ -55,6 +55,6 @@ def test_run_async_raises(foo_app, console):
 
 
 def test_interactive_shell_respects_exit_on_error(foo_app, mocker, console):
-    mocker.patch("cyclopts.core.input", side_effect=['foo "1', "quit"])
+    mocker.patch("builtins.input", side_effect=['foo "1', "quit"])
     with console.capture(), pytest.raises(SystemExit):
         foo_app.interactive_shell(exit_on_error=True)

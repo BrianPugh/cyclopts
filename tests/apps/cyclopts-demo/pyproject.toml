@@ -7,7 +7,7 @@ name = "cyclopts-demo"
 version = "0.1.0"
 description = "Demo application for testing Cyclopts completion features"
 authors = [{name = "Test", email = "test@example.com"}]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "cyclopts",
 ]

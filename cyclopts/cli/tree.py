@@ -14,7 +14,7 @@ def tree(
     script: str,
     /,
     *,
-    description: Annotated[bool, Parameter(alias="-d")] = True,
+    description: Annotated[bool, Parameter(negative_alias="-d")] = True,
     max_depth: Annotated[int | None, Parameter(alias="-m")] = None,
 ):
     """Display a tree of a Cyclopts application's commands.

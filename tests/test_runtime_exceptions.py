@@ -185,6 +185,9 @@ def test_runtime_exception_missing_tuple(app, console):
     when insufficient tokens were supplied to a tuple type.
 
     https://github.com/BrianPugh/cyclopts/issues/443
+
+    When a tuple requires more tokens than provided, MissingArgumentError should
+    be raised with a clear message about how many arguments are required.
     """
 
     @app.default
@@ -194,6 +197,7 @@ def test_runtime_exception_missing_tuple(app, console):
     ):
         pass
 
+    # tuple[int, int] needs 2 tokens but only 1 was provided
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app(["--network-delay", "1"], exit_on_error=False, error_console=console)
 

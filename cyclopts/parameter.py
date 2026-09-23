@@ -1,12 +1,13 @@
 import collections.abc
 import inspect
 import re
-import sys
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
 from typing import (  # noqa: UP035
+    TYPE_CHECKING,
     Any,
     List,
+    Self,
     Tuple,
     TypeVar,
     cast,
@@ -15,11 +16,6 @@ from typing import (  # noqa: UP035
 )
 
 from attrs import define, field
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 import cyclopts._env_var
 from cyclopts._convert import _abstract_to_concrete_type_mapping
@@ -33,7 +29,7 @@ from cyclopts.annotations import (
     resolve,
     resolve_annotated,
     resolve_new_type,
-    resolve_optional,
+    resolve_type_alias,
 )
 from cyclopts.field_info import FieldInfo, get_field_infos, signature_parameters
 from cyclopts.group import Group
@@ -44,6 +40,9 @@ from cyclopts.utils import (
     record_init,
     to_tuple_converter,
 )
+
+if TYPE_CHECKING:
+    from cyclopts.completion._engine import CompletionContext
 
 ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
     {
@@ -263,6 +262,16 @@ class Parameter:
         kw_only=True,
     )
 
+    # Produces dynamic candidate values at shell-completion time that can't be baked
+    # into a static script (e.g. names from a database or remote service). Invoked as
+    # ``completer(context)`` (a ``CompletionContext``); may return a ``str``, an
+    # iterable of ``str`` and/or ``(value, description)`` tuples, or a
+    # ``{value: description}`` mapping.
+    completer: "Callable[[CompletionContext], Any] | None" = field(
+        default=None,
+        kw_only=True,
+    )
+
     # This can ONLY ever be a Tuple[str, ...]
     alias: None | str | Iterable[str] = field(
         default=None,
@@ -323,6 +332,8 @@ class Parameter:
     )
 
     help: str | None = field(default=None, kw_only=True)
+
+    metavar: str | None = field(default=None, kw_only=True)
 
     show_env_var: bool = field(
         default=None,
@@ -573,6 +584,33 @@ class Parameter:
             type_, parameters = get_parameters(type_)
             return type_, cls.combine(*default_parameters, *parameters)
 
+    def resolve_converter(self, type_: type) -> Callable | None:
+        """Resolve this parameter's converter, handling string converters.
+
+        If the converter is a string, it is looked up as a method on the given type.
+
+        Parameters
+        ----------
+        type_
+            The type to resolve string converters against.
+
+        Returns
+        -------
+        Callable | None
+            The resolved converter callable, or None if no converter is set.
+
+        Raises
+        ------
+        AttributeError
+            If the converter is a string and the method doesn't exist on the type.
+        """
+        if self.converter is None:
+            return None
+        if callable(self.converter):
+            return self.converter
+        # String converter - resolve to method on type (raises AttributeError if not found)
+        return getattr(type_, self.converter)
+
     def __call__(self, obj: T) -> T:
         """Decorator interface for annotating a function/class with a :class:`Parameter`.
 
@@ -671,13 +709,17 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     Returns
     -------
     hint
-        Annotation hint with :obj:`Annotated`, :obj:`Optional`, and :obj:`NewType` resolved.
+        Annotation hint with :obj:`Annotated`, :obj:`NewType`, and type aliases resolved.
     list[Parameter]
         List of parameters discovered, ordered by priority (lowest to highest):
         converter-decoration < type-decoration < annotation.
     """
+    # NOTE: We intentionally do NOT call resolve_optional() to strip None here.
+    # None is a meaningful type that users can explicitly provide via "none"/"null" strings,
+    # so we preserve it in unions for proper handling downstream.
+
     # Extract parameters from Annotated metadata.
-    # Loop to handle nested Annotated/Optional/NewType combinations, e.g.
+    # Loop to handle nested Annotated/NewType/type-alias combinations, e.g.
     # ``Annotated[cyclopts.types.ResolvedPath | None, Parameter()]`` or a ``NewType``
     # wrapping ``ResolvedPath`` -- the inner wrapper is itself an ``Annotated`` carrying a
     # converter/validator that must not be lost. After unwrapping one layer the hint can
@@ -686,31 +728,49 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     while True:
         hint_prev = hint
         hint = cast(T, resolve_new_type(hint))
-        hint = resolve_optional(hint)
+        hint = resolve_type_alias(hint)
         if is_annotated(hint):
             inner = get_args(hint)
             hint = inner[0]
             # Prepend so that more deeply nested annotations have lower priority than outer ones.
             annotated_params[:0] = [x for x in inner[1:] if isinstance(x, Parameter)]
             continue
+        elif is_union(hint):  # pyright: ignore[reportArgumentType]
+            # For Optional patterns (T | None with exactly one non-None type),
+            # resolve/unwrap the non-None member while preserving the Optional.
+            # Don't do this for real unions (T | U) as each member's parameters
+            # should only apply when that specific type is selected.
+            non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
+            if len(non_none_args) == 1:
+                member = resolve_type_alias(cast(T, resolve_new_type(non_none_args[0])))
+                if is_annotated(member):
+                    inner = get_args(member)
+                    annotated_params[:0] = [x for x in inner[1:] if isinstance(x, Parameter)]
+                    # Unwrap Annotated but preserve the Optional: Annotated[T, ...] | None -> T | None
+                    member = inner[0]
+                if member is not non_none_args[0]:
+                    hint = member | NoneType  # pyright: ignore[reportAssignmentType]
+                    continue
         if hint == hint_prev:
             break
 
     # Extract parameters from type's __cyclopts__ attribute (after unwrapping Annotated)
+    # For Optional patterns (T | None), check the non-None member for __cyclopts__
     type_cyclopts_config_params = []
     if cyclopts_config := getattr(hint, "__cyclopts__", None):
         type_cyclopts_config_params.extend(cyclopts_config.parameters)
+    elif is_union(hint):  # pyright: ignore[reportArgumentType]
+        non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
+        if len(non_none_args) == 1:
+            if cyclopts_config := getattr(non_none_args[0], "__cyclopts__", None):
+                type_cyclopts_config_params.extend(cyclopts_config.parameters)
 
     # Check if any parameter has a converter with __cyclopts__ and extract its parameters
     converter_params = []
     if not skip_converter_params:
         for param in annotated_params + type_cyclopts_config_params:
             if param.converter:
-                converter = param.converter
-
-                # Resolve string converters to methods on the type
-                if isinstance(converter, str):
-                    converter = getattr(hint, converter)
+                converter = param.resolve_converter(hint)
 
                 # Check for __cyclopts__ on the converter
                 if hasattr(converter, "__cyclopts__"):

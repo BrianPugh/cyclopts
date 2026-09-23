@@ -20,6 +20,11 @@ from cyclopts.utils import UNSET
 Case = namedtuple("TestCase", ["args", "expected"])
 
 
+def test_argument_hint_strips_annotated_preserves_optional():
+    assert Argument(hint=Annotated[bool, Parameter()]).hint is bool
+    assert Argument(hint=Annotated[int | None, Parameter()]).hint == int | None
+
+
 def test_argument_collection_no_annotation_no_default():
     def foo(a, b):
         pass

@@ -34,6 +34,7 @@ PARAMETER_SUBKEY_BLOCKER = Parameter(
     validator=None,
     accepts_keys=None,
     env_var=None,
+    metavar=None,
     choices=None,
 )
 
@@ -78,7 +79,8 @@ def missing_keys_factory(
 ) -> Callable[["Argument", dict[str, Any]], list[str]]:
     def inner(argument: "Argument", data: dict[str, Any]) -> list[str]:
         provided_keys = set(data)
-        field_info = get_field_info(argument.hint)
+        # Use resolved_hint to get the actual class type (Optional stripped)
+        field_info = get_field_info(argument.resolved_hint)
         return [k for k, v in field_info.items() if (v.required and k not in provided_keys)]
 
     return inner
@@ -206,7 +208,9 @@ def generate_short_alias(
         # A boolean that already defaults to True would only get a no-op positive short
         # (the meaningful off-switch ``--no-flag`` is long-only), so skip auto-generation
         # and leave the letter free for a parameter that can actually use it.
-        if argument.hint is bool and field_info.default is True:
+        # ``resolved_hint`` strips ``Optional`` so a ``True``-defaulting ``Optional[bool]``
+        # is treated like a plain ``bool`` here (its only short would be a no-op positive).
+        if argument.resolved_hint is bool and field_info.default is True:
             return None
         # Derive the letter from the transformed CLI name (not the raw python identifier)
         # so it stays consistent with the long flag (``--my-flag`` -> ``-m``, ``_foo`` -> ``-f``).

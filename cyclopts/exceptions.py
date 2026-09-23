@@ -281,6 +281,9 @@ class UnknownOptionError(CycloptsError):
     argument_collection: "ArgumentCollection"
     """Argument collection of plausible options."""
 
+    parent_apps_with_collections: list[tuple[str, "ArgumentCollection"]] | None = None
+    """List of ``(app_name, argument_collection)`` from parent/meta apps, for scope-aware suggestions."""
+
     def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         value = self.token.keyword or self.token.value
         # Option-like values (start with '-') are self-delimiting; quoting them is noise.
@@ -300,6 +303,23 @@ class UnknownOptionError(CycloptsError):
             yield ".", ""
 
         if keyword := self.token.keyword or self.token.value:
+            # Check if a parent scope defines this option (for strict mode hints).
+            if self.parent_apps_with_collections is not None:
+                for parent_name, parent_ac in self.parent_apps_with_collections:
+                    # Strip "=value" suffix so "--verbose=true" matches "--verbose".
+                    # A ``**kwargs`` catch-all doesn't count (see _match_explicit) —
+                    # hinting on those would suppress the nearest-neighbor
+                    # suggestion below.
+                    if parent_ac._match_explicit(keyword.split("=", 1)[0]) is None:
+                        continue
+                    if self.command_chain:
+                        yield ' Did you mean to place it directly after "', ""
+                        yield parent_name, STYLE_NAME
+                        yield '"?', ""
+                    else:
+                        yield " This option is defined in a parent scope.", ""
+                    return
+
             # A short cluster reaches here whole only when its first char is unknown
             # (a typo'd ``-avb`` -> ``-xvb``, #932): name that char instead of a fuzzy
             # ``Did you mean`` on a later flag.

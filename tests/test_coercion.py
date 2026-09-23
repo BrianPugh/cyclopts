@@ -1,5 +1,4 @@
 import inspect
-import sys
 from collections.abc import Collection as AbcCollection
 from collections.abc import Container as AbcContainer
 from collections.abc import Iterable, Sequence
@@ -19,6 +18,9 @@ import pytest
 from cyclopts import CoercionError, Token
 from cyclopts._convert import convert, token_count
 from cyclopts.utils import default_name_transform
+
+# Case variations of "none" and "null" strings that should be parsed as None
+NONE_STRINGS = ["none", "null", "NONE", "NULL", "None", "Null"]
 
 
 def _assert_tuple(expected, actual):
@@ -96,9 +98,10 @@ def test_token_count_union():
     assert (1, False) == token_count(Union[int, str, float])
 
 
-def test_token_count_union_error():
-    with pytest.raises(ValueError):
-        assert (1, False) == token_count(Union[int, tuple[int, int]])
+def test_token_count_union_multi_token():
+    # Union with mixed token counts: first multi-token type (tc > 1) determines count
+    # int has tc=1, tuple has tc=2. Tuple wins (left-to-right, stop at tc > 1).
+    assert (2, False) == token_count(Union[int, tuple[int, int]])
 
 
 def test_coerce_no_tokens():
@@ -109,6 +112,39 @@ def test_coerce_no_tokens():
 def test_coerce_bool():
     assert True is convert(bool, ["true"])
     assert False is convert(bool, ["false"])
+
+
+@pytest.mark.parametrize("none_str", NONE_STRINGS)
+def test_coerce_none(none_str):
+    """Test that 'none' and 'null' strings are converted to None."""
+    assert None is convert(type(None), [none_str])
+
+
+def test_coerce_none_error():
+    """Test that invalid strings raise CoercionError for NoneType."""
+    with pytest.raises(CoercionError):
+        convert(type(None), ["foo"])
+    with pytest.raises(CoercionError):
+        convert(type(None), [""])
+
+
+@pytest.mark.parametrize("none_str", NONE_STRINGS)
+def test_coerce_none_union_none_first(none_str):
+    """Test that 'none'/'null' becomes None when None is before str in union."""
+    assert None is convert(None | str, [none_str])
+    assert None is convert(None | int | str, [none_str])
+
+
+def test_coerce_none_union_str_first():
+    """Test that 'none' stays as string when str is before None in union."""
+    assert "none" == convert(str | None, ["none"])
+    assert "none" == convert(int | str | None, ["none"])
+
+
+@pytest.mark.parametrize("none_str", NONE_STRINGS)
+def test_coerce_none_union_int_none(none_str):
+    """Test int | None: 'none'/'null' becomes None (int fails, None succeeds)."""
+    assert None is convert(int | None, [none_str])
 
 
 def test_coerce_error():
@@ -264,7 +300,6 @@ def test_coerce_tuple_len_mismatch_overflow():
         convert(tuple[int, int], ["1", "2", "3"])
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11), reason="Typing")
 def test_coerce_tuple_ellipsis_too_many_inner_types():
     with pytest.raises(ValueError):  # This is a ValueError because it happens prior to runtime.
         # Only 1 inner type annotation allowed
@@ -324,13 +359,11 @@ def test_coerce_frozenset():
         (AbcMutableSet[str], {"123", "456"}),
         (AbcMutableSequence[str], ["123", "456"]),
         (AbcCollection[str], ["123", "456"]),
-        (AbcContainer[str], ["123", "456"]),
         (AbcReversible[str], ["123", "456"]),
         (AbcSet, {"123", "456"}),
         (AbcMutableSet, {"123", "456"}),
         (AbcMutableSequence, ["123", "456"]),
         (AbcCollection, ["123", "456"]),
-        (AbcContainer, ["123", "456"]),
         (AbcReversible, ["123", "456"]),
     ],
 )
@@ -344,10 +377,43 @@ def test_coerce_abstract_collection_types(hint, expected):
     assert expected == result
 
 
+@pytest.mark.parametrize("hint", [AbcContainer[str], AbcContainer])
+def test_coerce_container_unsupported(hint):
+    """``Container`` only promises ``__contains__``, not iteration, so it is not a supported CLI collection type.
+
+    It falls through to the scalar-constructor path, which raises (the bind layer surfaces this as a
+    ``CoercionError``); it must not silently coerce to a ``list`` like the iterable abstract collections do.
+    """
+    with pytest.raises((CoercionError, TypeError)):
+        convert(hint, ["123", "456"])
+
+
 def test_coerce_literal():
     assert "foo" == convert(Literal["foo", "bar", 3], ["foo"])
     assert "bar" == convert(Literal["foo", "bar", 3], ["bar"])
     assert 3 == convert(Literal["foo", "bar", 3], ["3"])
+
+
+def test_coerce_literal_none_member():
+    """A ``None`` Literal member must not break conversion of the other members.
+
+    Regression test: pre-v5 the Literal loop raised an uncaught ``TypeError``
+    (``NoneType takes no arguments``) when trying a ``None`` member against a token.
+    In v5, ``None`` is an enterable choice via "none"/"null" strings.
+    """
+    assert "foo" == convert(Literal[None, "foo"], ["foo"])
+    assert "foo" == convert(Literal["foo", None], ["foo"])
+    assert 3 == convert(Literal[None, "foo", 3], ["3"])
+
+
+@pytest.mark.parametrize("token", NONE_STRINGS)
+def test_coerce_literal_none_member_none_strings(token):
+    assert convert(Literal[None, "foo"], [token]) is None
+
+
+def test_coerce_literal_none_member_invalid_choice():
+    with pytest.raises(CoercionError):
+        convert(Literal[None, "foo"], ["bogus"])
 
 
 def assert_convert_coercion_error(*args, msg, name_transform=None, **kwargs):
@@ -458,7 +524,6 @@ def test_coerce_date():
     assert expected == convert(date, ["1956-01-31"])
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11), reason="Not implemented in stdlib")
 def test_coerce_date_other_iso_formats():
     expected = date(year=2021, month=1, day=4)
     assert expected == convert(date, ["2021-W01-1"])
@@ -612,6 +677,68 @@ def test_parse_timedelta_equivalence():
     assert convert(timedelta, ["1w"]) == convert(timedelta, ["7d"])
     assert convert(timedelta, ["1h30m"]) == convert(timedelta, ["90m"])
     assert convert(timedelta, ["1d12h"]) == convert(timedelta, ["36h"])
+
+
+def test_token_count_union_with_upcoming_tokens():
+    """Test token_count for union types with upcoming_tokens probing.
+
+    This tests the core union probing mechanism that enables multi-token
+    type unions like `tuple[int, int] | None`.
+    """
+    # When upcoming_tokens is provided, token_count tries conversion-based probing
+    tokens = [Token(value="1"), Token(value="2")]
+
+    # tuple[int, int] | None - should return (2, False) based on token probing
+    hint = tuple[int, int] | None
+    tc, consume_all = token_count(hint, upcoming_tokens=tokens)
+    assert tc == 2
+    assert consume_all is False
+
+
+def test_token_count_union_with_upcoming_tokens_no_match():
+    """Test token_count for union when no type matches upcoming tokens.
+
+    When conversion-based probing fails for all union members, should
+    fall back to structural analysis.
+    """
+    # Provide tokens that don't match any union member
+    tokens = [Token(value="hello")]
+
+    # tuple[int, int] | float - neither can convert "hello"
+    hint = tuple[int, int] | float
+    tc, consume_all = token_count(hint, upcoming_tokens=tokens)
+    # Should fall back to structural (1, False) for non-Optional
+    assert tc == 1
+    assert consume_all is False
+
+
+def test_union_conversion_validation_error_returns_token_count():
+    """Test that ValidationError during union probing returns token count.
+
+    When a validator fails on a union member during probing, _union_conversion
+    catches the ValidationError and returns (None, tc, consume_all). This
+    signals that the type matched structurally but failed validation.
+    """
+    from typing import get_args
+
+    from cyclopts import Parameter, validators
+    from cyclopts._convert import _union_conversion
+
+    # Type with validator on inner union member
+    hint = Annotated[int, Parameter(validator=validators.Number(gt=10))] | str
+    union_args = get_args(hint)
+
+    # Create tokens for probing
+    tokens = [Token(value="5")]
+
+    # Call _union_conversion directly to test the ValidationError path
+    result, tc, consume_all = _union_conversion(union_args, tokens)
+
+    # ValidationError was caught, returning None for result but valid tc/consume_all
+    # This is the behavior from line 1035 when validation fails
+    assert result is None  # Validation failed
+    assert tc == 1  # int takes 1 token
+    assert consume_all is False  # int doesn't consume all
 
 
 def test_convert_json_object_for_type_whose_fields_consume_all_tokens():

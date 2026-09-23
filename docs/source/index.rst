@@ -44,6 +44,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    packaging.rst
    app_calling.rst
    meta_app.rst
+   parse_mode.rst
    command_chaining.rst
    autoregistry
 
@@ -64,6 +65,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    :maxdepth: 2
    :caption: Migration
 
+   migration/v5.rst
    migration/typer.rst
 
 .. toctree::

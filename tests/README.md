@@ -171,7 +171,7 @@ Key fixtures from `conftest.py`:
 
 ## Continuous Integration
 
-Tests run on multiple Python versions (3.10-3.14) and operating systems (Ubuntu, macOS, Windows). Some tests are skipped on certain configurations:
+Tests run on multiple Python versions (3.11-3.14) and operating systems (Ubuntu, macOS, Windows). Some tests are skipped on certain configurations:
 
 - `py312/` tests require Python 3.12+
 - Pydantic/attrs tests gracefully degrade if not installed

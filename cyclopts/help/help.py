@@ -2,33 +2,42 @@ import inspect
 import sys
 from collections.abc import Iterable, Sequence
 from enum import Enum
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     ForwardRef,
     Literal,
+    Self,
+    Union,
+    get_args,
+    get_origin,
 )
 
 from attrs import define, evolve, field
 
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
-
-from cyclopts.annotations import resolve_annotated
+from cyclopts.annotations import (
+    VARIADIC_COLLECTION_TYPES,
+    get_hint_name,
+    is_enum,
+    is_iterable_type,
+    is_union,
+    resolve_annotated,
+    resolve_optional,
+)
 from cyclopts.argument.utils import is_short_flag
 from cyclopts.core import _get_root_module_name, _iter_resolution_argument_collections
 from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT, SilentRich
-from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables, slice_to_str
+from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, get_parameters
+from cyclopts.utils import SortHelper, frozen, resolve_callables, slice_to_str
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
+    from rich.theme import Theme
 
     from cyclopts.argument import Argument, ArgumentCollection
     from cyclopts.core import App
@@ -79,31 +88,75 @@ class HelpEntry:
     """Container for help table entry data."""
 
     positive_names: tuple[str, ...] = ()
-    """Positive long option names (e.g., "--verbose", "--dry-run")."""
+    """Positive long option names (e.g., ``--verbose``, ``--dry-run``)."""
 
     positive_shorts: tuple[str, ...] = ()
-    """Positive short option names (e.g., "-v", "-n")."""
+    """Positive short option names (e.g., ``-v``, ``-n``)."""
 
     negative_names: tuple[str, ...] = ()
-    """Negative long option names (e.g., "--no-verbose", "--no-dry-run")."""
+    """Negative long option names (e.g., ``--no-verbose``, ``--no-dry-run``)."""
 
     negative_shorts: tuple[str, ...] = ()
-    """Negative short option names (e.g., "-N"). Rarely used."""
+    """Negative short option names (e.g., ``-N``). Rarely used."""
+
+    metavar: str | None = None
+    """Placeholder text for this parameter's **value** (e.g., the ``PATH`` in ``--config PATH``).
+
+    Describes the *shape* of the value a token becomes; it defaults to the parameter's
+    **type** in uppercase (``--config`` typed :class:`~pathlib.Path` → ``PATH``; ``str`` → ``STR``;
+    ``Literal``/``Enum`` → ``CHOICE``) and can be overridden with
+    :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`. :obj:`None` for entries that do not
+    consume a value (boolean flags, counting parameters, dict/structured parameters populated via
+    dotted keys, commands), even with an explicit ``Parameter.metavar``. Entries whose ``[choices]``
+    list is displayed still carry a ``CHOICE`` metavar (both are shown).
+
+    This is *not* how a positional parameter is displayed — that is its :attr:`positional_label`,
+    derived from the parameter's name. ``metavar`` never affects the identifier.
+    """
+
+    positional_label: str | None = None
+    """Display identifier for a **positional** parameter (e.g., the ``SRC`` in ``SRC --src``).
+
+    Derived from the parameter's **name** in uppercase; change it via
+    :attr:`Parameter.name <cyclopts.Parameter.name>`. :obj:`None` for keyword-only
+    parameters (which are identified by their option names) and commands. Unaffected
+    by :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`. Prefixed onto
+    :attr:`display_labels` for positional parameters.
+    """
 
     @property
     def names(self) -> tuple[str, ...]:
-        """All long option names (positive + negative). For backward compatibility."""
+        """All long **option** names (positive + negative).
+
+        Only contains ``--`` option names. A positional-only parameter has no option
+        names, so this is empty for it — its display identifier lives in
+        :attr:`positional_label`. Use :attr:`display_labels` to render an entry the way
+        the builtin formatters do.
+        """
         return self.positive_names + self.negative_names
 
     @property
     def shorts(self) -> tuple[str, ...]:
-        """All short option names (positive + negative). For backward compatibility."""
+        """All short option names (positive + negative)."""
         return self.positive_shorts + self.negative_shorts
 
     @property
     def all_options(self) -> tuple[str, ...]:
-        """All options in display order: positive longs, positive shorts, negative longs, negative shorts."""
+        """All options in display order: positive longs, positive shorts, negative longs, negative shorts.
+
+        Never includes the :attr:`positional_label`; see :attr:`display_labels`.
+        """
         return self.positive_names + self.positive_shorts + self.negative_names + self.negative_shorts
+
+    @property
+    def display_labels(self) -> tuple[str, ...]:
+        """:attr:`all_options`, preceded by :attr:`positional_label` for positional parameters.
+
+        This is what the builtin formatters render.
+        """
+        if self.positional_label:
+            return (self.positional_label,) + self.all_options
+        return self.all_options
 
     description: Any = None
     """Help text description for this entry.
@@ -128,6 +181,22 @@ class HelpEntry:
 
     default: str | None = None
     """Default value for this parameter to display. None means no default to show."""
+
+    @property
+    def display_labels_with_metavar(self) -> tuple[str, ...]:
+        """:attr:`display_labels` with the :attr:`metavar` appended to the last value-taking name.
+
+        This is what the builtin formatters render, e.g. ``("--config", "-c PATH", "--no-flag")``.
+        Positional rows are unchanged (their :attr:`positional_label` already stands in for the value).
+        """
+        if self.positional_label or not self.metavar:
+            return self.display_labels
+        positives = [*self.positive_names, *self.positive_shorts]
+        if positives:
+            positives[-1] = f"{positives[-1]} {self.metavar}"
+        else:
+            positives = [self.metavar]
+        return (*positives, *self.negative_names, *self.negative_shorts)
 
     def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
@@ -155,13 +224,16 @@ class HelpPanel:
     entries: list[HelpEntry] = field(factory=list)
     """List of help entries to display (in order) in the panel."""
 
+    theme: Union[dict[str, str], "Theme", None] = None
+    """Per-group theme (from :attr:`Group.theme`) layered over the ``cyclopts.*`` style defaults for this panel."""
+
     def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
     def _remove_duplicates(self):
         seen, out = set(), []
         for item in self.entries:
-            hashable = (item.names, item.shorts)
+            hashable = (item.names, item.shorts, item.positional_label)
             if hashable not in seen:
                 seen.add(hashable)
                 out.append(item)
@@ -214,7 +286,7 @@ def _categorize_keyword_arguments(argument_collection: "ArgumentCollection") -> 
 
         if argument.field_info.kind in (argument.field_info.VAR_KEYWORD,):
             optional.append(argument)
-        elif argument.field_info.is_keyword_only:
+        elif argument.field_info.is_keyword and argument.index is None:
             if argument.required:
                 required.append(argument)
             else:
@@ -249,7 +321,7 @@ def _categorize_positional_arguments(argument_collection: "ArgumentCollection") 
                 required.append(argument)
             else:
                 optional.append(argument)
-        elif argument.field_info.is_positional:
+        elif argument.index is not None:
             if argument.required:
                 required.append(argument)
             else:
@@ -262,10 +334,19 @@ def format_usage(
     app: "App",
     command_chain: Iterable[str],
     execution_path: Sequence["App"] | None = None,
+    *,
+    show_metavar: bool | None = None,
 ):
-    from rich.text import Text
+    """Build the ``Usage:`` line.
 
-    from cyclopts.annotations import get_hint_name
+    Parameters
+    ----------
+    show_metavar : bool | None
+        Force value placeholders on or off. :obj:`None` follows each parameter's
+        rendering formatter (its group's ``help_formatter``, else the app's), so the
+        usage line agrees with the panel rows.
+    """
+    from rich.text import Text
 
     usage = []
 
@@ -285,6 +366,13 @@ def format_usage(
 
     for command in command_chain:
         app = app[command]
+    default_formatter = app.app_stack.resolve("help_formatter")
+
+    def shows_metavar(argument) -> bool:
+        if show_metavar is not None:
+            return show_metavar
+        formatter = next((g.help_formatter for g in argument.parameter.group if g.help_formatter), default_formatter)
+        return getattr(formatter, "show_metavar", True)
 
     # Check for visible non-help/version commands without resolving lazy CommandSpecs.
     help_version_flags = {*app.help_flags, *app.version_flags}
@@ -309,19 +397,19 @@ def format_usage(
         optional_positional_args.extend(opos)
 
     for argument in required_keyword_params:
-        param_name = argument.name
-        type_name = get_hint_name(argument.hint).upper()
-        usage.append(f"{param_name} {type_name}")
+        # Keyword parameters show the value placeholder (``--foo STR``); positionals
+        # below show their name-derived label instead.
+        metavar = _resolve_metavar(argument) if shows_metavar(argument) else None
+        usage.append(f"{argument.name} {metavar}" if metavar else argument.name)
 
     if optional_keyword_params:
         usage.append("[OPTIONS]")
 
     for argument in required_positional_args:
+        arg_name = _resolve_positional_label(argument) or argument.name.lstrip("-").upper()
         if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
-            arg_name = argument.name.lstrip("-").upper()
             usage.append(f"{arg_name}...")
         else:
-            arg_name = argument.name.lstrip("-").upper()
             usage.append(arg_name)
 
     if optional_positional_args:
@@ -333,7 +421,7 @@ def format_usage(
         else:
             usage.append("[ARGS]")
 
-    return Text(" ".join(usage) + "\n", style="bold")
+    return Text(" ".join(usage) + "\n", style="cyclopts.usage")
 
 
 def _smart_join(strings: Sequence[str]) -> str:
@@ -459,8 +547,7 @@ def _expand_structured_dict_for_help(
         # to the names.
         base = _make_help_entry(argument, format)
         if outer_long_names:
-            suffixed_names = tuple(f"{n}.{{NAME}}" for n in base.positive_names)
-            yield evolve(base, positive_names=suffixed_names)
+            yield evolve(base, positive_names=tuple(f"{n}.{{NAME}}" for n in base.positive_names))
         else:
             yield base
         return
@@ -490,6 +577,134 @@ def _expand_structured_dict_for_help(
                 yield _make_help_entry(leaf, format)
 
 
+def _resolve_metavar(argument: "Argument") -> str | None:
+    """Resolve the value placeholder representing ``argument``'s **value** (the ``PATH`` in ``--config PATH``).
+
+    Returns :obj:`None` for arguments that never consume a value on the command line
+    (boolean flags, counting parameters), regardless of any explicit metavar: a placeholder
+    would misrepresent the CLI. For value-consuming arguments an explicit
+    :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` wins (an empty string suppresses
+    it); structured/dict parameters populated only through dotted sub-keys otherwise get
+    :obj:`None`. The default derives from the type hint (``STR``, ``PATH``, ``CHOICE``).
+    Independent of the positional display identifier; see :func:`_resolve_positional_label`.
+    """
+    if argument.parameter.count:
+        return None
+    hint = argument.hint
+    is_var_keyword = argument.field_info.kind is argument.field_info.VAR_KEYWORD
+    if is_var_keyword:
+        hint = get_args(hint)[1]
+    # Mirror ``Argument.match``'s flag rule rather than ``token_count`` so that
+    # ``Optional[bool]`` agrees with what the parser accepts.
+    resolved = resolve_optional(hint)
+    if resolved is bool or resolved in ITERATIVE_BOOL_IMPLICIT_VALUE:
+        return None
+    override = argument.parameter.metavar
+    if override is not None:
+        return override or None
+    if (
+        not is_var_keyword
+        and argument._accepts_keywords
+        and (argument._accepts_arbitrary_keywords or argument.children)
+    ):
+        return None
+    # An explicit ``Parameter.choices`` describes the leaf value exactly like a
+    # ``Literal``/``Enum`` hint does, so the leaf renders as ``CHOICE`` (``CHOICE...`` for a
+    # single-token collection, ``LIST[CHOICE]`` for a multi-token one), never the type name.
+    leaf = "CHOICE" if argument._explicit_choices() else None
+    metavar = _type_metavar(hint, leaf=leaf)
+    n_tokens = argument.parameter.n_tokens
+    if metavar and n_tokens and get_origin(resolved) is not tuple:
+        if is_iterable_type(resolved) and (args := get_args(resolved)):
+            # Each consumed token is one element, not one whole container.
+            metavar = _type_metavar(args[0], leaf=leaf)
+        metavar = f"{metavar}..." if n_tokens == -1 else " ".join([metavar] * n_tokens)
+    return metavar or None
+
+
+def _explicit_metavar(hint) -> tuple[Any, str | None]:
+    """Unwrap ``hint`` and return the highest-priority ``Parameter.metavar`` attached to it, if any.
+
+    Covers ``Annotated[T, Parameter(metavar=...)]`` aliases such as :data:`cyclopts.types.Port`
+    and ``@Parameter(metavar=...)``-decorated classes such as :class:`~cyclopts.StdioPath`.
+    """
+    hint, params = get_parameters(hint, skip_converter_params=True)
+    return hint, next((p.metavar for p in reversed(params) if p.metavar is not None), None)
+
+
+def _type_metavar(hint, *, leaf: str | None = None) -> str:
+    """Derive the default metavar from a type hint.
+
+    Tuples render argparse-style, one placeholder per token the user types
+    (``tuple[int, int]`` -> ``INT INT``, ``tuple[int, ...]`` -> ``INT...``), with nested
+    tuples flattened. Other variadic collections (``list``, ``set``, ``Sequence``, ...) consume
+    one element per token, so a single-token element renders like ``tuple[X, ...]``
+    (``list[str]`` -> ``STR...``); a multi-token element keeps the container form so its grouping
+    stays unambiguous (``list[tuple[int, str]]`` -> ``LIST[INT STR]``).
+    Remaining generics (e.g. ``dict``) are the uppercased type name over their arguments
+    (``DICT[STR, INT]``); a multi-token member is parenthesized when it has siblings
+    (``(INT INT)|STR``, ``DICT[STR, (INT INT)]``) so the grouping stays unambiguous.
+    ``Literal``/``Enum`` render as ``CHOICE``; ``leaf`` replaces every non-generic leaf name
+    (explicit ``Parameter.choices``).
+    """
+    if hint is Ellipsis:
+        return "..."
+    hint, explicit = _explicit_metavar(hint)
+    if explicit is not None:
+        return explicit
+    # ``Optional[Path]`` is always supplied as a ``PATH``; absence is conveyed by the
+    # parameter being optional, not by a ``NONE`` the user would type.
+    hint = resolve_optional(hint)
+    if get_origin(hint) is Literal or is_enum(hint):
+        return "CHOICE"
+    recurse = partial(_type_metavar, leaf=leaf)
+    if is_union(hint):
+        return "|".join(_group_tokens(m) for arg in get_args(hint) if (m := recurse(arg)))
+    origin, args = get_origin(hint), get_args(hint)
+    if origin is tuple and args:
+        if args[-1] is Ellipsis:
+            element = recurse(args[0])
+            return f"{element}..." if element else ""
+        return " ".join(m for arg in args if (m := recurse(arg)))
+    if origin in VARIADIC_COLLECTION_TYPES and args:
+        # Consumes one element per token, like ``tuple[X, ...]``. Only a single-token element
+        # collapses to ``X...``; a multi-token element keeps the ``LIST[...]`` form below so its
+        # grouping stays unambiguous (``LIST[INT STR]``, not ``INT STR...``).
+        element = recurse(args[0])
+        if element and " " not in element and "..." not in element:
+            return f"{element}..."
+    if origin and args:
+        names = [recurse(arg) for arg in args]
+        if not all(names):
+            # An element suppressed via an explicit empty ``Parameter.metavar`` collapses
+            # the whole container's placeholder.
+            return ""
+        if len(names) > 1:
+            names = [_group_tokens(n) for n in names]
+        return f"{get_hint_name(origin).upper()}[{', '.join(names)}]"
+    return leaf if leaf is not None else get_hint_name(hint).upper()
+
+
+def _group_tokens(metavar: str) -> str:
+    """Parenthesize a multi-token metavar so it reads as one member next to siblings."""
+    return f"({metavar})" if " " in metavar else metavar
+
+
+def _resolve_positional_label(argument: "Argument") -> str | None:
+    """Resolve the display identifier for a **positional** parameter (the ``SRC`` in ``SRC --src``).
+
+    Derived from the parameter's name; :obj:`None` for keyword-only parameters, which
+    are identified by their option names. Never affected by
+    :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` — use
+    :attr:`Parameter.name <cyclopts.Parameter.name>` to change it.
+    """
+    if argument.index is None or not argument.names:
+        return None
+    negatives = set(argument.negatives)
+    label_source = next((o for o in argument.names if o.startswith("--") and o not in negatives), argument.name)
+    return label_source.lstrip("-").upper() or None
+
+
 def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
     """Build a single ``HelpEntry`` for one ``Argument``.
 
@@ -503,11 +718,14 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
     seen: set[str] = set()
     options = [x for x in options if x not in seen and not seen.add(x)]
 
-    if argument.index is not None:
-        label_source = next((o for o in options if o.startswith("--")), options[0])
-        arg_name = label_source.lstrip("-").upper()
-        if arg_name != options[0]:
-            options = [arg_name, *options]
+    positional = argument.index is not None
+    metavar = _resolve_metavar(argument)
+    positional_label = _resolve_positional_label(argument)
+
+    if positional:
+        # A positional-only argument's bare name is a display label carried by
+        # ``positional_label``, not an option the user can type.
+        options = [o for o in options if o.startswith("-")]
 
     negatives = set(argument.negatives)
     positive_names = [o for o in options if o not in negatives and not is_short_flag(o)]
@@ -528,7 +746,7 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
         default = argument.show_default
     elif argument.show_default:
         default_val = argument.field_info.default
-        if is_class_and_subclass(argument.hint, Enum):
+        if isinstance(default_val, Enum):
             default = argument.parameter.name_transform(default_val.name)
         elif isinstance(default_val, (list, tuple, set, frozenset)):
             formatted_items = []
@@ -562,6 +780,8 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
         positive_shorts=tuple(positive_shorts),
         negative_names=tuple(negative_names),
         negative_shorts=tuple(negative_shorts),
+        metavar=metavar,
+        positional_label=positional_label,
         description=help_description,
         required=argument.required,
         type=resolve_annotated(argument.field_info.annotation),
@@ -581,6 +801,7 @@ def create_parameter_help_panel(
     kwargs = {
         "format": "parameter",
         "title": group.name,
+        "theme": group.theme,
         "description": InlineText.from_format(group.help, format=format, force_empty_end=True)
         if group.help
         else Text(),

@@ -1,27 +1,30 @@
 import inspect
 import sys
 import typing
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import (
+    Callable,
+    Collection,
+    Iterable,
+    MutableSequence,
+    MutableSet,
+    Reversible,
+    Sequence,
+    Set,
+)
 from enum import Enum, Flag
 from functools import partial
 from types import UnionType
-from typing import Annotated, Any, Literal, Union, get_args, get_origin
+from typing import Annotated, Any, Literal, NotRequired, Required, Union, Unpack, get_args, get_origin
 
 import attrs
 
 from cyclopts.utils import is_class_and_subclass
-
-if sys.version_info < (3, 11):  # pragma: no cover
-    from typing_extensions import NotRequired, Required, Unpack
-else:  # pragma: no cover
-    from typing import NotRequired, Required, Unpack
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
 else:  # pragma: no cover
     TypeAliasType = None
 
-# from types import NoneType is available >=3.10
 NoneType = type(None)
 AnnotatedType = type(Annotated[int, 0])
 
@@ -33,6 +36,22 @@ ITERABLE_TYPES = {
     list,
     set,
     tuple,
+}
+
+# Single-element iterables that consume one value per CLI token, so they share ``tuple[X, ...]``'s
+# ``X...`` metavar. Excludes ``tuple`` (fixed arity / explicit ``...``) and mappings (key/value pairs).
+VARIADIC_COLLECTION_TYPES = {
+    Iterable,
+    typing.Sequence,
+    Sequence,
+    Collection,
+    Reversible,
+    MutableSequence,
+    Set,
+    MutableSet,
+    frozenset,
+    list,
+    set,
 }
 
 
@@ -140,19 +159,47 @@ def is_typeddict(hint) -> bool:
 
 def resolve(
     type_: Any,
+    *,
+    type_alias: bool = True,
+    annotated: bool = True,
+    optional: bool = True,
+    required: bool = True,
+    new_type: bool = True,
 ) -> type:
-    """Perform all simplifying resolutions."""
+    """Perform all simplifying resolutions.
+
+    Parameters
+    ----------
+    type_
+        The type to resolve.
+    type_alias
+        If True (default), resolves Python 3.12+ TypeAliasType to underlying type.
+    annotated
+        If True (default), strips Annotated wrapper to get the base type.
+    optional
+        If True (default), strips NoneType from Optional/Union types.
+        Set to False when you need to preserve NoneType for conversion.
+    required
+        If True (default), strips Required/NotRequired wrappers.
+    new_type
+        If True (default), resolves NewType to its underlying type.
+    """
     if type_ is inspect.Parameter.empty:
         return str
 
     type_prev = None
     while type_ != type_prev:
         type_prev = type_
-        type_ = resolve_type_alias(type_)
-        type_ = resolve_annotated(type_)
-        type_ = resolve_optional(type_)
-        type_ = resolve_required(type_)
-        type_ = resolve_new_type(type_)
+        if type_alias:
+            type_ = resolve_type_alias(type_)
+        if annotated:
+            type_ = resolve_annotated(type_)
+        if optional:
+            type_ = resolve_optional(type_)
+        if required:
+            type_ = resolve_required(type_)
+        if new_type:
+            type_ = resolve_new_type(type_)
     return type_
 
 
@@ -164,7 +211,7 @@ def resolve_optional(type_: Any) -> Any:
     if not is_union(type_):
         return type_
 
-    non_none_types = [t for t in get_args(type_) if t is not NoneType]
+    non_none_types = [t for t in get_args(type_) if not is_nonetype(t)]
     if not non_none_types:  # pragma: no cover
         # This should never happen; python simplifies:
         #    ``Union[None, None] -> NoneType``
@@ -183,6 +230,12 @@ def resolve_annotated(type_: Any) -> type:
     type_ = resolve_type_alias(type_)
     if is_annotated(type_):
         type_ = get_args(type_)[0]
+    elif is_union(type_):
+        # Resolve Annotated inside union members
+        args = get_args(type_)
+        resolved_args = tuple(resolve_annotated(arg) for arg in args)
+        if resolved_args != args:
+            type_ = Union[resolved_args]  # noqa: UP007
     return type_
 
 
@@ -249,6 +302,8 @@ def get_hint_name(hint) -> str:
         return "None"
     if hint is Any:
         return "Any"
+    if is_annotated(hint):
+        return get_hint_name(get_args(hint)[0])
     if is_union(hint):
         return "|".join(get_hint_name(arg) for arg in get_args(hint))
     if origin := get_origin(hint):
@@ -298,7 +353,7 @@ def get_choices_from_hint(type_: Any, name_transform: Callable[[str], str]) -> l
                 choices.extend(x)
     elif _origin is Literal:
         choices.extend(str(x) for x in get_args(type_))
-    elif _origin in ITERABLE_TYPES:
+    elif is_iterable_type(type_):
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
             choices.extend(get_choices(args[0]))

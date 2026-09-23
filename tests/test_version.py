@@ -1,6 +1,8 @@
 import asyncio
 from pathlib import Path
 
+import pytest
+
 
 def test_version_print_console_from_init(app, console):
     app.console = console
@@ -329,3 +331,193 @@ def test_function_command_inherits_parent_version(console):
         root_app(["my-command", "--version"], console=console)
 
     assert "4.0.0\n" == capture.get()
+
+
+def test_subcommand_version_parameter_overrides_auto_version():
+    """A user-defined ``version`` parameter on a subcommand takes precedence
+    over the auto-registered ``--version`` flag (reported by octo-yart on PR #776).
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: bool = False):
+        return version
+
+    result = app(["sub", "--version"])
+    assert result is True
+
+    result = app(["sub"])
+    assert result is False
+
+
+def test_parent_version_still_works_when_subcommand_overrides(console):
+    """The override only affects the subcommand; the parent ``--version`` still
+    triggers the auto-registered handler.
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: bool = False):
+        return version
+
+    with console.capture() as capture:
+        app(["--version"], console=console)
+
+    assert "1.0.0\n" == capture.get()
+
+
+def test_subcommand_help_parameter_overrides_auto_help():
+    """A user-defined ``help`` parameter on a subcommand takes precedence over
+    the auto-registered ``--help`` flag.
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", result_action="return_value")
+
+    @app.command
+    def sub(help: bool = False):
+        return help
+
+    result = app(["sub", "--help"])
+    assert result is True
+
+
+def test_subcommand_version_parameter_non_bool():
+    """Override works for non-bool parameter types as well."""
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: str = "default"):
+        return version
+
+    result = app(["sub", "--version", "custom"])
+    assert result == "custom"
+
+
+def test_subcommand_repeated_version_flag_restores_all():
+    """When the user provides ``--version`` more than once and the command
+    shadows it, every occurrence is restored. The second occurrence triggers
+    cyclopts' normal repeat-argument detection rather than silently routing
+    to auto-version.
+    """
+    from cyclopts import App
+    from cyclopts.exceptions import RepeatArgumentError
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: bool = False):
+        return version
+
+    with pytest.raises(RepeatArgumentError):
+        app(["sub", "--version", "--version"], exit_on_error=False)
+
+
+def test_var_keyword_command_keeps_help_and_version(capsys):
+    """A command taking ``**kwargs`` must not be treated as shadowing the
+    help/version flags (a VAR_KEYWORD catch-all matches ANY keyword).
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", version="9.9.9", result_action="return_value")
+
+    @app.command
+    def cmd(**kwargs: str):
+        return kwargs
+
+    app(["cmd", "--help"], exit_on_error=False)
+    assert "Usage" in capsys.readouterr().out
+
+    app(["cmd", "--version"], exit_on_error=False)
+    assert "9.9.9" in capsys.readouterr().out
+
+
+def test_meta_driven_subcommand_version_shadowing():
+    """A subcommand's own ``version`` parameter must win over the auto handler
+    when the app is driven through its meta.
+    """
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="myapp", version="9.9.9", result_action="return_value")
+    captured: dict[str, object] = {}
+
+    @app.meta.default
+    def meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
+        return app(tokens)
+
+    @app.command
+    def cmd(*, version: bool = False):
+        captured["version"] = version
+
+    app.meta(["cmd", "--version"], exit_on_error=False)
+    assert captured == {"version": True}
+
+
+def test_strict_mode_shadowed_version_on_plain_app():
+    """``parse_mode='strict'`` must not strand a shadowed ``--version`` token in
+    the (pseudo-command driven) hierarchical path.
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", parse_mode="strict", version="9.9.9", result_action="return_value")
+
+    @app.default
+    def main(version: bool = False):
+        return version
+
+    assert app(["--version"], exit_on_error=False) is True
+
+
+def test_shadowed_version_with_help_flag_shows_help(console):
+    """``sub --version --help`` where ``sub`` shadows ``--version``: help wins,
+    and the leftover shadowed token must not be re-parsed by ``help_print`` as
+    the version pseudo-command (formerly crashed with ``NameError``).
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: bool = False):
+        return version
+
+    with console.capture() as capture:
+        app(["sub", "--version", "--help"], console=console)
+
+    assert "Usage: myapp sub" in capture.get()
+
+
+def test_version_flag_after_end_of_options_delimiter_is_positional():
+    """``--version`` after ``--`` is positional data, not a version request."""
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.default
+    def main(*args: str):
+        return args
+
+    assert app(["--", "--version"], exit_on_error=False) == ("--version",)
+
+
+def test_version_flag_before_end_of_options_delimiter_still_intercepts(console):
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.default
+    def main(*args: str):
+        return args
+
+    with console.capture() as capture:
+        app(["--version", "--", "x"], console=console)
+
+    assert "1.0.0\n" == capture.get()
