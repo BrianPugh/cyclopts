@@ -27,6 +27,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    text_editor.rst
    api
    cli_reference.rst
+   ai_assistants.rst
    known_issues.rst
 
 

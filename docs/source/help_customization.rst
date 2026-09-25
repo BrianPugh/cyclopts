@@ -609,11 +609,21 @@ using :class:`~cyclopts.help.ColumnSpec`:
 
    @app.default
    def main(
-       input_path: Annotated[str, Parameter(group=custom_group, help="Input file path")],
-       output_path: Annotated[str, Parameter(group=custom_group, help="Output file path")],
-       count: Annotated[int, Parameter(group=custom_group, help="Number of iterations")] = 1,
+       input_path: Annotated[str, Parameter(group=custom_group)],
+       output_path: Annotated[str, Parameter(group=custom_group)],
+       count: Annotated[int, Parameter(group=custom_group)] = 1,
    ):
-       """Demo custom column layout."""
+       """Demo custom column layout.
+
+       Parameters
+       ----------
+       input_path: str
+           Input file path
+       output_path: str
+           Output file path
+       count: int
+           Number of iterations
+       """
        print(f"Processing {input_path} -> {output_path} ({count} times)")
 
    if __name__ == "__main__":
