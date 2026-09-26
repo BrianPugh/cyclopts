@@ -6,9 +6,10 @@ import sys
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from functools import partial
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, get_args
 
 from cyclopts._convert import _bool, create_empty_instance
+from cyclopts.annotations import is_union
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -794,6 +795,18 @@ def _parse_kw_and_flags(
                             pass
                 else:
                     match.argument.append(CliToken(keyword=match.matched_token, implicit_value=match.implicit_value))
+            elif (
+                not cli_values
+                and not match.keys
+                and is_union(match.argument.resolved_hint)
+                and bool in get_args(match.argument.resolved_hint)
+                and (
+                    i + 1 >= len(tokens)
+                    or (not match.argument.parameter.allow_leading_hyphen and is_option_like(tokens[i + 1]))
+                )
+            ):
+                # A union containing ``bool`` (e.g. ``bool | list[str]``) given no value acts as a flag.
+                match.argument.append(CliToken(keyword=match.matched_token, implicit_value=True))
             else:
                 # This is a value-taking option (not a flag or counting parameter)
                 # Error only if we're trying to combine multiple value-taking options without values
