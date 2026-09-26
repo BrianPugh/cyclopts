@@ -350,3 +350,40 @@ def test_union_bool_flag_allow_repeating_last_wins(app, assert_parse_args, cmd, 
         pass
 
     assert_parse_args(default, cmd, x=expected)
+
+
+@pytest.mark.parametrize("consume_multiple", [False, True])
+@pytest.mark.parametrize("hint", [bool | tuple[_Metadata, ...], tuple[_Metadata, ...] | bool, _Metadata | bool])
+def test_union_bool_invalid_value_reports_member_error(app, hint, consume_multiple):
+    """With ``bool`` as the only other member, a bad value reports the value member's error (#972)."""
+
+    @app.default
+    def default(*, x: Annotated[hint, Parameter(consume_multiple=consume_multiple)] = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args("--x sub", print_error=False, exit_on_error=False)
+    assert 'Invalid value "sub" for --x. Choose from: "subtitles", "thumbnail", "info-json".' in str(e.value)
+
+
+def test_union_bool_consume_multiple_invalid_later_value(app):
+    """A bad value after a good one is a choices error, not an unused token (#972)."""
+
+    @app.default
+    def default(*, x: Annotated[bool | tuple[_Metadata, ...], Parameter(consume_multiple=True)] = False):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args("--x subtitles info-jsonn", print_error=False, exit_on_error=False)
+    assert 'Invalid value "info-jsonn" for --x.' in str(e.value)
+    assert 'Did you mean "info-json"?' in str(e.value)
+
+
+def test_union_multiple_value_members_keeps_generic_error(app):
+    @app.default
+    def default(*, x: int | _Metadata = 0):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args("--x sub", print_error=False, exit_on_error=False)
+    assert "unable to convert" in str(e.value)

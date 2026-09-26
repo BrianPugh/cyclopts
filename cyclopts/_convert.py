@@ -661,7 +661,8 @@ def _convert(
         out = convert(type_.__value__, token)
     elif is_union(origin_type):
         non_none_types = [t for t in inner_types if not is_nonetype(t)]
-        last_error = None
+        value_member = _sole_value_member(inner_types)
+        last_error = value_member_error = None
         for t in inner_types:
             try:
                 # When token is a sequence (e.g., list of Token objects), we may need
@@ -685,11 +686,15 @@ def _convert(
             except Exception as e:
                 if not is_nonetype(t):
                     last_error = e
+                if t is value_member:
+                    value_member_error = e
         else:
             if len(non_none_types) == 1 and isinstance(last_error, CycloptsError):
                 # ``T | None`` only has one real branch; surface its specific error
                 # (e.g. a nested missing field) instead of a generic one.
                 raise last_error
+            if isinstance(value_member_error, CycloptsError):
+                raise value_member_error
             if isinstance(token, Sequence):
                 raise ValueError  # noqa: TRY004
             raise CoercionError(token=token, target_type=type_)
@@ -1044,6 +1049,16 @@ def _resolve_effective_converter(
     return converter, name_transform
 
 
+def _sole_value_member(union_args: tuple[Any, ...]) -> Any:
+    """The union's only member that takes a value, ignoring ``None`` and a ``bool`` flag; else ``None``.
+
+    For ``bool | list[str]``, ``bool`` is the flag form, so a value that no member
+    converts was meant for ``list[str]``.
+    """
+    members = [t for t in union_args if not is_nonetype(t) and resolve(t) is not bool]
+    return members[0] if len(members) == 1 else None
+
+
 def _union_conversion(
     union_args: tuple[Any, ...],
     upcoming_tokens: "Sequence[Token]",
@@ -1170,6 +1185,8 @@ def token_count(
             non_none_types = [t for t in args if not is_nonetype(t)]
             if len(non_none_types) != 1:
                 # Not an Optional - it's a real union with multiple non-None types
+                if (value_member := _sole_value_member(args)) is not None:
+                    return token_count(value_member)
                 return 1, False
             # Optional type - fall through to structural analysis of the non-None type
 
@@ -1258,6 +1275,8 @@ def token_count(
                 non_none_types = [t for t in args if not is_nonetype(t)]
                 if len(non_none_types) != 1:
                     # Not an Optional - it's a real union with multiple non-None types
+                    if (value_member := _sole_value_member(args)) is not None:
+                        return token_count(value_member)
                     return 1, False
                 # Optional type - fall through to structural analysis
 
