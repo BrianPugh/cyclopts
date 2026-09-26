@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Flag, auto
 from pathlib import Path
 from textwrap import dedent
 from typing import Annotated, Literal, NewType, Union
@@ -387,3 +388,47 @@ def test_union_multiple_value_members_keeps_generic_error(app):
     with pytest.raises(CoercionError) as e:
         app.parse_args("--x sub", print_error=False, exit_on_error=False)
     assert "unable to convert" in str(e.value)
+
+
+class _Perm(Flag):
+    READ = auto()
+    WRITE = auto()
+
+
+@pytest.mark.parametrize(
+    "cmd,expected",
+    [
+        ("--x", True),
+        ("--no-x", False),
+        ("--x true", True),
+        ("--x=false", False),
+        ("--x read", _Perm.READ),
+        ("--x.read", _Perm.READ),
+        ("--x.read --x.write", _Perm.READ | _Perm.WRITE),
+    ],
+)
+def test_union_bool_enum_flag(app, assert_parse_args, cmd, expected):
+    @app.default
+    def default(*, x: bool | _Perm = False):
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
+
+
+def test_union_bool_enum_flag_invalid_value(app):
+    @app.default
+    def default(*, x: bool | _Perm = False):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args("--x reed", print_error=False, exit_on_error=False)
+    assert 'Invalid value "reed" for --x. Choose from: "read", "write".' in str(e.value)
+
+
+@pytest.mark.parametrize("cmd,expected", [("--x read", _Perm.READ), ("--x foo", "foo")])
+def test_union_enum_flag_other_member(app, assert_parse_args, cmd, expected):
+    @app.default
+    def default(*, x: _Perm | str = "default"):
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
