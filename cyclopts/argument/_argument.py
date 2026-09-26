@@ -834,6 +834,14 @@ class Argument:
             # ``--x={}`` on the cli) means "instantiate from defaults", not "missing".
             explicit_empty_mapping = False
 
+            if self._enum_flag_type and is_union(self.resolved_hint):
+                # e.g. ``bool | MyFlag``; the other members need a chance at the tokens.
+                positional_tokens = [token for token in self.tokens if not token.keys]
+                if len(positional_tokens) == 1 and self._is_whole_implicit_value(positional_tokens[0].implicit_value):
+                    return positional_tokens[0].implicit_value
+                if positional_tokens:
+                    return safe_converter(self.hint, tuple(positional_tokens))
+
             if self._enum_flag_type:
                 out = self._enum_flag_type(0)
 
