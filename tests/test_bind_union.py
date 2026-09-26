@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal, NewType, Union
 
 import pytest
 
 from cyclopts import Parameter
-from cyclopts.exceptions import CoercionError, MissingArgumentError
+from cyclopts.exceptions import CoercionError, MissingArgumentError, RepeatArgumentError
 
 
 @pytest.mark.parametrize(
@@ -292,3 +292,61 @@ def test_union_bool_and_tuple_custom_negative(app, assert_parse_args):
         pass
 
     assert_parse_args(default, "--no-write", write_metadata=False)
+
+
+_Name = NewType("_Name", str)
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        # Unique Literal values: typing caches unions, so reusing ``bool | Literal[...]``'s members
+        # would silently return the bool-first ordering and mask a failure.
+        Literal["lit-first-a", "lit-first-b"] | bool,
+        _Name | bool,
+    ],
+)
+@pytest.mark.parametrize("cmd,expected", [("--x", True), ("--no-x", False)])
+def test_union_bool_non_class_member_first(app, assert_parse_args, hint, cmd, expected):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
+
+
+@pytest.mark.parametrize(
+    "hint,cmd",
+    [
+        (bool | list[str], "--x --x"),
+        (bool | list[str], "--x a --no-x"),
+        (bool | list[str], "--no-x --x a"),
+        (bool | list[str], "--empty-x --x a"),
+        (list[str], "--empty-x --x a"),
+        (list[str], "--x a --empty-x"),
+    ],
+)
+def test_union_bool_flag_repeat_error(app, hint, cmd):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(RepeatArgumentError):
+        app.parse_args(cmd, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "cmd,expected",
+    [
+        ("--x --x", True),
+        ("--x a --no-x", False),
+        ("--no-x --x a", ["a"]),
+        ("--x --x a --x b", ["a", "b"]),
+    ],
+)
+def test_union_bool_flag_allow_repeating_last_wins(app, assert_parse_args, cmd, expected):
+    @app.default
+    def default(*, x: Annotated[bool | list[str], Parameter(allow_repeating=True)] = False):
+        pass
+
+    assert_parse_args(default, cmd, x=expected)

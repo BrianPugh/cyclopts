@@ -666,17 +666,37 @@ class Argument:
             if self.parameter.allow_repeating is False:
                 raise RepeatArgumentError(token=token)
             _, consume_all = self.token_count(token.keys)
+            is_flag_repeat = not token.keys and any(
+                self._is_whole_implicit_value(x.implicit_value)
+                for x in (token, *self.tokens)
+                if x.address == token.address
+            )
             if self.parameter.allow_repeating is True:
-                if not consume_all:
+                if not consume_all or is_flag_repeat:
                     # "last wins" for scalar types — remove old tokens with same address
                     self.tokens = [x for x in self.tokens if x.address != token.address]
-            elif not consume_all and not self.parameter.count:
+            elif (not consume_all or is_flag_repeat) and not self.parameter.count:
                 raise RepeatArgumentError(token=token)
 
         if self.tokens:
             if bool(token.keys) ^ any(x.keys for x in self.tokens):
                 raise MixedArgumentError(argument=self)
         self.tokens.append(token)
+
+    def _is_whole_implicit_value(self, value: Any) -> bool:
+        """Whether a flag's implicit value is this argument's complete value.
+
+        ``False`` for an element of an iterable, like each ``--flag`` of a ``list[bool]``.
+        """
+        if value is UNSET:
+            return False
+        hint = self.resolved_hint
+        for member in get_args(hint) if is_union(hint) else (hint,):
+            member = resolve_annotated(member)
+            origin = get_origin(member) or member
+            if isinstance(origin, type) and isinstance(value, origin):
+                return True
+        return False
 
     @property
     def has_tokens(self) -> bool:
@@ -762,12 +782,7 @@ class Argument:
             if self.parameter.choices:
                 expanded_tokens = self._validate_choices(expanded_tokens)
             for token in expanded_tokens:
-                if token.implicit_value is not UNSET and any(
-                    isinstance(token.implicit_value, get_origin(hint) or hint)
-                    for hint in (
-                        get_args(self.resolved_hint) if is_union(self.resolved_hint) else (self.resolved_hint,)
-                    )
-                ):
+                if self._is_whole_implicit_value(token.implicit_value):
                     assert len(expanded_tokens) == 1
                     return token.implicit_value
 
