@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated, Union
+from typing import Annotated, Literal, Union
 
 import pytest
 
@@ -234,3 +234,61 @@ def test_same_type_same_tokens_do_not_alias(app):
         return a is b
 
     assert app("--a 1 --a 2 --b 1 --b 2") is False
+
+
+_Metadata = Literal["subtitles", "thumbnail", "info-json"]
+
+
+@pytest.mark.parametrize("consume_multiple", [False, True])
+@pytest.mark.parametrize(
+    "hint,cmd,expected",
+    [
+        (bool | tuple[_Metadata, ...], "--write-metadata", True),
+        (bool | tuple[_Metadata, ...], "--write-metadata --other 1", True),
+        (bool | tuple[_Metadata, ...], "--write-metadata=false", False),
+        (bool | tuple[_Metadata, ...], "--write-metadata true", True),
+        (bool | tuple[_Metadata, ...], "--write-metadata subtitles", ("subtitles",)),
+        (bool | tuple[_Metadata, ...], "--no-write-metadata", False),
+        (bool | tuple[_Metadata, ...], "--no-write-metadata=false", True),
+        (bool | tuple[_Metadata, ...], "--empty-write-metadata", ()),
+        (tuple[_Metadata, ...] | bool, "--write-metadata", True),
+        (tuple[_Metadata, ...] | bool, "--no-write-metadata", False),
+        (tuple[_Metadata, ...] | bool, "--empty-write-metadata", ()),
+        (bool | list[str], "--write-metadata", True),
+        (bool | list[str], "--write-metadata foo", ["foo"]),
+        (bool | list[str], "--no-write-metadata", False),
+        (bool | list[str], "--empty-write-metadata", []),
+        (bool | int, "--write-metadata", True),
+        (bool | int, "--write-metadata 5", 5),
+        (bool | int, "--no-write-metadata", False),
+    ],
+)
+def test_union_bool_and_value_flag(app, assert_parse_args, hint, cmd, expected, consume_multiple):
+    """A union containing ``bool`` acts as a flag when given no value (#972)."""
+
+    @app.default
+    def default(
+        *,
+        write_metadata: Annotated[hint, Parameter(consume_multiple=consume_multiple)] = False,  # pyright: ignore
+        other: int = 0,
+    ):
+        pass
+
+    if "--other" in cmd:
+        assert_parse_args(default, cmd, write_metadata=expected, other=1)
+    else:
+        assert_parse_args(default, cmd, write_metadata=expected)
+
+
+def test_union_bool_and_tuple_custom_negative(app, assert_parse_args):
+    @app.default
+    def default(
+        *,
+        write_metadata: Annotated[
+            bool | tuple[_Metadata, ...],
+            Parameter(negative="--no-write", consume_multiple=True),
+        ] = False,
+    ):
+        pass
+
+    assert_parse_args(default, "--no-write", write_metadata=False)

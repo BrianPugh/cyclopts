@@ -762,8 +762,11 @@ class Argument:
             if self.parameter.choices:
                 expanded_tokens = self._validate_choices(expanded_tokens)
             for token in expanded_tokens:
-                if token.implicit_value is not UNSET and isinstance(
-                    token.implicit_value, get_origin(self.resolved_hint) or self.resolved_hint
+                if token.implicit_value is not UNSET and any(
+                    isinstance(token.implicit_value, get_origin(hint) or hint)
+                    for hint in (
+                        get_args(self.resolved_hint) if is_union(self.resolved_hint) else (self.resolved_hint,)
+                    )
                 ):
                     assert len(expanded_tokens) == 1
                     return token.implicit_value
