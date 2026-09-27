@@ -672,7 +672,10 @@ class Argument:
                 if x.address == token.address
             )
             if self.parameter.allow_repeating is True:
-                if not consume_all or is_flag_repeat:
+                if is_flag_repeat:
+                    # A flag replaces the whole value, including every element of a multi-token occurrence.
+                    self.tokens = [x for x in self.tokens if x.keys != token.keys]
+                elif not consume_all:
                     # "last wins" for scalar types — remove old tokens with same address
                     self.tokens = [x for x in self.tokens if x.address != token.address]
             elif (not consume_all or is_flag_repeat) and not self.parameter.count:
@@ -694,8 +697,13 @@ class Argument:
         for member in get_args(hint) if is_union(hint) else (hint,):
             member = resolve_annotated(member)
             origin = get_origin(member) or member
-            if isinstance(origin, type) and isinstance(value, origin):
-                return True
+            if not isinstance(origin, type):
+                continue
+            try:
+                if isinstance(value, origin):
+                    return True
+            except TypeError:  # e.g. TypedDict and non-runtime Protocols reject isinstance.
+                continue
         return False
 
     @property
@@ -872,6 +880,8 @@ class Argument:
                     positional_tokens = [
                         token for token in positional_tokens if not isinstance(token.implicit_value, dict)
                     ]
+                if len(positional_tokens) == 1 and self._is_whole_implicit_value(positional_tokens[0].implicit_value):
+                    return positional_tokens[0].implicit_value
                 if positional_tokens:
                     return safe_converter(self.hint, tuple(positional_tokens))
 
