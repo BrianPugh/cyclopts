@@ -785,6 +785,41 @@ This also works with ``None`` and ``Literal`` types in the union:
       $ my-program 1 2 hello
       values=['1', '2', 'hello']
 
+^^^^^^^^^^^
+Bool Unions
+^^^^^^^^^^^
+A union containing :obj:`bool` acts as a flag when given no value; otherwise, the value is converted by the remaining members.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(*, metadata: bool | list[str] = False):
+       print(f"{metadata=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --metadata
+   metadata=True
+
+   $ my-program --no-metadata
+   metadata=False
+
+   $ my-program --metadata subtitles
+   metadata=['subtitles']
+
+.. note::
+
+   * A following token is always consumed as the value, so ``--metadata input.txt`` sets ``metadata=['input.txt']``.
+     Place the flag after positional arguments, or follow it with ``--``, to use it bare.
+   * Members are still tried left-to-right, so with ``bool`` first, boolean-like values (``0``, ``yes``, ``false``) become :obj:`bool`.
+     Put ``bool`` last (e.g. ``int | bool``) to keep them as values.
+
 
 ********
 Optional
