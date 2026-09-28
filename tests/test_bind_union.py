@@ -403,7 +403,16 @@ def test_union_bool_flag_allow_repeating_typeddict(app, assert_parse_args, cmd, 
 
 
 @pytest.mark.parametrize("consume_multiple", [False, True])
-@pytest.mark.parametrize("hint", [bool | tuple[_Metadata, ...], tuple[_Metadata, ...] | bool, _Metadata | bool])
+@pytest.mark.parametrize(
+    "hint",
+    [
+        bool | tuple[_Metadata, ...],
+        tuple[_Metadata, ...] | bool,
+        _Metadata | bool,
+        bool | tuple[_Metadata, ...] | None,
+        _Metadata | None | bool,
+    ],
+)
 def test_union_bool_invalid_value_reports_member_error(app, hint, consume_multiple):
     """With ``bool`` as the only other member, a bad value reports the value member's error (#972)."""
 
@@ -437,3 +446,49 @@ def test_union_multiple_value_members_keeps_generic_error(app):
     with pytest.raises(CoercionError) as e:
         app.parse_args("--x sub", print_error=False, exit_on_error=False)
     assert "unable to convert" in str(e.value)
+
+
+@pytest.mark.parametrize("consume_multiple", [False, True])
+@pytest.mark.parametrize(
+    "hint",
+    [bool | tuple[_Metadata, ...], bool | list[int], bool | tuple[int, int], bool | list[int] | None],
+)
+@pytest.mark.parametrize("cmd,expected", [("--x true pos", True), ("--x false pos", False), ("--x=yes pos", True)])
+def test_union_bool_explicit_value_leaves_trailing_positional(
+    app, assert_parse_args, hint, consume_multiple, cmd, expected
+):
+    @app.default
+    def default(pos: str, *, x: Annotated[hint, Parameter(consume_multiple=consume_multiple)] = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, "pos", x=expected)
+
+
+def test_union_bool_value_member_element_missing_token(app):
+    """``"1"`` is a bool word, but it is also a valid first element of ``tuple[int, int]``."""
+
+    @app.default
+    def default(*, x: bool | tuple[int, int] = False):
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("--x 1", print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize("cmd,expected", [("true", True), ("1 2 3", [1, 2, 3])])
+def test_union_bool_positional_list(app, assert_parse_args, cmd, expected):
+    @app.default
+    def default(x: bool | list[int]):
+        pass
+
+    assert_parse_args(default, cmd, expected)
+
+
+def test_union_bool_positional_list_invalid_later_value(app):
+    @app.default
+    def default(x: bool | list[int]):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args("1 2 foo", print_error=False, exit_on_error=False)
+    assert 'unable to convert "foo" into int' in str(e.value)

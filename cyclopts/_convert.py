@@ -1059,6 +1059,34 @@ def _sole_value_member(union_args: tuple[Any, ...]) -> Any:
     return members[0] if len(members) == 1 else None
 
 
+def _unmatched_union_token_count(union_args: tuple[Any, ...], upcoming_tokens: "Sequence[Token]") -> tuple[int, bool]:
+    """Token count for a union that no member could convert ``upcoming_tokens`` into.
+
+    A leading bool word (``--x true pos``) is the ``bool`` flag's value, unless the value
+    member would take it as its first element (``"1"`` for ``bool | tuple[int, int]``);
+    then the value member's count reports the bad or missing value like the plain type does.
+    """
+    value_member = _sole_value_member(union_args)
+    if value_member is None:
+        return 1, False
+    tc, consume_all = token_count(value_member)
+    try:
+        _bool(upcoming_tokens[0].value)
+    except CoercionError:
+        return tc, consume_all
+    if tc == 1 and not consume_all:
+        element = value_member
+    elif args := get_args(resolve(value_member)):
+        element = args[0]
+    else:
+        return 1, False
+    try:
+        _convert(element, upcoming_tokens[0], converter=None, name_transform=default_name_transform)
+    except Exception:
+        return 1, False
+    return tc, consume_all
+
+
 def _union_conversion(
     union_args: tuple[Any, ...],
     upcoming_tokens: "Sequence[Token]",
@@ -1185,9 +1213,7 @@ def token_count(
             non_none_types = [t for t in args if not is_nonetype(t)]
             if len(non_none_types) != 1:
                 # Not an Optional - it's a real union with multiple non-None types
-                if (value_member := _sole_value_member(args)) is not None:
-                    return token_count(value_member)
-                return 1, False
+                return _unmatched_union_token_count(args, upcoming_tokens)
             # Optional type - fall through to structural analysis of the non-None type
 
     # Check for explicit n_tokens in Parameter annotation before resolving
@@ -1275,9 +1301,7 @@ def token_count(
                 non_none_types = [t for t in args if not is_nonetype(t)]
                 if len(non_none_types) != 1:
                     # Not an Optional - it's a real union with multiple non-None types
-                    if (value_member := _sole_value_member(args)) is not None:
-                        return token_count(value_member)
-                    return 1, False
+                    return _unmatched_union_token_count(args, upcoming_tokens)
                 # Optional type - fall through to structural analysis
 
         # Fallback: use structural analysis.
