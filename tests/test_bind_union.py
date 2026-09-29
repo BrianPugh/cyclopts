@@ -464,11 +464,26 @@ def test_union_bool_explicit_value_leaves_trailing_positional(
     assert_parse_args(default, cmd, "pos", x=expected)
 
 
-def test_union_bool_value_member_element_missing_token(app):
-    """``"1"`` is a bool word, but it is also a valid first element of ``tuple[int, int]``."""
+@dataclass
+class _Point:
+    a: int
+    b: int
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        bool | tuple[int, int],
+        bool | list[tuple[int, int]],
+        bool | tuple[tuple[int, int], int],
+        bool | _Point,
+    ],
+)
+def test_union_bool_value_member_element_missing_token(app, hint):
+    """``"1"`` is a bool word, but it is also a valid first token of the value member."""
 
     @app.default
-    def default(*, x: bool | tuple[int, int] = False):
+    def default(*, x: hint = False):  # pyright: ignore
         pass
 
     with pytest.raises(MissingArgumentError):
