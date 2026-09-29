@@ -926,26 +926,27 @@ class Argument:
 
             self._run_missing_keys_checker(data)
 
-            if self._enum_flag_type:
+            member = None
+            if self._union_branches and data:
+                # ``instantiate_from_dict`` cannot build a bare ``Union``; pick the branch
+                # whose fields accept the supplied data.
+                member = self._resolve_union_member(set(data))
+                if member is None or (member is not self._enum_flag_type and out):
+                    # Supplied fields span multiple branches / match no single one, or
+                    # sibling-member fields were mixed with enum.Flag values.
+                    raise CoercionError(
+                        msg=f"Cannot determine which {get_hint_name(self.hint)} variant the supplied fields belong to.",
+                        argument=self,
+                        target_type=self.hint,
+                    )
+
+            if self._enum_flag_type and member in (None, self._enum_flag_type):
                 out |= enum_flag_from_dict(self._enum_flag_type, data, self.parameter.name_transform)
                 if not out:
                     out = UNSET
             elif data or explicit_empty_mapping:
                 # Use resolved_hint to get the actual class type (Optional stripped)
-                target_hint = self.resolved_hint
-                if self._union_branches:
-                    # ``instantiate_from_dict`` cannot build a bare ``Union``; pick the branch
-                    # whose fields accept the supplied data.
-                    member = self._resolve_union_member(set(data))
-                    if member is None:
-                        # Supplied fields span multiple branches / match no single one.
-                        raise CoercionError(
-                            msg=f"Cannot determine which {get_hint_name(self.hint)} variant the supplied fields belong to.",
-                            argument=self,
-                            target_type=self.hint,
-                        )
-                    target_hint = member
-                out = instantiate_from_dict(target_hint, data)
+                out = instantiate_from_dict(member or self.resolved_hint, data)
             elif self.required:
                 raise MissingArgumentError(argument=self)  # pragma: no cover
             else:
