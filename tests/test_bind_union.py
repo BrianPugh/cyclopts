@@ -547,6 +547,26 @@ def test_union_bool_enum_flag_invalid_value(app):
     assert 'Invalid value "reed" for --x. Choose from: "read", "write".' in str(e.value)
 
 
+@pytest.mark.parametrize("cmd", ["--x true --x.write", "--x --x.write"])
+def test_union_bool_enum_flag_mixed_with_keys(app, cmd):
+    """A bool value alongside ``--x.<member>`` is rejected, not silently dropped."""
+
+    @app.default
+    def default(*, x: bool | _Perm = False):
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(cmd, print_error=False, exit_on_error=False)
+
+
+def test_union_enum_flag_keyless_and_keyed_combine(app, assert_parse_args):
+    @app.default
+    def default(*, x: _Perm | str = "default"):
+        pass
+
+    assert_parse_args(default, "--x read --x.write", x=_Perm.READ | _Perm.WRITE)
+
+
 @pytest.mark.parametrize("cmd,expected", [("--x read", _Perm.READ), ("--x foo", "foo")])
 def test_union_enum_flag_other_member(app, assert_parse_args, cmd, expected):
     @app.default
