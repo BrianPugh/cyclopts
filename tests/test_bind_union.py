@@ -7,6 +7,7 @@ import pytest
 
 from cyclopts import Parameter
 from cyclopts.exceptions import CoercionError, MissingArgumentError, RepeatArgumentError
+from cyclopts.validators import Number
 
 
 @pytest.mark.parametrize(
@@ -477,6 +478,7 @@ class _Point:
         bool | list[tuple[int, int]],
         bool | tuple[tuple[int, int], int],
         bool | _Point,
+        bool | tuple[Annotated[int, Parameter(validator=Number(gt=5))], int],
     ],
 )
 def test_union_bool_value_member_element_missing_token(app, hint):

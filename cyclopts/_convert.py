@@ -1072,6 +1072,8 @@ def _takes_first_token(type_: Any, token: "Token") -> bool:
             return False
     try:
         _convert(type_, token, converter=None, name_transform=default_name_transform)
+    except ValidationError:
+        return True
     except Exception:
         return False
     return True
