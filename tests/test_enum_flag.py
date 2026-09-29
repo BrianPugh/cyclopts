@@ -391,3 +391,40 @@ def test_flag_in_dataclass_help_no_keywords(app, assert_parse_args, console):
     assert expected == actual
 
     assert_parse_args(main, "Bob read write", User("Bob", perms=Permission.READ | Permission.WRITE))
+
+
+@pytest.mark.parametrize("hint", [Permission | User, User | Permission])
+@pytest.mark.parametrize(
+    "cmd,expected",
+    [
+        ("--x.name Bob", User("Bob")),
+        ("--x.name Bob --x.perms write", User("Bob", perms=Permission.WRITE)),
+        ("--x.read", Permission.READ),
+        ("--x.read --x.write", Permission.READ | Permission.WRITE),
+    ],
+)
+def test_flag_union_keyword_member(app, assert_parse_args, hint, cmd, expected):
+    @app.default
+    def main(*, x: hint = None):  # pyright: ignore
+        pass
+
+    assert_parse_args(main, cmd, x=expected)
+
+
+@pytest.mark.parametrize("cmd", ["--x.read --x.name Bob", "--x read --x.name Bob"])
+def test_flag_union_keyword_member_mixed(app, cmd):
+    @app.default
+    def main(*, x: Permission | User | None = None):
+        pass
+
+    with pytest.raises(CoercionError, match="Cannot determine which"):
+        app.parse_args(cmd, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize("hint,expected", [(Permission | User, Permission.READ), (User | Permission, User("read"))])
+def test_flag_union_keyless_value_follows_member_order(app, assert_parse_args, hint, expected):
+    @app.default
+    def main(*, x: hint = None):  # pyright: ignore
+        pass
+
+    assert_parse_args(main, "--x read", x=expected)
