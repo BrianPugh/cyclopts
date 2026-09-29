@@ -660,8 +660,8 @@ def _convert(
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         out = convert(type_.__value__, token)
     elif is_union(origin_type):
-        non_none_types = [t for t in inner_types if not is_nonetype(t)]
-        last_error = None
+        value_member = _sole_value_member(inner_types)
+        value_member_error = None
         for t in inner_types:
             try:
                 # When token is a sequence (e.g., list of Token objects), we may need
@@ -683,13 +683,13 @@ def _convert(
                 # Propagate immediately since the input matched this type's structure.
                 raise
             except Exception as e:
-                if not is_nonetype(t):
-                    last_error = e
+                if t is value_member:
+                    value_member_error = e
         else:
-            if len(non_none_types) == 1 and isinstance(last_error, CycloptsError):
-                # ``T | None`` only has one real branch; surface its specific error
-                # (e.g. a nested missing field) instead of a generic one.
-                raise last_error
+            # A union with a single value member (``T | None``, ``bool | T``) surfaces
+            # that member's specific error (e.g. a nested missing field) instead of a generic one.
+            if isinstance(value_member_error, CycloptsError):
+                raise value_member_error
             if isinstance(token, Sequence):
                 raise ValueError  # noqa: TRY004
             raise CoercionError(token=token, target_type=type_)
@@ -1044,6 +1044,62 @@ def _resolve_effective_converter(
     return converter, name_transform
 
 
+def _sole_value_member(union_args: tuple[Any, ...]) -> Any:
+    """The union's only member that takes a value, ignoring ``None`` and a ``bool`` flag; else ``None``.
+
+    For ``bool | list[str]``, ``bool`` is the flag form, so a value that no member
+    converts was meant for ``list[str]``. ``bool | None`` has no flag form, so its value member is ``bool``.
+    """
+    members = [t for t in union_args if not is_nonetype(t)]
+    if len(members) > 1:
+        members = [t for t in members if resolve(t) is not bool]
+    return members[0] if len(members) == 1 else None
+
+
+def _takes_first_token(type_: Any, token: "Token") -> bool:
+    """Whether ``type_`` accepts ``token`` as its first token.
+
+    Descends through container elements and structured-class fields to the single-token
+    type that would consume it, e.g. ``int`` for ``list[tuple[int, int]]``.
+    """
+    while token_count(type_) != (1, False):
+        resolved = resolve(type_)
+        if args := get_args(resolved):
+            type_ = args[0]
+        elif field_infos := get_field_infos(resolved):
+            type_ = next(iter(field_infos.values())).hint
+        else:
+            return False
+    try:
+        _convert(type_, token, converter=None, name_transform=default_name_transform)
+    except ValidationError:
+        return True
+    except Exception:
+        return False
+    return True
+
+
+def _unmatched_union_token_count(union_args: tuple[Any, ...], upcoming_tokens: "Sequence[Token]") -> tuple[int, bool]:
+    """Token count for a union that no member could convert ``upcoming_tokens`` into.
+
+    A leading bool word (``--x true pos``) is the ``bool`` flag's value, unless the value
+    member takes it as its first token (``"1"`` for ``bool | tuple[int, int]``); otherwise
+    the value member's count reports the bad or missing value like the plain type does.
+    """
+    value_member = _sole_value_member(union_args)
+    if value_member is None:
+        return 1, False
+    token = upcoming_tokens[0]
+    try:
+        _bool(token.value)
+    except CoercionError:
+        pass
+    else:
+        if not _takes_first_token(value_member, token):
+            return 1, False
+    return token_count(value_member)
+
+
 def _union_conversion(
     union_args: tuple[Any, ...],
     upcoming_tokens: "Sequence[Token]",
@@ -1170,7 +1226,7 @@ def token_count(
             non_none_types = [t for t in args if not is_nonetype(t)]
             if len(non_none_types) != 1:
                 # Not an Optional - it's a real union with multiple non-None types
-                return 1, False
+                return _unmatched_union_token_count(args, upcoming_tokens)
             # Optional type - fall through to structural analysis of the non-None type
 
     # Check for explicit n_tokens in Parameter annotation before resolving
@@ -1258,7 +1314,7 @@ def token_count(
                 non_none_types = [t for t in args if not is_nonetype(t)]
                 if len(non_none_types) != 1:
                     # Not an Optional - it's a real union with multiple non-None types
-                    return 1, False
+                    return _unmatched_union_token_count(args, upcoming_tokens)
                 # Optional type - fall through to structural analysis
 
         # Fallback: use structural analysis.

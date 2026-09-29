@@ -7,6 +7,7 @@ import pytest
 
 from cyclopts import Parameter
 from cyclopts.exceptions import CoercionError, MissingArgumentError, RepeatArgumentError
+from cyclopts.validators import Number
 
 
 @pytest.mark.parametrize(
@@ -400,3 +401,111 @@ def test_union_bool_flag_allow_repeating_typeddict(app, assert_parse_args, cmd, 
         pass
 
     assert_parse_args(default, cmd, x=expected)
+
+
+@pytest.mark.parametrize("consume_multiple", [False, True])
+@pytest.mark.parametrize(
+    "hint",
+    [
+        bool | tuple[_Metadata, ...],
+        tuple[_Metadata, ...] | bool,
+        _Metadata | bool,
+        bool | tuple[_Metadata, ...] | None,
+        _Metadata | None | bool,
+    ],
+)
+def test_union_bool_invalid_value_reports_member_error(app, hint, consume_multiple):
+    """With ``bool`` as the only other member, a bad value reports the value member's error (#972)."""
+
+    @app.default
+    def default(*, x: Annotated[hint, Parameter(consume_multiple=consume_multiple)] = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args("--x sub", print_error=False, exit_on_error=False)
+    assert 'Invalid value "sub" for --x. Choose from: "subtitles", "thumbnail", "info-json".' in str(e.value)
+
+
+def test_union_bool_consume_multiple_invalid_later_value(app):
+    """A bad value after a good one is a choices error, not an unused token (#972)."""
+
+    @app.default
+    def default(*, x: Annotated[bool | tuple[_Metadata, ...], Parameter(consume_multiple=True)] = False):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args("--x subtitles info-jsonn", print_error=False, exit_on_error=False)
+    assert 'Invalid value "info-jsonn" for --x.' in str(e.value)
+    assert 'Did you mean "info-json"?' in str(e.value)
+
+
+def test_union_multiple_value_members_keeps_generic_error(app):
+    @app.default
+    def default(*, x: int | _Metadata = 0):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args("--x sub", print_error=False, exit_on_error=False)
+    assert "unable to convert" in str(e.value)
+
+
+@pytest.mark.parametrize("consume_multiple", [False, True])
+@pytest.mark.parametrize(
+    "hint",
+    [bool | tuple[_Metadata, ...], bool | list[int], bool | tuple[int, int], bool | list[int] | None],
+)
+@pytest.mark.parametrize("cmd,expected", [("--x true pos", True), ("--x false pos", False), ("--x=yes pos", True)])
+def test_union_bool_explicit_value_leaves_trailing_positional(
+    app, assert_parse_args, hint, consume_multiple, cmd, expected
+):
+    @app.default
+    def default(pos: str, *, x: Annotated[hint, Parameter(consume_multiple=consume_multiple)] = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, "pos", x=expected)
+
+
+@dataclass
+class _Point:
+    a: int
+    b: int
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        bool | tuple[int, int],
+        bool | list[tuple[int, int]],
+        bool | tuple[tuple[int, int], int],
+        bool | _Point,
+        bool | tuple[Annotated[int, Parameter(validator=Number(gt=5))], int],
+    ],
+)
+def test_union_bool_value_member_element_missing_token(app, hint):
+    """``"1"`` is a bool word, but it is also a valid first token of the value member."""
+
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("--x 1", print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize("cmd,expected", [("true", True), ("1 2 3", [1, 2, 3])])
+def test_union_bool_positional_list(app, assert_parse_args, cmd, expected):
+    @app.default
+    def default(x: bool | list[int]):
+        pass
+
+    assert_parse_args(default, cmd, expected)
+
+
+def test_union_bool_positional_list_invalid_later_value(app):
+    @app.default
+    def default(x: bool | list[int]):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args("1 2 foo", print_error=False, exit_on_error=False)
+    assert 'unable to convert "foo" into int' in str(e.value)
