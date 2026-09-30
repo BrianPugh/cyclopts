@@ -8,8 +8,8 @@ from contextlib import suppress
 from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple, get_args
 
-from cyclopts._convert import _bool, create_empty_instance
-from cyclopts.annotations import is_union
+from cyclopts._convert import _bool, _none, create_empty_instance
+from cyclopts.annotations import is_nonetype, is_union
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -550,6 +550,23 @@ def _common_root_keys(argument_collection) -> tuple[str, ...]:
     return common
 
 
+def _is_optional_bool_none_assignment(match: _KeywordMatch, value: str) -> bool:
+    """Whether ``value`` is a none-string assigned to the positive flag of a ``bool | None``."""
+    hint = match.argument.hint
+    if not (
+        match.implicit_value is True
+        and match.argument.resolved_hint is bool
+        and is_union(hint)
+        and any(is_nonetype(arg) for arg in get_args(hint))
+    ):
+        return False
+    try:
+        _none(value)
+    except CoercionError:
+        return False
+    return True
+
+
 def _parse_kw_and_flags(
     argument_collection: ArgumentCollection,
     tokens: Sequence[str],
@@ -770,7 +787,10 @@ def _parse_kw_and_flags(
                     match.argument.append(CliToken(keyword=match.matched_token, implicit_value=1))
             elif match.implicit_value is not UNSET:
                 # A flag was parsed
-                if cli_values:
+                if cli_values and _is_optional_bool_none_assignment(match, cli_values[-1]):
+                    # e.g. ``--flag=none`` for ``bool | None``.
+                    match.argument.append(CliToken(keyword=match.matched_token, implicit_value=None))
+                elif cli_values:
                     try:
                         coerced_value = _bool(cli_values[-1])
                     except CoercionError as e:

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 import pytest
 
@@ -677,3 +677,53 @@ def test_bind_validation_error_propagation_in_union(app):
     # ValidationError should propagate
     with pytest.raises(ValidationError):
         app.parse_args(["50"], exit_on_error=False)
+
+
+@pytest.mark.parametrize("none_str", NONE_STRINGS)
+@pytest.mark.parametrize("type_hint", [bool | None, None | bool, Optional[Annotated[bool, Parameter(negative="")]]])
+def test_bind_none_string_optional_bool_flag(app, assert_parse_args, type_hint, none_str):
+    @app.default
+    def default(*, flag: type_hint = True):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(default, f"--flag={none_str}", flag=None)
+
+
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        "--no-flag=none",
+        "--none-flag=none",
+    ],
+)
+def test_bind_none_string_optional_bool_negated_flag_errors(app, cmd):
+    from cyclopts.exceptions import CoercionError
+
+    @app.default
+    def default(*, flag: Annotated[bool | None, Parameter(negative_none="none-")] = True):
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(cmd.split(), exit_on_error=False)
+
+
+def test_bind_none_string_plain_bool_flag_errors(app):
+    from cyclopts.exceptions import CoercionError
+
+    @app.default
+    def default(*, flag: bool = True):
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(["--flag=none"], exit_on_error=False)
+
+
+def test_bind_none_string_optional_list_bool_flag_errors(app):
+    from cyclopts.exceptions import CoercionError
+
+    @app.default
+    def default(*, flag: list[bool] | None = None):
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(["--flag", "--flag=none"], exit_on_error=False)

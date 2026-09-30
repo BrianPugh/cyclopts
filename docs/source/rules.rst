@@ -168,6 +168,8 @@ For optional parameters (e.g., ``int | None``), the strings ``"none"`` and ``"nu
 
 This is particularly useful for resetting a parameter to its unset state, or for explicitly indicating "no value" in configuration scenarios.
 
+This also applies to a ``bool | None`` flag given an explicit value, e.g. ``--flag=none``. The negated forms (e.g. ``--no-flag=none``) only accept boolean values.
+
 .. note::
    **Union ordering matters.** For union types, Cyclopts iterates left-to-right and uses the first
    successful coercion (see :ref:`Union <Coercion Rules - Union>`). If ``str`` appears before ``None`` in a union (e.g., ``str | None``),
