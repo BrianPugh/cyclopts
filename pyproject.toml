@@ -30,7 +30,7 @@ dependencies = [
 trio = ["trio>=0.10.0"]
 yaml = ["pyyaml>=6.0.1"]
 docs = [
-    "sphinx>=7.4.7,<8.2.0",
+    "sphinx>=7.4.7,<9.1.0",
     "sphinx_rtd_theme>=3.0.0,<4.0.0",
     "gitpython>=3.1.31",
     "sphinx-copybutton>=0.5,<1.0",
