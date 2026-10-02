@@ -205,8 +205,9 @@ html_css_files = [
 def simplify_exception_signature(
     app: Sphinx, what: str, name: str, obj, options: Options, signature, return_annotation
 ):
-    # Check if the object is an exception and modify the signature
-    if what == "exception" and isinstance(obj, type) and issubclass(obj, BaseException):
+    # Check if the object is an exception and modify the signature.
+    # Sphinx 9 raises IndexError if we return a result when there is no signature to replace.
+    if signature is not None and what == "exception" and isinstance(obj, type) and issubclass(obj, BaseException):
         return ("", None)  # Return an empty signature and no return annotation
 
 
