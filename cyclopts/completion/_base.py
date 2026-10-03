@@ -21,6 +21,7 @@ from cyclopts.utils import frozen, is_class_and_subclass
 
 if TYPE_CHECKING:
     from cyclopts import App
+    from cyclopts.command_spec import CommandSpec
 
 
 class CompletionAction(Enum):
@@ -71,6 +72,19 @@ def visible_commands(app: "App") -> list[RegisteredCommand]:
                 if registered_command.app.show and registered_command not in commands:
                     commands.append(registered_command)
     return commands
+
+
+def app_description(cmd_app: "App | CommandSpec", help_format: str) -> str:
+    """Plain-text short description of a command (not shell-escaped)."""
+    from cyclopts.help.help import docstring_parse
+
+    try:
+        parsed = docstring_parse(cmd_app.help, "plaintext")
+        text = parsed.short_description or ""
+    except Exception:
+        text = str(cmd_app.help or "")
+
+    return strip_markup(text, format=help_format)
 
 
 def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]:

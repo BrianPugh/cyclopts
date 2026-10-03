@@ -2,12 +2,12 @@
 Shell Completion
 ================
 
-Cyclopts provides shell completion (tab completion) for bash, zsh, and fish shells.
+Cyclopts provides shell completion (tab completion) for bash, zsh, fish, and PowerShell.
 
 Development & Standalone Scripts
 ==================================
 
-Shell completion systems (bash, zsh, fish) can only provide completion for **installed commands** (executables in your ``$PATH``), not for arbitrary Python scripts like ``python myapp.py``. This is a fundamental limitation of how shells work.
+Shell completion systems can only provide completion for **installed commands** (executables in your ``$PATH``), not for arbitrary Python scripts like ``python myapp.py``. This is a fundamental limitation of how shells work.
 
 To work around this during development, Cyclopts provides a ``cyclopts run`` command that acts as a wrapper:
 
@@ -107,6 +107,7 @@ Default Installation Paths
 - **Zsh**: ``~/.zsh/completions/_cyclopts_<app_name>``
 - **Bash**: ``~/.local/share/bash-completion/completions/<app_name>``
 - **Fish**: ``~/.config/fish/completions/<app_name>.fish``
+- **PowerShell**: ``Completions/<app_name>.ps1`` in your PowerShell profile's directory
 
 Script Generation
 =================
@@ -129,6 +130,7 @@ By default, Cyclopts modifies your shell RC file to enable completion:
 - **Zsh**: Adds to ``~/.zshrc``
 - **Bash**: Adds to ``~/.bashrc``
 - **Fish**: No modification needed (automatically loads from ``~/.config/fish/completions/``)
+- **PowerShell**: Adds a line loading the script to your all-hosts profile (``$PROFILE.CurrentUserAllHosts``)
 
 After installation, restart your shell or source the RC file.
 
@@ -138,16 +140,33 @@ To install without modifying shell RC files, use:
 
    app.register_install_completion_command(add_to_startup=False)
 
+PowerShell
+==========
+
+Completion works in PowerShell 7+ (``pwsh``, on any OS) and in Windows PowerShell 5.1 (``powershell.exe``).
+``--shell powershell`` covers both editions. The 2 editions keep separate profiles, and ``--install-completion`` edits the profile of the edition it's run from (Windows PowerShell 5.1 when run from outside PowerShell, e.g. ``cmd.exe``), so on Windows run it once from each edition you use.
+It differs from the other shells in a few ways:
+
+- **Every** ``<TAB>`` **runs your program.** The bash, zsh, and fish scripts contain your app's commands, options, and choices, so most completions never start Python. The PowerShell script contains none of that; each ``<TAB>`` launches your program, which computes all candidates. Keep module-level imports light (see :ref:`Lazy Loading`), since their cost is paid on every ``<TAB>``.
+- **No candidates means file completion.** When nothing matches (for example, the value of an ``int`` option), PowerShell falls back to completing file names, as it does for any native command.
+- **Descriptions** appear as tooltips in PowerShell's menu completion (``Ctrl+Space``, or ``Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete``).
+
+On Windows, if PowerShell reports that running scripts is disabled when loading your profile, allow local scripts:
+
+.. code-block:: console
+
+   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
 Custom Completers
 =================
 
 Static completion can only offer values that are known when the completion script is generated.
 Sometimes, valid values are only known at runtime; for these cases, attach a **completer callback** to a parameter.
-The callback is invoked when the user presses ``<TAB>``, enabling **runtime value completion** for bash, zsh, and fish.
+The callback is invoked when the user presses ``<TAB>``, enabling **runtime value completion** in every supported shell.
 
 .. warning::
 
-   Completing the value of a completer-backed parameter launches your Python program in a fresh process to run the completer. Each such ``<TAB>`` pays interpreter startup plus every import your program performs at module load, *before* the completer callback runs. (Completing command names, option names, and static choices stays entirely in-shell and pays none of this.) Heavy, non-lazy top-level imports (``numpy``, ``pandas``, ``torch``, ...) make those completions noticeably sluggish.
+   Completing the value of a completer-backed parameter launches your Python program in a fresh process to run the completer. Each such ``<TAB>`` pays interpreter startup plus every import your program performs at module load, *before* the completer callback runs. (In bash, zsh, and fish, completing command names, option names, and static choices stays entirely in-shell and pays none of this; in PowerShell, every ``<TAB>`` pays it.) Heavy, non-lazy top-level imports (``numpy``, ``pandas``, ``torch``, ...) make those completions noticeably sluggish.
 
    To keep completion responsive, avoid heavy module-level imports, import expensive dependencies lazily inside the functions that use them, and use :ref:`Lazy Loading` for commands with heavy dependencies.
 
@@ -160,7 +179,7 @@ Basic Usage
 
 .. important::
 
-   Only reach for a completer when the candidate values are genuinely unknown until runtime -- git branches, running containers, rows from a database, files on disk. If the values are fixed at definition time, use a :class:`~typing.Literal`, an :class:`~enum.Enum`, or :attr:`.Parameter.choices` instead: those complete entirely in the shell, whereas a completer launches your Python program on every ``<TAB>`` (see the warning above).
+   Only reach for a completer when the candidate values are genuinely unknown until runtime -- git branches, running containers, rows from a database, files on disk. If the values are fixed at definition time, use a :class:`~typing.Literal`, an :class:`~enum.Enum`, or :attr:`.Parameter.choices` instead: in bash, zsh, and fish those complete entirely in the shell, whereas a completer launches your Python program on every ``<TAB>`` (see the warning above). PowerShell launches your program for every completion either way.
 
 A completer is a callable that accepts a single :class:`~cyclopts.completion.CompletionContext` argument and returns the candidate values: a single string, an iterable of strings and/or ``(value, description)`` tuples, or a ``{value: description}`` dictionary. This example completes a git branch name -- values that can't be baked into a static script, since they change as branches come and go:
 
@@ -204,7 +223,7 @@ Use ``ctx.incomplete`` (the partial word typed so far) to *narrow expensive look
 
 .. note::
 
-   In fish, a completer on a *positional* parameter of the **root** command (``@app.default`` with no subcommand) is not wired up; fish falls back to its default file completion there. Positional completers on subcommands, and option-value completers everywhere, work in all three shells.
+   In fish, a completer on a *positional* parameter of the **root** command (``@app.default`` with no subcommand) is not wired up; fish falls back to its default file completion there. Positional completers on subcommands, and option-value completers everywhere, work in every shell. PowerShell is not affected.
 
 .. note::
 
@@ -213,7 +232,7 @@ Use ``ctx.incomplete`` (the partial word typed so far) to *narrow expensive look
 Descriptions
 ------------
 
-To display descriptions alongside completions, return ``(value, description)`` tuples or a ``{value: description}`` dictionary. zsh and fish render these in the completion menu; bash shows the values only. Here each branch is annotated with the subject of its latest commit:
+To display descriptions alongside completions, return ``(value, description)`` tuples or a ``{value: description}`` dictionary. zsh and fish render these in the completion menu, PowerShell shows them as menu-completion tooltips, and bash shows the values only. Here each branch is annotated with the subject of its latest commit:
 
 .. code-block:: python
 
@@ -281,7 +300,7 @@ For a parameter that takes several values (``tuple[str, str]``, ``list[str]``, `
 
 .. note::
 
-   Per-value dispatch works for positional multi-value parameters in all three shells, and for the first value of a multi-value *option*. The generated scripts do not yet invoke the completer for the *second and later* values of a multi-value option (e.g. ``--point 1 <TAB>`` on a ``tuple[int, int]``): the engine resolves that slot correctly, but bash/zsh/fish route it as a fresh positional/option position instead. If later elements need completion, prefer a positional multi-value parameter.
+   Per-value dispatch works for positional multi-value parameters in every shell, and for the first value of a multi-value *option*. The bash, zsh, and fish scripts do not yet invoke the completer for the *second and later* values of a multi-value option (e.g. ``--point 1 <TAB>`` on a ``tuple[int, int]``): the engine resolves that slot correctly, but those scripts route it as a fresh positional/option position instead. If later elements need completion, prefer a positional multi-value parameter. PowerShell completes every value.
 
 Shared Completers
 -----------------

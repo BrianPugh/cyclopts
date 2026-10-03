@@ -976,7 +976,7 @@ def _lead(completion: str) -> str:
     return completion.split("\t", 1)[0].split(" -- ", 1)[0].strip()
 
 
-@pytest.fixture(params=["bash", "zsh", "fish"])
+@pytest.fixture(params=["bash", "zsh", "fish", "powershell"])
 def shell(request):
     return request.param
 

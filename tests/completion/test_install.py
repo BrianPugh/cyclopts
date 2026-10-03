@@ -1,6 +1,9 @@
 """Tests for completion installation functionality."""
 
+import os
+import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -427,3 +430,216 @@ def test_install_completion_bash_add_to_startup_appends(temp_home):
     existing_pos = bashrc_content.index("# Existing bash config")
     completion_pos = bashrc_content.index("# Load testapp completion")
     assert existing_pos < completion_pos, "bash completion should be appended after existing content"
+
+
+@pytest.fixture
+def ps_profile(temp_home, monkeypatch):
+    """Point PowerShell's profile into the temp home without spawning PowerShell."""
+    profile = temp_home / "pwsh-config" / "profile.ps1"
+    monkeypatch.setattr("cyclopts.completion.install.powershell_profile", lambda: profile)
+    return profile
+
+
+def test_install_completion_powershell(ps_profile):
+    app = App(name="testapp")
+
+    install_path = app.install_completion(shell="powershell")
+
+    assert install_path == ps_profile.parent / "Completions" / "testapp.ps1"
+    assert "Register-ArgumentCompleter -Native" in install_path.read_text()
+    assert ps_profile.read_bytes().startswith(b"\xef\xbb\xbf")
+    assert ps_profile.read_text(encoding="utf-8-sig") == (
+        f"# Load testapp completion\nif (Test-Path -LiteralPath '{install_path}') {{ . '{install_path}' }}\n"
+    )
+
+
+def test_install_completion_powershell_idempotent_and_appends(ps_profile):
+    ps_profile.parent.mkdir(parents=True)
+    ps_profile.write_text("Set-PSReadLineOption -EditMode Emacs")
+    app = App(name="testapp")
+
+    app.install_completion(shell="powershell")
+    app.install_completion(shell="powershell")
+
+    content = ps_profile.read_text()
+    assert content.startswith("Set-PSReadLineOption -EditMode Emacs\n# Load testapp completion\n")
+    assert content.count("# Load testapp completion") == 1
+
+
+def test_install_completion_powershell_quotes_path(ps_profile):
+    app = App(name="testapp")
+    output = ps_profile.parent / "it's" / "testapp.ps1"
+
+    app.install_completion(shell="powershell", output=output)
+
+    quoted = "'" + str(output).replace("'", "''") + "'"
+    assert f"if (Test-Path -LiteralPath {quoted}) {{ . {quoted} }}" in ps_profile.read_text()
+
+
+def test_install_completion_powershell_comment_strips_line_breaks(ps_profile):
+    app = App(name="a\rb\nc")
+
+    app.install_completion(shell="powershell", output=ps_profile.parent / "x.ps1")
+
+    assert ps_profile.read_text(encoding="utf-8-sig").splitlines()[0] == "# Load a b c completion"
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-8-sig", "utf-8"])
+def test_install_completion_powershell_preserves_profile_encoding(ps_profile, encoding):
+    ps_profile.parent.mkdir(parents=True)
+    ps_profile.write_bytes("Set-Alias g git\r\n".encode(encoding))
+
+    install_path = App(name="testapp").install_completion(shell="powershell")
+
+    assert ps_profile.read_bytes().decode(encoding) == (
+        f"Set-Alias g git\r\n# Load testapp completion\nif (Test-Path -LiteralPath '{install_path}') {{ . '{install_path}' }}\n"
+    )
+
+
+def test_install_completion_powershell_empty_profile_gets_bom(ps_profile):
+    ps_profile.parent.mkdir(parents=True)
+    ps_profile.write_bytes(b"")
+
+    App(name="testapp").install_completion(shell="powershell")
+
+    assert ps_profile.read_bytes().startswith(b"\xef\xbb\xbf# Load testapp completion\n")
+
+
+@pytest.mark.parametrize(
+    ("shell", "rc_name"),
+    [("bash", ".bashrc"), ("zsh", ".zshrc"), ("powershell", "pwsh-config/profile.ps1")],
+)
+def test_install_completion_rc_preserves_undecodable_bytes(ps_profile, temp_home, shell, rc_name):
+    rc = temp_home / rc_name
+    rc.parent.mkdir(parents=True, exist_ok=True)
+    original = b"# calf\xe9 \x81\x8d\r\n"
+    rc.write_bytes(original)
+
+    App(name="testapp").install_completion(shell=shell)
+
+    data = rc.read_bytes()
+    assert original in data
+    assert len(data) > len(original)
+
+
+def test_install_completion_relative_output_is_absolute_in_profile(ps_profile, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    install_path = App(name="testapp").install_completion(shell="powershell", output=Path("comp.ps1"))
+
+    assert install_path == tmp_path / "comp.ps1"
+    assert f"Test-Path -LiteralPath '{tmp_path / 'comp.ps1'}'" in ps_profile.read_text(encoding="utf-8-sig")
+
+
+def test_install_completion_powershell_add_to_startup_false(ps_profile):
+    App(name="testapp").install_completion(shell="powershell", add_to_startup=False)
+    assert not ps_profile.exists()
+
+
+def test_install_completion_command_powershell(ps_profile, monkeypatch, capsys):
+    app = App(name="testapp")
+    app.register_install_completion_command()
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "powershell")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    out = capsys.readouterr().out
+    assert f"Added completion loader to {ps_profile}" in out
+    assert f"run: . '{ps_profile}'" in out
+
+
+def test_install_completion_command_powershell_quotes_profile(ps_profile, temp_home, monkeypatch, capsys):
+    profile = temp_home / "O'Connor" / "profile.ps1"
+    monkeypatch.setattr("cyclopts.completion.install.powershell_profile", lambda: profile)
+    app = App(name="testapp")
+    app.register_install_completion_command()
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "powershell")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    assert "run: . '" + str(profile).replace("'", "''") + "'" in capsys.readouterr().out
+
+
+def test_powershell_profile_queries_powershell(monkeypatch):
+    from unittest.mock import Mock
+
+    from cyclopts.completion import install
+
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        return Mock(returncode=0, stdout="/somewhere/profile.ps1\n")
+
+    monkeypatch.setattr(install.subprocess, "run", fake_run)
+    assert install.powershell_profile() == Path("/somewhere/profile.ps1")
+    assert calls[0][-1] == "$PROFILE.CurrentUserAllHosts"
+
+
+def test_powershell_profile_fallback(temp_home, monkeypatch):
+    from cyclopts.completion import install
+
+    def missing(*args, **kwargs):
+        raise FileNotFoundError
+
+    monkeypatch.setattr(install.subprocess, "run", missing)
+    if sys.platform == "win32":
+        expected = Path.home() / "Documents" / "PowerShell" / "profile.ps1"
+        monkeypatch.setenv("PSModulePath", str(Path.home() / "Documents" / "PowerShell" / "Modules"))
+    else:
+        expected = temp_home / ".config" / "powershell" / "profile.ps1"
+    assert install.powershell_profile() == expected
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows resolves the profile from Documents, not $HOME")
+def test_install_completion_powershell_real_profile(temp_home, tmp_path, monkeypatch):
+    """Install into a real (temp-$HOME) profile, then complete in a fresh pwsh that loads it."""
+    from .conftest import _check_pwsh_available, write_shim
+
+    if not _check_pwsh_available():
+        pytest.skip("pwsh not available")
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    entry = tmp_path / "entry.py"
+    entry.write_text("from cyclopts import App\napp = App(name='testapp')\n@app.command\ndef deploy(): ...\napp()\n")
+    write_shim(tmp_path / "bin", "testapp", entry)
+    monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}")
+
+    install_path = App(name="testapp").install_completion(shell="powershell")
+
+    assert install_path == temp_home / ".config" / "powershell" / "Completions" / "testapp.ps1"
+    result = subprocess.run(
+        [
+            "pwsh",
+            "-NonInteractive",
+            "-Command",
+            "(TabExpansion2 -inputScript 'testapp de' -cursorColumn 10).CompletionMatches.CompletionText",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert result.stdout.split() == ["deploy"]
+
+
+def test_install_completion_command_non_utf8_stdout(ps_profile, monkeypatch):
+    """Redirected stdout on Windows is cp1252, which has no check mark; the messages must still print."""
+    import io
+
+    app = App(name="testapp")
+    app.register_install_completion_command()
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "powershell")
+    stdout = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    app(["--install-completion"], exit_on_error=False, result_action="return_value")
+
+    stdout.seek(0)
+    assert "Completion script installed" in stdout.read()
