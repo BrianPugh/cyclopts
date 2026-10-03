@@ -302,7 +302,7 @@ def _resolve_active_argument(
     return active
 
 
-def _assemble_arguments(execution_path: "Sequence[App]", parse_docstring: bool = False) -> ArgumentCollection:
+def _assemble_arguments(execution_path: "Sequence[App]") -> ArgumentCollection:
     """Collect every argument that may occupy a slot on the resolved command's line.
 
     The resolved command's own parameters, plus the keyword parameters
@@ -322,7 +322,7 @@ def _assemble_arguments(execution_path: "Sequence[App]", parse_docstring: bool =
     command_app = execution_path[-1]
     arguments = ArgumentCollection()
     launcher_arguments = ArgumentCollection()
-    for subapp, collection in _iter_resolution_argument_collections(execution_path, parse_docstring=parse_docstring):
+    for subapp, collection in _iter_resolution_argument_collections(execution_path, parse_docstring=True):
         if subapp is command_app:
             arguments.extend(collection)
             continue
@@ -358,7 +358,7 @@ class Slot:
     active: "Argument | None"
 
 
-def resolve_slot(app: "App", words: list[str], *, parse_docstring: bool = False) -> Slot | None:
+def resolve_slot(app: "App", words: list[str]) -> Slot | None:
     """Resolve which command and argument own the word being completed.
 
     Parameters
@@ -368,8 +368,6 @@ def resolve_slot(app: "App", words: list[str], *, parse_docstring: bool = False)
     words : list[str]
         Command-line words following the program name; the last is the (possibly
         empty) word under the cursor.
-    parse_docstring : bool
-        Fill each argument's help from its docstring (for candidate descriptions).
 
     Returns
     -------
@@ -421,7 +419,7 @@ def resolve_slot(app: "App", words: list[str], *, parse_docstring: bool = False)
     # real parse (core.py) and the static extractor (_base.py) do.
     with app.app_stack(execution_path):
         try:
-            arguments = _assemble_arguments(execution_path, parse_docstring=parse_docstring)
+            arguments = _assemble_arguments(execution_path)
         except Exception as e:
             debug(f"assembling arguments failed: {_exc(e)}")
             return None
@@ -599,7 +597,7 @@ def compute_full_completions(app: "App", words: list[str]) -> FullCompletions:
     Unlike :func:`compute_completions`, this filters by the typed prefix, since
     its caller has no static data of its own to merge in and filter.
     """
-    slot = resolve_slot(app, words, parse_docstring=True)
+    slot = resolve_slot(app, words)
     if slot is None:
         return FullCompletions([])
     with slot.app.app_stack(slot.execution_path):
