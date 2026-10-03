@@ -42,6 +42,12 @@ Register-ArgumentCompleter -Native -CommandName __COMMAND_NAMES__ -ScriptBlock {
     $quote = ''
     if ($wordToComplete.StartsWith("'") -or $wordToComplete.StartsWith('"')) { $quote = $wordToComplete.Substring(0, 1) }
 
+    $program = __PROG_INVOKE__
+    if ($elements[0] -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+        $resolved = Get-Command -Name $elements[0].Value -CommandType Application -ErrorAction Ignore | Select-Object -First 1
+        if ($resolved) { $program = $resolved.Source }
+    }
+
     $savedWords = $env:CYCLOPTS_COMPLETE_WORDS
     $savedEncoding = $env:PYTHONIOENCODING
     $savedConsoleEncoding = $null
@@ -52,7 +58,7 @@ Register-ArgumentCompleter -Native -CommandName __COMMAND_NAMES__ -ScriptBlock {
             $savedConsoleEncoding = [Console]::OutputEncoding
             [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
         } catch { }
-        $lines = & __PROG_INVOKE__ __complete 2>$null
+        $lines = & $program __complete 2>$null
     } finally {
         $env:CYCLOPTS_COMPLETE_WORDS = $savedWords
         $env:PYTHONIOENCODING = $savedEncoding
@@ -84,9 +90,9 @@ Register-ArgumentCompleter -Native -CommandName __COMMAND_NAMES__ -ScriptBlock {
         if ($value.StartsWith('-') -and -not $prefix) { $resultType = 'ParameterName' }
         $text = $prefix + $value
         if ($quote -eq '"') {
-            $text = '"' + ($text -replace '([`"$])', '`$1') + '"'
-        } elseif ($quote -eq "'" -or $text -match '[\s''"`$,;(){}@|&<>#]') {
-            $text = "'" + $text.Replace("'", "''") + "'"
+            $text = '"' + ($text -replace '([`"$\u201C-\u201E])', '`$1') + '"'
+        } elseif ($quote -eq "'" -or $text -match '[\s''"`$,;(){}@|&<>#*?\[\u2018-\u201E]') {
+            $text = "'" + ($text -replace '([''\u2018-\u201B])', '$1$1') + "'"
         }
         New-Object System.Management.Automation.CompletionResult $text, $value, $resultType, $description
     }

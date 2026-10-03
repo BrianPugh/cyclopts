@@ -4,6 +4,7 @@ The script tests drive real PowerShell through ``TabExpansion2`` (see ``conftest
 They run under ``pwsh``, plus Windows PowerShell 5.1 (``powershell.exe``) on Windows.
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Annotated, Literal
@@ -141,7 +142,7 @@ def test_script_registers_exe_name():
 def test_script_quotes_prog_name():
     script = App(name="it's").generate_completion(shell="powershell")
     assert "-CommandName 'it''s', 'it''s.exe'" in script
-    assert "& 'it''s' __complete" in script
+    assert "$program = 'it''s'" in script
 
 
 def test_script_comment_strips_line_breaks():
@@ -168,7 +169,16 @@ app = App(name="deployer")
 
 
 def complete_target(ctx):
-    return [("my target", "Has a space"), ("cost$5", "Has a dollar"), ("it's", "Has a quote"), ("café", "Non-ASCII")]
+    return [
+        ("my target", "Has a space"),
+        ("cost$5", "Has a dollar"),
+        ("it's", "Has a quote"),
+        ("café", "Non-ASCII"),
+        ("rel*", "Has a glob"),
+        ("br[ab]", "Has a glob"),
+        ("O\u2019Brien", "Has a smart single quote"),
+        ("dq\u201cz", "Has a smart double quote"),
+    ]
 
 
 @app.command
@@ -217,6 +227,12 @@ def test_e2e_result_types_and_tooltips(tester):
         ("deployer deploy --target 'co", ["'cost$5'"]),
         ('deployer deploy --target "co', ['"cost`$5"']),
         ("deployer deploy --target=my", ["'--target=my target'"]),
+        ("deployer deploy --target re", ["'rel*'"]),
+        ("deployer deploy --target br", ["'br[ab]'"]),
+        ("deployer deploy --target O", ["'O\u2019\u2019Brien'"]),
+        ("deployer deploy --target 'O", ["'O\u2019\u2019Brien'"]),
+        ("deployer deploy --target dq", ["'dq\u201cz'"]),
+        ('deployer deploy --target "dq', ['"dq`\u201cz"']),
     ],
 )
 def test_e2e_quoting(tester, line, expected):
@@ -301,3 +317,11 @@ def test_e2e_root_positional_completer(dynamic_completion_tester):
     """Fish doesn't wire a root-command positional completer; PowerShell does."""
     tester = dynamic_completion_tester(GAPS_SOURCE, prog_name="deployer", shell="powershell")
     assert tester.get_completions("deployer ") == ["alpha", "beta"]
+
+
+def test_e2e_invoked_by_path_off_path(dynamic_completion_tester, tmp_path, monkeypatch):
+    """The program the user typed is asked, even when its name isn't on PATH."""
+    tester = dynamic_completion_tester(GAPS_SOURCE, prog_name="deployer", shell="powershell")
+    bindir = tmp_path / "bin"
+    monkeypatch.setenv("PATH", os.environ["PATH"].replace(f"{bindir}{os.pathsep}", "", 1))
+    assert tester.get_completions(f"& '{bindir / 'deployer'}' ") == ["alpha", "beta"]

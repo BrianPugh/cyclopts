@@ -4,6 +4,7 @@ This module handles the installation of completion scripts to shell-specific
 locations and the updating of shell RC files to load completions.
 """
 
+import locale
 import os
 import subprocess
 import sys
@@ -129,6 +130,25 @@ def _powershell_quote(path: Path) -> str:
     return "'" + str(path).replace("'", "''") + "'"
 
 
+def _read_text(path: Path, default_encoding: str) -> tuple[str, str]:
+    """Read ``path`` as ``(content, encoding)``, detecting a BOM (Windows PowerShell 5.1's ``>>`` writes UTF-16)."""
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        return "", default_encoding
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        encoding = "utf-16"
+    elif data.startswith(b"\xef\xbb\xbf"):
+        encoding = "utf-8-sig"
+    else:
+        encoding = "utf-8"
+    try:
+        return data.decode(encoding), encoding
+    except UnicodeDecodeError:
+        encoding = locale.getpreferredencoding(False)
+        return data.decode(encoding, errors="replace"), encoding
+
+
 def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zsh", "powershell"]) -> bool:
     """Add completion configuration to shell RC file.
 
@@ -165,35 +185,32 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
     elif shell == "powershell":
         rc_file = powershell_profile()
         quoted = _powershell_quote(script_path)
-        config_line = f"if (Test-Path {quoted}) {{ . {quoted} }}"
+        config_line = f"if (Test-Path -LiteralPath {quoted}) {{ . {quoted} }}"
         comment = f"# Load {prog_name} completion"
     else:
         raise NotImplementedError
 
     rc_file = rc_file.resolve()
 
-    if rc_file.exists():
-        content = rc_file.read_text()
-        # For zsh, check if this directory is already in fpath configuration
-        # For bash, check if the exact source line exists
-        if shell == "zsh" and str(script_path.parent) in content and "fpath=" in content:
-            return False
-        elif config_line in content:
-            return False
-    else:
-        content = ""
+    # Windows PowerShell 5.1 reads a BOM-less profile as ANSI.
+    content, encoding = _read_text(rc_file, "utf-8-sig" if shell == "powershell" else "utf-8")
+    # For zsh, check if this directory is already in fpath configuration
+    # For bash, check if the exact source line exists
+    if shell == "zsh" and str(script_path.parent) in content and "fpath=" in content:
+        return False
+    elif config_line in content:
+        return False
 
     if shell == "zsh":
         # Prepend to ensure fpath is set before any compinit call
-        rc_file.write_text(f"{comment}\n{config_line}\n{content}")
+        content = f"{comment}\n{config_line}\n{content}"
     else:
         # Bash/PowerShell: append
-        rc_file.parent.mkdir(parents=True, exist_ok=True)
-        needs_newline = content and not content.endswith("\n")
-        with rc_file.open("a") as f:
-            if needs_newline:
-                f.write("\n")
-            f.write(f"{comment}\n{config_line}\n")
+        if content and not content.endswith("\n"):
+            content += "\n"
+        content += f"{comment}\n{config_line}\n"
+    rc_file.parent.mkdir(parents=True, exist_ok=True)
+    rc_file.write_text(content, encoding=encoding, newline="")
 
     return True
 

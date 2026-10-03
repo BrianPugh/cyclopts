@@ -447,8 +447,9 @@ def test_install_completion_powershell(ps_profile):
 
     assert install_path == ps_profile.parent / "Completions" / "testapp.ps1"
     assert "Register-ArgumentCompleter -Native" in install_path.read_text()
-    assert ps_profile.read_text() == (
-        f"# Load testapp completion\nif (Test-Path '{install_path}') {{ . '{install_path}' }}\n"
+    assert ps_profile.read_bytes().startswith(b"\xef\xbb\xbf")
+    assert ps_profile.read_text(encoding="utf-8-sig") == (
+        f"# Load testapp completion\nif (Test-Path -LiteralPath '{install_path}') {{ . '{install_path}' }}\n"
     )
 
 
@@ -472,7 +473,7 @@ def test_install_completion_powershell_quotes_path(ps_profile):
     app.install_completion(shell="powershell", output=output)
 
     quoted = "'" + str(output).replace("'", "''") + "'"
-    assert f"if (Test-Path {quoted}) {{ . {quoted} }}" in ps_profile.read_text()
+    assert f"if (Test-Path -LiteralPath {quoted}) {{ . {quoted} }}" in ps_profile.read_text()
 
 
 def test_install_completion_powershell_comment_strips_line_breaks(ps_profile):
@@ -480,7 +481,19 @@ def test_install_completion_powershell_comment_strips_line_breaks(ps_profile):
 
     app.install_completion(shell="powershell", output=ps_profile.parent / "x.ps1")
 
-    assert ps_profile.read_text().splitlines()[0] == "# Load a b c completion"
+    assert ps_profile.read_text(encoding="utf-8-sig").splitlines()[0] == "# Load a b c completion"
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-8-sig", "utf-8"])
+def test_install_completion_powershell_preserves_profile_encoding(ps_profile, encoding):
+    ps_profile.parent.mkdir(parents=True)
+    ps_profile.write_bytes("Set-Alias g git\r\n".encode(encoding))
+
+    install_path = App(name="testapp").install_completion(shell="powershell")
+
+    assert ps_profile.read_bytes().decode(encoding) == (
+        f"Set-Alias g git\r\n# Load testapp completion\nif (Test-Path -LiteralPath '{install_path}') {{ . '{install_path}' }}\n"
+    )
 
 
 def test_install_completion_powershell_add_to_startup_false(ps_profile):
