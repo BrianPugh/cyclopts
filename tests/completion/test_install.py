@@ -496,6 +496,32 @@ def test_install_completion_powershell_preserves_profile_encoding(ps_profile, en
     )
 
 
+def test_install_completion_powershell_empty_profile_gets_bom(ps_profile):
+    ps_profile.parent.mkdir(parents=True)
+    ps_profile.write_bytes(b"")
+
+    App(name="testapp").install_completion(shell="powershell")
+
+    assert ps_profile.read_bytes().startswith(b"\xef\xbb\xbf# Load testapp completion\n")
+
+
+@pytest.mark.parametrize(
+    ("shell", "rc_name"),
+    [("bash", ".bashrc"), ("zsh", ".zshrc"), ("powershell", "pwsh-config/profile.ps1")],
+)
+def test_install_completion_rc_preserves_undecodable_bytes(ps_profile, temp_home, shell, rc_name):
+    rc = temp_home / rc_name
+    rc.parent.mkdir(parents=True, exist_ok=True)
+    original = b"# calf\xe9 \x81\x8d\r\n"
+    rc.write_bytes(original)
+
+    App(name="testapp").install_completion(shell=shell)
+
+    data = rc.read_bytes()
+    assert original in data
+    assert len(data) > len(original)
+
+
 def test_install_completion_powershell_add_to_startup_false(ps_profile):
     App(name="testapp").install_completion(shell="powershell", add_to_startup=False)
     assert not ps_profile.exists()

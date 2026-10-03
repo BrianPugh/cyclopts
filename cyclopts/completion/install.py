@@ -4,7 +4,6 @@ This module handles the installation of completion scripts to shell-specific
 locations and the updating of shell RC files to load completions.
 """
 
-import locale
 import os
 import subprocess
 import sys
@@ -130,23 +129,26 @@ def _powershell_quote(path: Path) -> str:
     return "'" + str(path).replace("'", "''") + "'"
 
 
+def _codec_errors(encoding: str) -> str:
+    """Error handler that round-trips any bytes ``encoding`` can represent, so rewriting a file never alters it."""
+    return "surrogatepass" if encoding == "utf-16" else "surrogateescape"
+
+
 def _read_text(path: Path, default_encoding: str) -> tuple[str, str]:
     """Read ``path`` as ``(content, encoding)``, detecting a BOM (Windows PowerShell 5.1's ``>>`` writes UTF-16)."""
     try:
         data = path.read_bytes()
     except FileNotFoundError:
-        return "", default_encoding
-    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        data = b""
+    if not data:
+        encoding = default_encoding
+    elif data.startswith((b"\xff\xfe", b"\xfe\xff")):
         encoding = "utf-16"
     elif data.startswith(b"\xef\xbb\xbf"):
         encoding = "utf-8-sig"
     else:
         encoding = "utf-8"
-    try:
-        return data.decode(encoding), encoding
-    except UnicodeDecodeError:
-        encoding = locale.getpreferredencoding(False)
-        return data.decode(encoding, errors="replace"), encoding
+    return data.decode(encoding, errors=_codec_errors(encoding)), encoding
 
 
 def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zsh", "powershell"]) -> bool:
@@ -210,7 +212,7 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
             content += "\n"
         content += f"{comment}\n{config_line}\n"
     rc_file.parent.mkdir(parents=True, exist_ok=True)
-    rc_file.write_text(content, encoding=encoding, newline="")
+    rc_file.write_bytes(content.encode(encoding, errors=_codec_errors(encoding)))
 
     return True
 
