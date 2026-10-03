@@ -1,6 +1,9 @@
 """Tests for shell detection functionality."""
 
+import os
 import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -14,6 +17,7 @@ def clean_shell_env(monkeypatch):
     monkeypatch.delenv("ZSH_VERSION", raising=False)
     monkeypatch.delenv("BASH_VERSION", raising=False)
     monkeypatch.delenv("FISH_VERSION", raising=False)
+    monkeypatch.delenv("PSModulePath", raising=False)
 
 
 @pytest.mark.parametrize(
@@ -71,6 +75,7 @@ def test_detect_shell_empty_string_not_detected(monkeypatch):
     monkeypatch.setenv("BASH_VERSION", "")
     monkeypatch.setenv("FISH_VERSION", "")
     monkeypatch.delenv("SHELL", raising=False)
+    monkeypatch.delenv("PSModulePath", raising=False)
     _mock_failed_subprocess(monkeypatch)
 
     with pytest.raises(ShellDetectionError):
@@ -120,6 +125,8 @@ def test_detect_shell_fallback_unsupported_shell(clean_shell_env, monkeypatch):
         ("/usr/local/bin/fish", "fish"),
         ("-zsh", "zsh"),
         ("login_bash", "bash"),
+        ("pwsh", "powershell"),
+        ("/usr/local/microsoft/powershell/7/pwsh", "powershell"),
     ],
 )
 def test_detect_shell_via_parent_process(clean_shell_env, monkeypatch, parent_process_name, expected):
@@ -168,3 +175,27 @@ def test_detect_shell_subprocess_returns_unsupported_shell_falls_back(clean_shel
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: mock_result)
 
     assert detect_shell() == "fish"
+
+
+@pytest.mark.parametrize(
+    ("ps_module_path", "expected"),
+    [
+        (r"{home}\Documents\PowerShell\Modules;C:\Program Files\PowerShell\Modules", True),
+        (r"{home}\Documents\WindowsPowerShell\Modules;C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules", True),
+        (r"C:\Program Files\WindowsPowerShell\Modules;C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules", False),
+    ],
+)
+def test_detect_shell_windows_powershell_module_path(clean_shell_env, monkeypatch, tmp_path, ps_module_path, expected):
+    """On Windows (no ``ps``), a user-level ``PSModulePath`` entry means PowerShell launched us."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(os, "pathsep", ";")
+    monkeypatch.setattr(Path, "home", lambda: Path(r"C:\Users\me"))
+    monkeypatch.delenv("SHELL", raising=False)
+    monkeypatch.setenv("PSModulePath", ps_module_path.format(home=r"C:\Users\me"))
+    _mock_failed_subprocess(monkeypatch)
+
+    if expected:
+        assert detect_shell() == "powershell"
+    else:
+        with pytest.raises(ShellDetectionError):
+            detect_shell()

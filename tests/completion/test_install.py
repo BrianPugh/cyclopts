@@ -1,6 +1,9 @@
 """Tests for completion installation functionality."""
 
+import os
+import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -427,3 +430,128 @@ def test_install_completion_bash_add_to_startup_appends(temp_home):
     existing_pos = bashrc_content.index("# Existing bash config")
     completion_pos = bashrc_content.index("# Load testapp completion")
     assert existing_pos < completion_pos, "bash completion should be appended after existing content"
+
+
+@pytest.fixture
+def ps_profile(temp_home, monkeypatch):
+    """Point PowerShell's profile into the temp home without spawning PowerShell."""
+    profile = temp_home / "pwsh-config" / "profile.ps1"
+    monkeypatch.setattr("cyclopts.completion.install.powershell_profile", lambda: profile)
+    return profile
+
+
+def test_install_completion_powershell(ps_profile):
+    app = App(name="testapp")
+
+    install_path = app.install_completion(shell="powershell")
+
+    assert install_path == ps_profile.parent / "Completions" / "testapp.ps1"
+    assert "Register-ArgumentCompleter -Native" in install_path.read_text()
+    assert ps_profile.read_text() == (
+        f"# Load testapp completion\nif (Test-Path '{install_path}') {{ . '{install_path}' }}\n"
+    )
+
+
+def test_install_completion_powershell_idempotent_and_appends(ps_profile):
+    ps_profile.parent.mkdir(parents=True)
+    ps_profile.write_text("Set-PSReadLineOption -EditMode Emacs")
+    app = App(name="testapp")
+
+    app.install_completion(shell="powershell")
+    app.install_completion(shell="powershell")
+
+    content = ps_profile.read_text()
+    assert content.startswith("Set-PSReadLineOption -EditMode Emacs\n# Load testapp completion\n")
+    assert content.count("# Load testapp completion") == 1
+
+
+def test_install_completion_powershell_quotes_path(ps_profile):
+    app = App(name="testapp")
+    output = ps_profile.parent / "it's" / "testapp.ps1"
+
+    app.install_completion(shell="powershell", output=output)
+
+    quoted = "'" + str(output).replace("'", "''") + "'"
+    assert f"if (Test-Path {quoted}) {{ . {quoted} }}" in ps_profile.read_text()
+
+
+def test_install_completion_powershell_add_to_startup_false(ps_profile):
+    App(name="testapp").install_completion(shell="powershell", add_to_startup=False)
+    assert not ps_profile.exists()
+
+
+def test_install_completion_command_powershell(ps_profile, monkeypatch, capsys):
+    app = App(name="testapp")
+    app.register_install_completion_command()
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "powershell")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    out = capsys.readouterr().out
+    assert f"Added completion loader to {ps_profile}" in out
+    assert f"run: . '{ps_profile}'" in out
+
+
+def test_powershell_profile_queries_powershell(monkeypatch):
+    from unittest.mock import Mock
+
+    from cyclopts.completion import install
+
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        return Mock(returncode=0, stdout="/somewhere/profile.ps1\n")
+
+    monkeypatch.setattr(install.subprocess, "run", fake_run)
+    assert install.powershell_profile() == Path("/somewhere/profile.ps1")
+    assert calls[0][-1] == "$PROFILE.CurrentUserAllHosts"
+
+
+def test_powershell_profile_fallback(temp_home, monkeypatch):
+    from cyclopts.completion import install
+
+    def missing(*args, **kwargs):
+        raise FileNotFoundError
+
+    monkeypatch.setattr(install.subprocess, "run", missing)
+    if sys.platform == "win32":
+        expected = Path.home() / "Documents" / "PowerShell" / "profile.ps1"
+        monkeypatch.setenv("PSModulePath", str(Path.home() / "Documents" / "PowerShell" / "Modules"))
+    else:
+        expected = temp_home / ".config" / "powershell" / "profile.ps1"
+    assert install.powershell_profile() == expected
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows resolves the profile from Documents, not $HOME")
+def test_install_completion_powershell_real_profile(temp_home, tmp_path, monkeypatch):
+    """Install into a real (temp-$HOME) profile, then complete in a fresh pwsh that loads it."""
+    from .conftest import _check_pwsh_available, write_shim
+
+    if not _check_pwsh_available():
+        pytest.skip("pwsh not available")
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    entry = tmp_path / "entry.py"
+    entry.write_text("from cyclopts import App\napp = App(name='testapp')\n@app.command\ndef deploy(): ...\napp()\n")
+    write_shim(tmp_path / "bin", "testapp", entry)
+    monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}")
+
+    install_path = App(name="testapp").install_completion(shell="powershell")
+
+    assert install_path == temp_home / ".config" / "powershell" / "Completions" / "testapp.ps1"
+    result = subprocess.run(
+        [
+            "pwsh",
+            "-NonInteractive",
+            "-Command",
+            "(TabExpansion2 -inputScript 'testapp de' -cursorColumn 10).CompletionMatches.CompletionText",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert result.stdout.split() == ["deploy"]

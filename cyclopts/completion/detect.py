@@ -7,6 +7,7 @@ scripts for different shell environments.
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Literal
 
@@ -15,7 +16,7 @@ class ShellDetectionError(Exception):
     """Raised when the shell type cannot be detected."""
 
 
-def _extract_shell_name(shell_string: str) -> Literal["zsh", "bash", "fish"] | None:
+def _extract_shell_name(shell_string: str) -> Literal["zsh", "bash", "fish", "powershell"] | None:
     """Extract shell name from a string (path or process name).
 
     Parameters
@@ -25,7 +26,7 @@ def _extract_shell_name(shell_string: str) -> Literal["zsh", "bash", "fish"] | N
 
     Returns
     -------
-    Literal["zsh", "bash", "fish"] | None
+    Literal["zsh", "bash", "fish", "powershell"] | None
         The detected shell type, or None if not recognized.
     """
     shell_lower = shell_string.lower()
@@ -35,15 +36,31 @@ def _extract_shell_name(shell_string: str) -> Literal["zsh", "bash", "fish"] | N
         return "bash"
     elif "fish" in shell_lower:
         return "fish"
+    elif "pwsh" in shell_lower or "powershell" in shell_lower:
+        return "powershell"
     return None
 
 
-def detect_shell() -> Literal["zsh", "bash", "fish"]:
+def _running_in_windows_powershell() -> bool:
+    """Whether a PowerShell session (either edition) launched us on Windows.
+
+    Windows has no ``ps`` for the parent-process check. Both PowerShell editions
+    add the user's own module directory (under their home) to ``PSModulePath``
+    for child processes, while the system-wide default (what ``cmd.exe`` sees)
+    has none.
+    """
+    if sys.platform != "win32":
+        return False
+    home = str(Path.home()).lower()
+    return any(path.lower().startswith(home) for path in os.environ.get("PSModulePath", "").split(os.pathsep) if path)
+
+
+def detect_shell() -> Literal["zsh", "bash", "fish", "powershell"]:
     """Detect the current shell type using multiple detection methods.
 
     Returns
     -------
-    Literal["zsh", "bash", "fish"]
+    Literal["zsh", "bash", "fish", "powershell"]
         The detected shell type.
 
     Raises
@@ -86,5 +103,8 @@ def detect_shell() -> Literal["zsh", "bash", "fish"]:
         shell = _extract_shell_name(shell_name)
         if shell:
             return shell
+
+    if _running_in_windows_powershell():
+        return "powershell"
 
     raise ShellDetectionError("Unable to detect shell type.")
