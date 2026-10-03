@@ -144,6 +144,7 @@ PowerShell
 ==========
 
 Completion works in PowerShell 7+ (``pwsh``, on any OS) and in Windows PowerShell 5.1 (``powershell.exe``).
+``--shell powershell`` covers both editions. The 2 editions keep separate profiles, and ``--install-completion`` edits the profile of the edition it's run from (Windows PowerShell 5.1 when run from outside PowerShell, e.g. ``cmd.exe``), so on Windows run it once from each edition you use.
 It differs from the other shells in a few ways:
 
 - **Every** ``<TAB>`` **runs your program.** The bash, zsh, and fish scripts contain your app's commands, options, and choices, so most completions never start Python. The PowerShell script contains none of that; each ``<TAB>`` launches your program, which computes all candidates. Keep module-level imports light (see :ref:`Lazy Loading`), since their cost is paid on every ``<TAB>``.
