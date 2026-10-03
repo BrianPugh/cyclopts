@@ -555,3 +555,19 @@ def test_install_completion_powershell_real_profile(temp_home, tmp_path, monkeyp
         timeout=15,
     )
     assert result.stdout.split() == ["deploy"]
+
+
+def test_install_completion_command_non_utf8_stdout(ps_profile, monkeypatch):
+    """Redirected stdout on Windows is cp1252, which has no check mark; the messages must still print."""
+    import io
+
+    app = App(name="testapp")
+    app.register_install_completion_command()
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "powershell")
+    stdout = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    app(["--install-completion"], exit_on_error=False, result_action="return_value")
+
+    stdout.seek(0)
+    assert "Completion script installed" in stdout.read()

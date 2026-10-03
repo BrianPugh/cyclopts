@@ -193,6 +193,15 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
     return True
 
 
+def _check_mark() -> str:
+    """``✓``, or ``*`` when stdout can't encode it (redirected output on Windows is typically cp1252)."""
+    try:
+        "✓".encode(sys.stdout.encoding or "utf-8")
+    except (UnicodeEncodeError, LookupError):
+        return "*"
+    return "✓"
+
+
 def create_install_completion_command(
     install_completion_fn: Callable[..., Path],
     add_to_startup: bool,
@@ -244,17 +253,18 @@ def create_install_completion_command(
                 sys.exit(1)
 
         install_path = install_completion_fn(shell=shell, output=output, add_to_startup=add_to_startup)
+        mark = _check_mark()
 
-        print(f"✓ Completion script installed to {install_path}")
+        print(f"{mark} Completion script installed to {install_path}")
 
         if shell == "zsh":
             if _detect_omz_completions_dir():
-                print("✓ Detected oh-my-zsh: completions directory is already in $fpath.")
+                print(f"{mark} Detected oh-my-zsh: completions directory is already in $fpath.")
                 print("\nRestart your shell or run: exec zsh")
             elif add_to_startup:
                 zshrc = Path.home() / ".zshrc"
                 completion_dir = install_path.parent
-                print(f"✓ Added {completion_dir} to fpath in {zshrc}")
+                print(f"{mark} Added {completion_dir} to fpath in {zshrc}")
                 print("\nNote: Ensure compinit is configured in your .zshrc (most zsh setups already have this).")
                 print("Restart your shell or run: exec zsh")
             else:
@@ -267,7 +277,7 @@ def create_install_completion_command(
         elif shell == "bash":
             if add_to_startup:
                 bashrc = Path.home() / ".bashrc"
-                print(f"✓ Added completion loader to {bashrc}")
+                print(f"{mark} Added completion loader to {bashrc}")
                 print("\nRestart your shell or run: source ~/.bashrc")
             else:
                 print("\nCompletions will be automatically loaded by bash-completion.")
@@ -284,7 +294,7 @@ def create_install_completion_command(
         elif shell == "powershell":
             if add_to_startup:
                 profile = powershell_profile()
-                print(f"✓ Added completion loader to {profile}")
+                print(f"{mark} Added completion loader to {profile}")
                 print(f"\nRestart PowerShell or run: . '{profile}'")
             else:
                 print("\nTo enable completions, add this line to your PowerShell profile ($PROFILE):")
