@@ -267,6 +267,21 @@ def test_e2e_paths(tester, tmp_path, monkeypatch):
     assert _texts(tester, "deployer deploy --config=co") == [f"--config=.{sep}conf.toml"]
 
 
+def test_e2e_paths_are_literal(tester, tmp_path, monkeypatch):
+    """CompleteFilename's cmdlet escaping is undone; the program receives the literal file name."""
+    (tmp_path / "work").mkdir()
+    names = ["br[1].txt", "tick`y.txt", "it's.txt"] + ([] if sys.platform == "win32" else ["a*b.txt"])
+    for name in names:
+        (tmp_path / "work" / name).write_text("")
+    monkeypatch.chdir(tmp_path / "work")
+    sep = "\\" if sys.platform == "win32" else "/"
+    expected = [f"'.{sep}br[1].txt'", f"'.{sep}tick`y.txt'", f"'.{sep}it''s.txt'"]
+    if sys.platform != "win32":
+        expected.append(f"'.{sep}a*b.txt'")
+    assert sorted(_texts(tester, "deployer deploy --config ")) == sorted(expected)
+    assert _texts(tester, "deployer deploy --config=br") == [f"'--config=.{sep}br[1].txt'"]
+
+
 def test_e2e_environment_restored(tester):
     """The script's temporary environment variables don't leak into the session."""
     driver = (

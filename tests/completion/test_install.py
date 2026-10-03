@@ -522,6 +522,15 @@ def test_install_completion_rc_preserves_undecodable_bytes(ps_profile, temp_home
     assert len(data) > len(original)
 
 
+def test_install_completion_relative_output_is_absolute_in_profile(ps_profile, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    install_path = App(name="testapp").install_completion(shell="powershell", output=Path("comp.ps1"))
+
+    assert install_path == tmp_path / "comp.ps1"
+    assert f"Test-Path -LiteralPath '{tmp_path / 'comp.ps1'}'" in ps_profile.read_text(encoding="utf-8-sig")
+
+
 def test_install_completion_powershell_add_to_startup_false(ps_profile):
     App(name="testapp").install_completion(shell="powershell", add_to_startup=False)
     assert not ps_profile.exists()

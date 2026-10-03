@@ -67,6 +67,15 @@ Register-ArgumentCompleter -Native -CommandName __COMMAND_NAMES__ -ScriptBlock {
         }
     }
 
+    $format = {
+        param($text)
+        if ($quote -eq '"') { return '"' + ($text -replace '([`"$\u201C-\u201E])', '`$1') + '"' }
+        if ($quote -eq "'" -or $text -match '[\s''"`$,;(){}@|&<>#*?\[\u2018-\u201E]') {
+            return "'" + ($text -replace '([''\u2018-\u201B])', '$1$1') + "'"
+        }
+        $text
+    }
+
     $started = $false
     $prefix = ''
     $files = $false
@@ -88,20 +97,20 @@ Register-ArgumentCompleter -Native -CommandName __COMMAND_NAMES__ -ScriptBlock {
         if ($fields.Count -gt 1 -and $fields[1]) { $description = $fields[1] }
         $resultType = 'ParameterValue'
         if ($value.StartsWith('-') -and -not $prefix) { $resultType = 'ParameterName' }
-        $text = $prefix + $value
-        if ($quote -eq '"') {
-            $text = '"' + ($text -replace '([`"$\u201C-\u201E])', '`$1') + '"'
-        } elseif ($quote -eq "'" -or $text -match '[\s''"`$,;(){}@|&<>#*?\[\u2018-\u201E]') {
-            $text = "'" + ($text -replace '([''\u2018-\u201B])', '$1$1') + "'"
-        }
-        New-Object System.Management.Automation.CompletionResult $text, $value, $resultType, $description
+        New-Object System.Management.Automation.CompletionResult (& $format ($prefix + $value)), $value, $resultType, $description
     }
 
     if ($files) {
         $pathWord = $wordToComplete
         if ($prefix -and $pathWord.StartsWith($prefix)) { $pathWord = $pathWord.Substring($prefix.Length) }
         foreach ($path in [System.Management.Automation.CompletionCompleters]::CompleteFilename($pathWord)) {
-            New-Object System.Management.Automation.CompletionResult ($prefix + $path.CompletionText), $path.ListItemText, $path.ResultType, $path.ToolTip
+            # CompleteFilename quotes and wildcard-escapes for cmdlets (5.1 leaves backticks bare); recover the literal path.
+            $raw = $path.CompletionText
+            if ($raw.Length -gt 1 -and $raw.StartsWith("'") -and $raw.EndsWith("'")) {
+                $raw = $raw.Substring(1, $raw.Length - 2) -replace '([''\u2018-\u201B])[''\u2018-\u201B]', '$1'
+            }
+            $raw = $raw -replace '`([\[\]`])', '$1'
+            New-Object System.Management.Automation.CompletionResult (& $format ($prefix + $raw)), $path.ListItemText, $path.ResultType, $path.ToolTip
         }
     }
 }

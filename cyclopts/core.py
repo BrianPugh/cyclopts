@@ -2948,6 +2948,7 @@ class App:
 
         if output is None:
             output = get_default_completion_path(shell, self.name[0])
+        output = output.absolute()
 
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(script_content)
