@@ -125,6 +125,10 @@ def get_default_completion_path(shell: Literal["zsh", "bash", "fish", "powershel
         raise ValueError(f"Unsupported shell: {shell}")
 
 
+def _powershell_quote(path: Path) -> str:
+    return "'" + str(path).replace("'", "''") + "'"
+
+
 def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zsh", "powershell"]) -> bool:
     """Add completion configuration to shell RC file.
 
@@ -146,6 +150,7 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
     bool
         True if configuration was added, False if it already existed or on error.
     """
+    prog_name = prog_name.replace("\r", " ").replace("\n", " ")
     if shell == "bash":
         rc_file = Path.home() / ".bashrc"
         config_line = f'[ -f "{script_path}" ] && . "{script_path}"'
@@ -159,7 +164,7 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
         comment = f"# {prog_name} completions"
     elif shell == "powershell":
         rc_file = powershell_profile()
-        quoted = "'" + str(script_path).replace("'", "''") + "'"
+        quoted = _powershell_quote(script_path)
         config_line = f"if (Test-Path {quoted}) {{ . {quoted} }}"
         comment = f"# Load {prog_name} completion"
     else:
@@ -295,10 +300,10 @@ def create_install_completion_command(
             if add_to_startup:
                 profile = powershell_profile()
                 print(f"{mark} Added completion loader to {profile}")
-                print(f"\nRestart PowerShell or run: . '{profile}'")
+                print(f"\nRestart PowerShell or run: . {_powershell_quote(profile)}")
             else:
                 print("\nTo enable completions, add this line to your PowerShell profile ($PROFILE):")
-                print(f"    . '{install_path}'")
+                print(f"    . {_powershell_quote(install_path)}")
             if sys.platform == "win32":
                 print("\nIf PowerShell reports that running scripts is disabled, allow local scripts with:")
                 print("    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned")

@@ -178,7 +178,7 @@ Basic Usage
 
 .. important::
 
-   Only reach for a completer when the candidate values are genuinely unknown until runtime -- git branches, running containers, rows from a database, files on disk. If the values are fixed at definition time, use a :class:`~typing.Literal`, an :class:`~enum.Enum`, or :attr:`.Parameter.choices` instead: those complete entirely in the shell, whereas a completer launches your Python program on every ``<TAB>`` in bash, zsh, and fish (see the warning above).
+   Only reach for a completer when the candidate values are genuinely unknown until runtime -- git branches, running containers, rows from a database, files on disk. If the values are fixed at definition time, use a :class:`~typing.Literal`, an :class:`~enum.Enum`, or :attr:`.Parameter.choices` instead: in bash, zsh, and fish those complete entirely in the shell, whereas a completer launches your Python program on every ``<TAB>`` (see the warning above). PowerShell launches your program for every completion either way.
 
 A completer is a callable that accepts a single :class:`~cyclopts.completion.CompletionContext` argument and returns the candidate values: a single string, an iterable of strings and/or ``(value, description)`` tuples, or a ``{value: description}`` dictionary. This example completes a git branch name -- values that can't be baked into a static script, since they change as branches come and go:
 

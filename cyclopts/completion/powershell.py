@@ -123,7 +123,7 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
     """
     names = [prog_name] if prog_name.lower().endswith(".exe") else [prog_name, f"{prog_name}.exe"]
     return (
-        _TEMPLATE.replace("__PROG_COMMENT__", prog_name.replace("\n", " "))
+        _TEMPLATE.replace("__PROG_COMMENT__", prog_name.replace("\r", " ").replace("\n", " "))
         .replace("__COMMAND_NAMES__", ", ".join(_single_quote(name) for name in names))
         .replace("__PROG_INVOKE__", _single_quote(prog_name))
     )

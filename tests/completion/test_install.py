@@ -475,6 +475,14 @@ def test_install_completion_powershell_quotes_path(ps_profile):
     assert f"if (Test-Path {quoted}) {{ . {quoted} }}" in ps_profile.read_text()
 
 
+def test_install_completion_powershell_comment_strips_line_breaks(ps_profile):
+    app = App(name="a\rb\nc")
+
+    app.install_completion(shell="powershell", output=ps_profile.parent / "x.ps1")
+
+    assert ps_profile.read_text().splitlines()[0] == "# Load a b c completion"
+
+
 def test_install_completion_powershell_add_to_startup_false(ps_profile):
     App(name="testapp").install_completion(shell="powershell", add_to_startup=False)
     assert not ps_profile.exists()
@@ -494,6 +502,22 @@ def test_install_completion_command_powershell(ps_profile, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert f"Added completion loader to {ps_profile}" in out
     assert f"run: . '{ps_profile}'" in out
+
+
+def test_install_completion_command_powershell_quotes_profile(ps_profile, temp_home, monkeypatch, capsys):
+    profile = temp_home / "O'Connor" / "profile.ps1"
+    monkeypatch.setattr("cyclopts.completion.install.powershell_profile", lambda: profile)
+    app = App(name="testapp")
+    app.register_install_completion_command()
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "powershell")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    assert "run: . '" + str(profile).replace("'", "''") + "'" in capsys.readouterr().out
 
 
 def test_powershell_profile_queries_powershell(monkeypatch):
