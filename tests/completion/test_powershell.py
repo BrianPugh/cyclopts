@@ -69,6 +69,20 @@ def test_full_mode_option_names_with_docstring_descriptions(app, monkeypatch, ca
     assert _full_complete(app, ["deploy", "--u"], monkeypatch, capsys) == ["--user\tWho deploys."]
 
 
+def test_full_mode_uses_command_help_version_flags(monkeypatch, capsys):
+    app = App(name="myapp", version="1.0", result_action="return_value")
+
+    @app.command(help_flags=["--aide"], version_flags=[])
+    def deploy(): ...
+
+    assert _full_complete(app, ["-"], monkeypatch, capsys) == [
+        "--help\tDisplay this message and exit.",
+        "-h\tDisplay this message and exit.",
+        "--version\tDisplay application version.",
+    ]
+    assert _full_complete(app, ["deploy", "-"], monkeypatch, capsys) == ["--aide"]
+
+
 def test_full_mode_static_choices(app, monkeypatch, capsys):
     assert _full_complete(app, ["deploy", ""], monkeypatch, capsys) == ["dev", "prod"]
 
@@ -143,6 +157,12 @@ def test_script_quotes_prog_name():
     script = App(name="it's").generate_completion(shell="powershell")
     assert "-CommandName 'it''s', 'it''s.exe'" in script
     assert "$program = 'it''s'" in script
+
+
+def test_script_non_ascii_prog_name_is_ascii():
+    script = App(name="calf\u00e9\U0001f600").generate_completion(shell="powershell")
+    script.encode("ascii")
+    assert "$program = (-join [char[]](0x63,0x61,0x66,0xe9,0xd83d,0xde00))" in script
 
 
 def test_script_comment_strips_line_breaks():
@@ -340,3 +360,10 @@ def test_e2e_invoked_by_path_off_path(dynamic_completion_tester, tmp_path, monke
     bindir = tmp_path / "bin"
     monkeypatch.setenv("PATH", os.environ["PATH"].replace(f"{bindir}{os.pathsep}", "", 1))
     assert tester.get_completions(f"& '{bindir / 'deployer'}' ") == ["alpha", "beta"]
+
+
+def test_e2e_non_ascii_prog_name(dynamic_completion_tester):
+    tester = dynamic_completion_tester(
+        GAPS_SOURCE.replace('"deployer"', '"déployer"'), prog_name="déployer", shell="powershell"
+    )
+    assert tester.get_completions("déployer ") == ["alpha", "beta"]

@@ -117,8 +117,13 @@ Register-ArgumentCompleter -Native -CommandName __COMMAND_NAMES__ -ScriptBlock {
 """
 
 
-def _single_quote(text: str) -> str:
-    return "'" + text.replace("'", "''") + "'"
+def _ps_string(text: str) -> str:
+    """PowerShell string expression for ``text``; non-ASCII becomes char codes so the script stays ASCII."""
+    if text.isascii():
+        return "'" + text.replace("'", "''") + "'"
+    units = text.encode("utf-16-le")
+    codes = ",".join(f"0x{int.from_bytes(units[i : i + 2], 'little'):x}" for i in range(0, len(units), 2))
+    return f"(-join [char[]]({codes}))"
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
@@ -138,7 +143,10 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
     """
     names = [prog_name] if prog_name.lower().endswith(".exe") else [prog_name, f"{prog_name}.exe"]
     return (
-        _TEMPLATE.replace("__PROG_COMMENT__", prog_name.replace("\r", " ").replace("\n", " "))
-        .replace("__COMMAND_NAMES__", ", ".join(_single_quote(name) for name in names))
-        .replace("__PROG_INVOKE__", _single_quote(prog_name))
+        _TEMPLATE.replace(
+            "__PROG_COMMENT__",
+            prog_name.replace("\r", " ").replace("\n", " ").encode("ascii", "backslashreplace").decode(),
+        )
+        .replace("__COMMAND_NAMES__", ", ".join(_ps_string(name) for name in names))
+        .replace("__PROG_INVOKE__", _ps_string(prog_name))
     )

@@ -541,7 +541,7 @@ def static_candidates(slot: Slot) -> list[tuple[str, "Argument | RegisteredComma
     """
     root = slot.app
     commands = visible_commands(slot.command_app)
-    flags = (*root.help_flags, *root.version_flags)
+    flags = (*slot.command_app.help_flags, *slot.command_app.version_flags)
 
     if slot.option_name:
         return [
