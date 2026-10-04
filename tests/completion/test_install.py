@@ -623,7 +623,12 @@ def test_install_completion_powershell_real_profile(temp_home, tmp_path, monkeyp
     write_shim(tmp_path / "bin", "testapp", entry)
     monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}")
 
-    install_path = App(name="testapp").install_completion(shell="powershell")
+    app = App(name="testapp")
+
+    @app.command
+    def deploy(): ...
+
+    install_path = app.install_completion(shell="powershell")
 
     assert install_path == temp_home / ".config" / "powershell" / "Completions" / "testapp.ps1"
     result = subprocess.run(

@@ -147,7 +147,7 @@ Completion works in PowerShell 7+ (``pwsh``, on any OS) and in Windows PowerShel
 ``--shell powershell`` covers both editions. The 2 editions keep separate profiles, and ``--install-completion`` edits the profile of the edition it's run from (Windows PowerShell 5.1 when run from outside PowerShell, e.g. ``cmd.exe``), so on Windows run it once from each edition you use.
 It differs from the other shells in a few ways:
 
-- **Every** ``<TAB>`` **runs your program.** The bash, zsh, and fish scripts contain your app's commands, options, and choices, so most completions never start Python. The PowerShell script contains none of that; each ``<TAB>`` launches your program, which computes all candidates. Keep module-level imports light (see :ref:`Lazy Loading`), since their cost is paid on every ``<TAB>``.
+- **Matching ignores case**, as is usual in PowerShell: ``DEP<TAB>`` completes ``deploy``.
 - **No candidates means file completion.** When nothing matches (for example, the value of an ``int`` option), PowerShell falls back to completing file names, as it does for any native command.
 - **Descriptions** appear as tooltips in PowerShell's menu completion (``Ctrl+Space``, or ``Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete``).
 
@@ -166,7 +166,7 @@ The callback is invoked when the user presses ``<TAB>``, enabling **runtime valu
 
 .. warning::
 
-   Completing the value of a completer-backed parameter launches your Python program in a fresh process to run the completer. Each such ``<TAB>`` pays interpreter startup plus every import your program performs at module load, *before* the completer callback runs. (In bash, zsh, and fish, completing command names, option names, and static choices stays entirely in-shell and pays none of this; in PowerShell, every ``<TAB>`` pays it.) Heavy, non-lazy top-level imports (``numpy``, ``pandas``, ``torch``, ...) make those completions noticeably sluggish.
+   Completing the value of a completer-backed parameter launches your Python program in a fresh process to run the completer. Each such ``<TAB>`` pays interpreter startup plus every import your program performs at module load, *before* the completer callback runs. (Completing command names, option names, and static choices stays entirely in the shell and pays none of this.) Heavy, non-lazy top-level imports (``numpy``, ``pandas``, ``torch``, ...) make those completions noticeably sluggish.
 
    To keep completion responsive, avoid heavy module-level imports, import expensive dependencies lazily inside the functions that use them, and use :ref:`Lazy Loading` for commands with heavy dependencies.
 
@@ -179,7 +179,7 @@ Basic Usage
 
 .. important::
 
-   Only reach for a completer when the candidate values are genuinely unknown until runtime -- git branches, running containers, rows from a database, files on disk. If the values are fixed at definition time, use a :class:`~typing.Literal`, an :class:`~enum.Enum`, or :attr:`.Parameter.choices` instead: in bash, zsh, and fish those complete entirely in the shell, whereas a completer launches your Python program on every ``<TAB>`` (see the warning above). PowerShell launches your program for every completion either way.
+   Only reach for a completer when the candidate values are genuinely unknown until runtime -- git branches, running containers, rows from a database, files on disk. If the values are fixed at definition time, use a :class:`~typing.Literal`, an :class:`~enum.Enum`, or :attr:`.Parameter.choices` instead: those complete entirely in the shell, whereas a completer launches your Python program on every ``<TAB>`` (see the warning above).
 
 A completer is a callable that accepts a single :class:`~cyclopts.completion.CompletionContext` argument and returns the candidate values: a single string, an iterable of strings and/or ``(value, description)`` tuples, or a ``{value: description}`` dictionary. This example completes a git branch name -- values that can't be baked into a static script, since they change as branches come and go:
 

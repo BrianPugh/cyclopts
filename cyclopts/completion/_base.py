@@ -54,6 +54,11 @@ class CompletionData:
         Arguments contributed by *this path's* plain ``@app.default``. These
         are alternatives to the subcommand at the same word slot and must
         never shift it.
+    help_flags : tuple[str, ...]
+        Help flags of the command at this path (dispatch uses the command's own,
+        which may differ from the root's).
+    version_flags : tuple[str, ...]
+        Version flags of the command at this path.
     """
 
     arguments: "ArgumentCollection"
@@ -61,6 +66,8 @@ class CompletionData:
     help_format: str
     launcher_arguments: "ArgumentCollection" = field(factory=ArgumentCollection)
     own_arguments: "ArgumentCollection" = field(factory=ArgumentCollection)
+    help_flags: tuple[str, ...] = ()
+    version_flags: tuple[str, ...] = ()
 
 
 def visible_commands(app: "App") -> list[RegisteredCommand]:
@@ -156,6 +163,8 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
             help_format=help_format,
             launcher_arguments=launcher_arguments,
             own_arguments=own_arguments,
+            help_flags=tuple(command_app.help_flags),
+            version_flags=tuple(command_app.version_flags),
         )
 
         for registered_command in commands:

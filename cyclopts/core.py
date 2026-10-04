@@ -2748,9 +2748,9 @@ class App:
 
         *Full* mode, requested by setting ``CYCLOPTS_COMPLETE_WORDS`` (which then
         supplies the words, see :data:`~cyclopts.completion._engine.COMPLETE_WORDS_ENV_VAR`),
-        serves a script that carries no static data (PowerShell). Its records also
-        cover command names, option names, and static choices, already filtered
-        by the typed prefix. Two directives may precede the records:
+        serves the PowerShell script's completer-backed slots. Its records also
+        cover command names, option names, and static choices for that slot,
+        already filtered (case-insensitively) by the typed prefix. Two directives may precede the records:
         ``\x1fprefix<TAB><text>`` (completing an ``=``-form value: insert ``<text>``,
         e.g. ``--opt=``, before every candidate) and ``\x1ffiles`` (add the
         shell's own path completions).

@@ -162,13 +162,13 @@ def test_script_registers_exe_name():
 def test_script_quotes_prog_name():
     script = App(name="it's").generate_completion(shell="powershell")
     assert "-CommandName 'it''s', 'it''s.exe'" in script
-    assert "$program = 'it''s'" in script
+    assert "$programName = 'it''s'" in script
 
 
 def test_script_non_ascii_prog_name_is_ascii():
     script = App(name="d\u00e9ploy\U0001f600").generate_completion(shell="powershell")
     script.encode("ascii")
-    assert "$program = (-join [char[]](0x64,0xe9,0x70,0x6c,0x6f,0x79,0xd83d,0xde00))" in script
+    assert "$programName = (-join [char[]](0x64,0xe9,0x70,0x6c,0x6f,0x79,0xd83d,0xde00))" in script
 
 
 def test_script_comment_strips_line_breaks():
@@ -377,3 +377,94 @@ def test_e2e_non_ascii_prog_name(dynamic_completion_tester):
         GAPS_SOURCE.replace('"deployer"', '"déployer"'), prog_name="déployer", shell="powershell"
     )
     assert tester.get_completions("déployer ") == ["alpha", "beta"]
+
+
+# --- Static script: completes without running the program ---------------------------------
+
+
+def _static_app():
+    app = App(name="ghost", version="1.0")
+
+    @app.command(alias="dep")
+    def deploy(
+        env: Literal["dev", "prod"],
+        *,
+        point: tuple[int, int] = (0, 0),
+        tags: Annotated[list[str], Parameter(consume_multiple=True)] = [],  # noqa: B006
+        verbose: bool = False,
+        out: Annotated[Path, Parameter(name="--out")] = Path(),
+    ):
+        """Deploy the service."""
+
+    sub = App(name="sub", help_flags=["--aide"], version_flags=[])
+    app.command(sub)
+
+    @sub.default
+    def run(level: Literal["low", "high"] = "low"): ...
+
+    return app
+
+
+@pytest.fixture(params=["pwsh", "powershell"])
+def static_tester(request, pwsh_available) -> PowerShellCompletionTester:
+    """Tester whose program ``ghost`` is not on PATH, so only the script's own data can answer."""
+    if request.param == "pwsh" and not pwsh_available:
+        pytest.skip("pwsh not available")
+    if request.param == "powershell" and not _check_windows_powershell_available():
+        pytest.skip("Windows PowerShell 5.1 not available")
+    script = _static_app().generate_completion(shell="powershell")
+    return PowerShellCompletionTester(script, "ghost", executable=request.param)
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("ghost ", ["deploy", "dep", "sub"]),
+        ("ghost d", ["deploy", "dep"]),
+        ("ghost DE", ["deploy", "dep"]),
+        ("ghost --", ["--help", "--version"]),
+        ("ghost -", ["--help", "-h", "--version"]),
+        ("ghost deploy ", ["dev", "prod"]),
+        ("ghost dep p", ["prod"]),
+        ("ghost deploy --env ", ["dev", "prod"]),
+        ("ghost deploy --env=d", ["dev"]),
+        ("ghost deploy --v", ["--verbose", "--version"]),
+        ("ghost deploy --no", ["--no-verbose"]),
+        ("ghost deploy --point 1 --v", ["--verbose", "--version"]),
+        ("ghost deploy --tags a b --verb", ["--verbose"]),
+        ("ghost deploy dev ", []),
+        ("ghost sub -", ["--level", "--aide"]),
+        ("ghost sub ", ["low", "high"]),
+    ],
+)
+def test_static_completions(static_tester, line, expected):
+    assert static_tester.get_completions(line) == expected
+
+
+def test_static_after_end_of_options(static_tester):
+    """Words after ``--`` are positional values, never option names."""
+    assert static_tester.get_completions("ghost deploy -- -") == []
+    assert static_tester.get_completions("ghost deploy -- p") == ["prod"]
+
+
+def test_static_skips_option_values(static_tester):
+    """A value that looks like a command or choice is consumed by its option, not counted as a positional."""
+    assert static_tester.get_completions("ghost deploy --point 1 2 ") == ["dev", "prod"]
+
+
+def test_static_eq_form_inserts_prefix(static_tester):
+    assert _texts(static_tester, "ghost deploy --env=d") == ["--env=dev"]
+
+
+def test_static_path_option(static_tester, tmp_path, monkeypatch):
+    (tmp_path / "work").mkdir()
+    (tmp_path / "work" / "folder").mkdir()
+    (tmp_path / "work" / "file.txt").write_text("")
+    monkeypatch.chdir(tmp_path / "work")
+    sep = "\\" if sys.platform == "win32" else "/"
+    assert sorted(_texts(static_tester, "ghost deploy --out ")) == [f".{sep}file.txt", f".{sep}folder"]
+
+
+def test_static_negative_number_is_a_value(static_tester):
+    assert static_tester.get_completions("ghost deploy --point -1 ") == []
+    assert static_tester.get_completions("ghost deploy --point -1 -2 --verb") == ["--verbose"]
