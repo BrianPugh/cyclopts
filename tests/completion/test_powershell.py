@@ -438,6 +438,8 @@ def static_tester(request, pwsh_available) -> PowerShellCompletionTester:
     ],
 )
 def test_static_completions(static_tester, line, expected):
+    if static_tester.executable == "powershell" and line.split(" ")[-1] in ("-", "--"):
+        pytest.skip("Windows PowerShell 5.1 never calls a native completer for a bare - or --")
     assert static_tester.get_completions(line) == expected
 
 

@@ -149,6 +149,7 @@ It differs from the other shells in a few ways:
 
 - **Matching ignores case**, as is usual in PowerShell: ``DEP<TAB>`` completes ``deploy``.
 - **No candidates means file completion.** When nothing matches (for example, the value of an ``int`` option), PowerShell falls back to completing file names, as it does for any native command.
+- **Windows PowerShell 5.1 can't complete a bare dash.** It never calls a completer for ``-`` or ``--``, so type one more character (``--v<TAB>``) to list option names. PowerShell 7 completes them.
 - **Descriptions** appear as tooltips in PowerShell's menu completion (``Ctrl+Space``, or ``Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete``).
 
 On Windows, if PowerShell reports that running scripts is disabled when loading your profile, allow local scripts:

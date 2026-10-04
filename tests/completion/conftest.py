@@ -601,7 +601,8 @@ def dynamic_completion_tester(tmp_path, monkeypatch):
             pytest.skip(f"{shell} not available")
 
         # 1. Write and import the app module (guarded ``app()`` won't run on import).
-        module_path = tmp_path / f"{prog_name}_app.py"
+        # An ASCII name: cmd.exe decodes the .cmd shim in the current console code page, which the completer changes.
+        module_path = tmp_path / "app_module.py"
         module_path.write_text(app_source, encoding="utf-8")
         spec = importlib.util.spec_from_file_location(f"_dyn_{prog_name}_app", module_path)
         assert spec and spec.loader
