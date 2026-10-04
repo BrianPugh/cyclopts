@@ -65,6 +65,12 @@ def test_full_mode_filters_by_prefix(app, monkeypatch, capsys):
     assert _full_complete(app, ["dep"], monkeypatch, capsys) == ["deploy\tDeploy the service."]
 
 
+def test_full_mode_prefix_is_case_insensitive(app, monkeypatch, capsys):
+    assert _full_complete(app, ["DeP"], monkeypatch, capsys) == ["deploy\tDeploy the service."]
+    assert _full_complete(app, ["deploy", "--U"], monkeypatch, capsys) == ["--user\tWho deploys."]
+    assert _full_complete(app, ["deploy", "--user", "A"], monkeypatch, capsys) == ["alice\tAdmin", "anna"]
+
+
 def test_full_mode_option_names_with_docstring_descriptions(app, monkeypatch, capsys):
     assert _full_complete(app, ["deploy", "--u"], monkeypatch, capsys) == ["--user\tWho deploys."]
 
@@ -160,9 +166,9 @@ def test_script_quotes_prog_name():
 
 
 def test_script_non_ascii_prog_name_is_ascii():
-    script = App(name="calf\u00e9\U0001f600").generate_completion(shell="powershell")
+    script = App(name="d\u00e9ploy\U0001f600").generate_completion(shell="powershell")
     script.encode("ascii")
-    assert "$program = (-join [char[]](0x63,0x61,0x66,0xe9,0xd83d,0xde00))" in script
+    assert "$program = (-join [char[]](0x64,0xe9,0x70,0x6c,0x6f,0x79,0xd83d,0xde00))" in script
 
 
 def test_script_comment_strips_line_breaks():
@@ -257,6 +263,10 @@ def test_e2e_result_types_and_tooltips(tester):
 )
 def test_e2e_quoting(tester, line, expected):
     assert _texts(tester, line) == expected
+
+
+def test_e2e_case_insensitive(tester):
+    assert _texts(tester, "deployer DEP") == ["deploy"]
 
 
 def test_e2e_non_ascii(tester):

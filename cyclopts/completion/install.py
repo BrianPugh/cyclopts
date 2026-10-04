@@ -11,6 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Literal
 
+from cyclopts.completion.powershell import _ps_string
 from cyclopts.parameter import Parameter
 
 
@@ -53,6 +54,13 @@ def _powershell_executable() -> str:
     return "pwsh" if any("\\powershell\\" in path for path in paths) else "powershell"
 
 
+# Redirected output otherwise uses the console code page, garbling a non-ASCII path.
+_PROFILE_COMMAND = (
+    "try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }; "
+    "$PROFILE.CurrentUserAllHosts"
+)
+
+
 def powershell_profile() -> Path:
     """The current user's all-hosts PowerShell profile (``$PROFILE.CurrentUserAllHosts``).
 
@@ -61,9 +69,10 @@ def powershell_profile() -> Path:
     executable = _powershell_executable()
     try:
         result = subprocess.run(
-            [executable, "-NoProfile", "-NonInteractive", "-Command", "$PROFILE.CurrentUserAllHosts"],
+            [executable, "-NoProfile", "-NonInteractive", "-Command", _PROFILE_COMMAND],
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
         )
         if result.returncode == 0 and result.stdout.strip():
@@ -186,7 +195,8 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
         comment = f"# {prog_name} completions"
     elif shell == "powershell":
         rc_file = powershell_profile()
-        quoted = _powershell_quote(script_path)
+        # Windows PowerShell 5.1 reads a BOM-less profile as ANSI, so keep the line ASCII.
+        quoted = _ps_string(str(script_path))
         config_line = f"if (Test-Path -LiteralPath {quoted}) {{ . {quoted} }}"
         comment = f"# Load {prog_name} completion"
     else:

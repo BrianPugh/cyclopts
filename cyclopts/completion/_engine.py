@@ -605,9 +605,11 @@ def compute_full_completions(app: "App", words: list[str]) -> FullCompletions:
 
     seen: set[str] = set()
     candidates: list[Completion] = []
+    # PowerShell completion is case-insensitive; the inserted candidate restores the real case.
+    incomplete = slot.incomplete.casefold()
 
     def add(value: str, description: "str | Callable[[], str]") -> None:
-        if value in seen or not value.startswith(slot.incomplete):
+        if value in seen or not value.casefold().startswith(incomplete):
             return
         seen.add(value)
         if callable(description):

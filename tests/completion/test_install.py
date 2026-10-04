@@ -531,6 +531,16 @@ def test_install_completion_relative_output_is_absolute_in_profile(ps_profile, t
     assert f"Test-Path -LiteralPath '{tmp_path / 'comp.ps1'}'" in ps_profile.read_text(encoding="utf-8-sig")
 
 
+def test_install_completion_powershell_non_ascii_path_is_ascii(ps_profile):
+    output = ps_profile.parent / "jos\u00e9" / "testapp.ps1"
+
+    App(name="testapp").install_completion(shell="powershell", output=output)
+
+    content = ps_profile.read_bytes().decode("utf-8-sig")
+    content.encode("ascii")
+    assert "0xe9" in content
+
+
 def test_install_completion_powershell_add_to_startup_false(ps_profile):
     App(name="testapp").install_completion(shell="powershell", add_to_startup=False)
     assert not ps_profile.exists()
@@ -581,7 +591,8 @@ def test_powershell_profile_queries_powershell(monkeypatch):
 
     monkeypatch.setattr(install.subprocess, "run", fake_run)
     assert install.powershell_profile() == Path("/somewhere/profile.ps1")
-    assert calls[0][-1] == "$PROFILE.CurrentUserAllHosts"
+    assert calls[0][-1].endswith("$PROFILE.CurrentUserAllHosts")
+    assert "UTF8Encoding" in calls[0][-1]
 
 
 def test_powershell_profile_fallback(temp_home, monkeypatch):
