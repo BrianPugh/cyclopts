@@ -1,14 +1,14 @@
 """Runtime engine for dynamic (Python-invoked) shell completion.
 
-The static ``bash``/``zsh``/``fish`` generators bake command, option, and static
-choice names into a script at install time. When an argument has a
-:attr:`.Parameter.completer`, that script also calls back at TAB time through the
-reserved ``__complete`` command, which routes here to run the completer and emit
-its candidate values.
+The static ``bash``/``zsh``/``fish``/``powershell`` generators bake command,
+option, and static choice names into a script at install time. When an argument
+has a :attr:`.Parameter.completer`, that script also calls back at TAB time
+through the reserved ``__complete`` command, which routes here to run the
+completer and emit its candidate values.
 
-The PowerShell script has no static data at all: it requests *full* completion
-(:func:`compute_full_completions`), where this engine also supplies the command
-names, option names, and static choices.
+The PowerShell script requests *full* completion
+(:func:`compute_full_completions`) for a completer-backed slot, so this engine
+also supplies that slot's static choices, ``=`` prefix, and file directive.
 """
 
 import os
@@ -595,7 +595,7 @@ def compute_full_completions(app: "App", words: list[str]) -> FullCompletions:
     """Compute every completion candidate (static and dynamic) for a partial command line.
 
     Unlike :func:`compute_completions`, this filters by the typed prefix, since
-    its caller has no static data of its own to merge in and filter.
+    its caller hands over the whole active slot and adds no candidates of its own.
     """
     slot = resolve_slot(app, words)
     if slot is None:

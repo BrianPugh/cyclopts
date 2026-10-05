@@ -470,3 +470,116 @@ def test_static_path_option(static_tester, tmp_path, monkeypatch):
 def test_static_negative_number_is_a_value(static_tester):
     assert static_tester.get_completions("ghost deploy --point -1 ") == []
     assert static_tester.get_completions("ghost deploy --point -1 -2 --verb") == ["--verbose"]
+
+
+def test_static_double_quoted_words(static_tester):
+    """A quoted word without ``$`` parses as a string constant; its value (not its quotes) is the word."""
+    assert static_tester.get_completions('ghost "deploy" ') == ["dev", "prod"]
+
+
+def test_static_no_commands_after_end_of_options(static_tester):
+    """After ``--`` a command name is a positional value, so commands are neither listed nor descended into."""
+    assert static_tester.get_completions("ghost -- d") == []
+    assert static_tester.get_completions("ghost -- sub ") == []
+
+
+def _slots_app():
+    app = App(name="spectre", version_flags=[])
+
+    @app.command
+    def deploy(
+        hidden: Annotated[str, Parameter(show=False)],
+        pair: tuple[str, str],
+        env: Literal["dev", "prod"],
+        *,
+        secret: Annotated[str, Parameter(show=False)] = "",
+        strict: Annotated[Literal["on", "off"], Parameter(name=["--strict", "-s"], requires_equals=True)] = "on",
+        labels: dict[str, int] = {},  # noqa: B006
+        span: tuple[int, int] = (0, 0),
+    ): ...
+
+    child = App(name="child", end_of_options_delimiter="STOP")
+    app.command(child)
+
+    @child.default
+    def run(mode: Literal["fast", "slow"] = "fast", *, flag: bool = False): ...
+
+    return app
+
+
+@pytest.fixture(params=["pwsh", "powershell"])
+def slots_tester(request, pwsh_available) -> PowerShellCompletionTester:
+    if request.param == "pwsh" and not pwsh_available:
+        pytest.skip("pwsh not available")
+    if request.param == "powershell" and not _check_windows_powershell_available():
+        pytest.skip("Windows PowerShell 5.1 not available")
+    script = _slots_app().generate_completion(shell="powershell")
+    return PowerShellCompletionTester(script, "spectre", executable=request.param)
+
+
+def test_static_positional_slots(slots_tester):
+    """A hidden positional still takes its slot, and a fixed tuple takes one slot per element."""
+    assert slots_tester.get_completions("spectre deploy h ") == []
+    assert slots_tester.get_completions("spectre deploy h a ") == []
+    assert slots_tester.get_completions("spectre deploy h a b ") == ["dev", "prod"]
+
+
+def test_static_hidden_option_keeps_arity(slots_tester):
+    assert slots_tester.get_completions("spectre deploy --se") == []
+    assert slots_tester.get_completions("spectre deploy --secret s h a b ") == ["dev", "prod"]
+
+
+def test_static_requires_equals_inserts_equals(slots_tester):
+    assert _texts(slots_tester, "spectre deploy --st") == ["--strict="]
+
+
+def test_static_requires_equals_takes_no_spaced_value(slots_tester):
+    """``--strict on`` is rejected, so the next word is not its value; the short name still takes one."""
+    assert slots_tester.get_completions("spectre deploy --strict ") == []
+    assert slots_tester.get_completions("spectre deploy -s ") == ["on", "off"]
+
+
+def test_static_dict_key_option_takes_value(slots_tester):
+    assert slots_tester.get_completions("spectre deploy --labels.x 1 h a b ") == ["dev", "prod"]
+
+
+def test_static_eq_form_takes_remaining_values(slots_tester):
+    assert slots_tester.get_completions("spectre deploy --span=1 2 h a b ") == ["dev", "prod"]
+
+
+def test_static_per_command_end_of_options(slots_tester):
+    assert slots_tester.get_completions("spectre child STOP --f") == []
+    assert slots_tester.get_completions("spectre child STOP f") == ["fast"]
+    assert slots_tester.get_completions("spectre child --f") == ["--flag"]
+
+
+def test_static_meta_launcher_positional_precedes_command(pwsh_available):
+    if not pwsh_available:
+        pytest.skip("pwsh not available")
+    app = App(name="meta")
+
+    @app.command
+    def build(kind: Literal["k1", "k2"]): ...
+
+    @app.meta.default
+    def launcher(
+        profile: Literal["p1", "p2"],
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    ): ...
+
+    tester = PowerShellCompletionTester(app.meta.generate_completion(shell="powershell"), "meta")
+    assert tester.get_completions("meta ") == ["p1", "p2"]
+    assert tester.get_completions("meta p1 ") == ["build"]
+    assert tester.get_completions("meta p1 build ") == ["k1", "k2"]
+
+
+def test_script_placeholders_in_user_text_are_literal(pwsh_available):
+    app = App(name="ph", help_format="plaintext")
+
+    @app.default
+    def main(*, x: Annotated[str, Parameter(help="it's __PROG_INVOKE__ __NODES__")] = ""): ...
+
+    script = app.generate_completion(shell="powershell")
+    assert "'it''s __PROG_INVOKE__ __NODES__'" in script
+    if pwsh_available:
+        assert PowerShellCompletionTester(script, "ph").validate_script_syntax()

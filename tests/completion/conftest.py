@@ -417,8 +417,8 @@ def zsh_tester(zsh_available):
 #
 # PowerShell's ``TabExpansion2`` runs the full completion pipeline (including
 # registered native completers) for a given line and cursor, no TTY needed.
-# The generated script has no static data, so *every* completion runs the
-# program: the ``prog`` shim must be on PATH even for static scenarios.
+# Static completions stay in the script; the ``prog`` shim is on PATH for the
+# completer-backed scenarios, which run the program.
 
 _PWSH_DRIVER = r"""
 param([string]$Script, [string]$Line, [int]$Cursor = -1)

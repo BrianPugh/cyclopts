@@ -484,15 +484,25 @@ def test_install_completion_powershell_comment_strips_line_breaks(ps_profile):
     assert ps_profile.read_text(encoding="utf-8-sig").splitlines()[0] == "# Load a b c completion"
 
 
-@pytest.mark.parametrize("encoding", ["utf-16", "utf-8-sig", "utf-8"])
-def test_install_completion_powershell_preserves_profile_encoding(ps_profile, encoding):
+@pytest.mark.parametrize(
+    ("encoding", "bom"),
+    [
+        ("utf-16-le", "\ufeff"),
+        ("utf-16-be", "\ufeff"),
+        ("utf-32-le", "\ufeff"),
+        ("utf-32-be", "\ufeff"),
+        ("utf-8", "\ufeff"),
+        ("utf-8", ""),
+    ],
+)
+def test_install_completion_powershell_preserves_profile_encoding(ps_profile, encoding, bom):
     ps_profile.parent.mkdir(parents=True)
-    ps_profile.write_bytes("Set-Alias g git\r\n".encode(encoding))
+    ps_profile.write_bytes(f"{bom}Set-Alias g git\r\n".encode(encoding))
 
     install_path = App(name="testapp").install_completion(shell="powershell")
 
     assert ps_profile.read_bytes().decode(encoding) == (
-        f"Set-Alias g git\r\n# Load testapp completion\nif (Test-Path -LiteralPath '{install_path}') {{ . '{install_path}' }}\n"
+        f"{bom}Set-Alias g git\r\n# Load testapp completion\nif (Test-Path -LiteralPath '{install_path}') {{ . '{install_path}' }}\n"
     )
 
 

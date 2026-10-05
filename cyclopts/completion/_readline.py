@@ -1,10 +1,10 @@
 """Tab completion for :meth:`.App.interactive_shell` via the stdlib ``readline`` module.
 
-The bash/zsh/fish generators handle command names, option names, static choices,
-and paths in the generated script; only :attr:`.Parameter.completer` values come
-from Python. The interactive shell has no script, so this module takes the
-static candidates from the engine (as PowerShell does), adds paths, and merges
-in the dynamic ones.
+The bash/zsh/fish/PowerShell generators handle command names, option names,
+static choices, and paths in the generated script; only
+:attr:`.Parameter.completer` values come from Python. The interactive shell has
+no script, so this module takes the static candidates from the engine, adds
+paths, and merges in the dynamic ones.
 """
 
 import glob

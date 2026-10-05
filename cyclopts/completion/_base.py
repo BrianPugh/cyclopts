@@ -59,6 +59,8 @@ class CompletionData:
         which may differ from the root's).
     version_flags : tuple[str, ...]
         Version flags of the command at this path.
+    end_of_options_delimiter : str
+        Resolved end-of-options delimiter at this path (``""`` when disabled).
     """
 
     arguments: "ArgumentCollection"
@@ -68,6 +70,7 @@ class CompletionData:
     own_arguments: "ArgumentCollection" = field(factory=ArgumentCollection)
     help_flags: tuple[str, ...] = ()
     version_flags: tuple[str, ...] = ()
+    end_of_options_delimiter: str = "--"
 
 
 def visible_commands(app: "App") -> list[RegisteredCommand]:
@@ -152,6 +155,7 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
                     launcher_arguments.extend(app_arguments)  # this path's meta launcher
                 else:
                     own_arguments.extend(app_arguments)  # plain @app.default
+            end_of_options_delimiter = app.app_stack.resolve("end_of_options_delimiter", fallback="--") or ""
 
         commands = visible_commands(command_app)
 
@@ -165,6 +169,7 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
             own_arguments=own_arguments,
             help_flags=tuple(command_app.help_flags),
             version_flags=tuple(command_app.version_flags),
+            end_of_options_delimiter=end_of_options_delimiter,
         )
 
         for registered_command in commands:

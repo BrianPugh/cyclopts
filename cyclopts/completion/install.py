@@ -140,7 +140,7 @@ def _powershell_quote(path: Path) -> str:
 
 def _codec_errors(encoding: str) -> str:
     """Error handler that round-trips any bytes ``encoding`` can represent, so rewriting a file never alters it."""
-    return "surrogatepass" if encoding == "utf-16" else "surrogateescape"
+    return "surrogatepass" if encoding.startswith(("utf-16", "utf-32")) else "surrogateescape"
 
 
 def _read_text(path: Path, default_encoding: str) -> tuple[str, str]:
@@ -151,8 +151,13 @@ def _read_text(path: Path, default_encoding: str) -> tuple[str, str]:
         data = b""
     if not data:
         encoding = default_encoding
-    elif data.startswith((b"\xff\xfe", b"\xfe\xff")):
-        encoding = "utf-16"
+    elif data.startswith((b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff")):
+        encoding = "utf-32-le" if data[0] == 0xFF else "utf-32-be"
+    elif data.startswith(b"\xff\xfe"):
+        # Endian-specific codecs keep the BOM as U+FEFF, so it round-trips in the original byte order.
+        encoding = "utf-16-le"
+    elif data.startswith(b"\xfe\xff"):
+        encoding = "utf-16-be"
     elif data.startswith(b"\xef\xbb\xbf"):
         encoding = "utf-8-sig"
     else:
