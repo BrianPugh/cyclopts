@@ -12,13 +12,13 @@ from typing import Annotated, Literal
 import pytest
 
 from cyclopts import App, Parameter
-from cyclopts.completion._engine import COMPLETE_WORDS_ENV_VAR
+from cyclopts.completion._engine import COMPLETION_WORDS_ENV_VAR
 
 from .conftest import PowerShellCompletionTester, _check_windows_powershell_available
 
 
 def _full_complete(app, words, monkeypatch, capsys) -> list[str]:
-    monkeypatch.setenv(COMPLETE_WORDS_ENV_VAR, "".join(word + "\x1f" for word in words))
+    monkeypatch.setenv(COMPLETION_WORDS_ENV_VAR, "".join(word + "\x1f" for word in words))
     app(["__complete"], exit_on_error=False)
     lines = capsys.readouterr().out.splitlines()
     return lines[lines.index("\x1fbegin") + 1 :]
@@ -121,7 +121,7 @@ def test_full_mode_env_var_hidden_from_completer(monkeypatch, capsys):
     def spy(ctx):
         import os
 
-        seen.append(os.environ.get(COMPLETE_WORDS_ENV_VAR))
+        seen.append(os.environ.get(COMPLETION_WORDS_ENV_VAR))
         return ["x"]
 
     @app.default
@@ -133,7 +133,7 @@ def test_full_mode_env_var_hidden_from_completer(monkeypatch, capsys):
 
 
 def test_full_mode_words_env_overrides_arguments(app, monkeypatch, capsys):
-    monkeypatch.setenv(COMPLETE_WORDS_ENV_VAR, "dep\x1f")
+    monkeypatch.setenv(COMPLETION_WORDS_ENV_VAR, "dep\x1f")
     app(["__complete", "ignored", ""], exit_on_error=False)
     out = capsys.readouterr().out.splitlines()
     assert out[out.index("\x1fbegin") + 1 :] == ["deploy\tDeploy the service."]
@@ -319,7 +319,7 @@ def test_e2e_environment_restored(tester):
         ". $Script\n"
         "$env:PYTHONIOENCODING = 'sentinel'\n"
         "$null = TabExpansion2 -inputScript 'deployer deploy ' -cursorColumn 16\n"
-        '[Console]::Out.Write("$env:PYTHONIOENCODING|$([bool](Test-Path env:CYCLOPTS_COMPLETE_WORDS))")\n'
+        '[Console]::Out.Write("$env:PYTHONIOENCODING|$([bool](Test-Path env:CYCLOPTS_COMPLETION_WORDS))")\n'
     )
     result = tester._run(driver)
     assert result.stdout.decode() == "sentinel|False"

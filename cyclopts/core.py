@@ -2746,8 +2746,8 @@ class App:
         value and description are flattened to spaces, and a leading ``\x1f`` is
         stripped, so completer-supplied data can never forge a field or directive.
 
-        *Full* mode, requested by setting ``CYCLOPTS_COMPLETE_WORDS`` (which then
-        supplies the words, see :data:`~cyclopts.completion._engine.COMPLETE_WORDS_ENV_VAR`),
+        *Full* mode, requested by setting ``CYCLOPTS_COMPLETION_WORDS`` (which then
+        supplies the words, see :data:`~cyclopts.completion._engine.COMPLETION_WORDS_ENV_VAR`),
         serves the PowerShell script's completer-backed slots. Its records also
         cover command names, option names, and static choices for that slot,
         already filtered (case-insensitively) by the typed prefix. Two directives may precede the records:
@@ -2756,7 +2756,7 @@ class App:
         shell's own path completions).
         """
         from cyclopts.completion._engine import (
-            COMPLETE_WORDS_ENV_VAR,
+            COMPLETION_WORDS_ENV_VAR,
             FullCompletions,
             completion_debug_enabled,
             compute_completions,
@@ -2767,7 +2767,7 @@ class App:
         def sanitize(text: str) -> str:
             return text.replace("\t", " ").replace("\n", " ").replace("\r", " ").lstrip("\x1f")
 
-        full_words = os.environ.pop(COMPLETE_WORDS_ENV_VAR, None)
+        full_words = os.environ.pop(COMPLETION_WORDS_ENV_VAR, None)
         if full_words is not None:
             words = full_words.split("\x1f")[:-1]
         full: FullCompletions | None = None

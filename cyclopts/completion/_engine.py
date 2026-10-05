@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 #: arguments and mangles embedded quotes when calling a native program, and an
 #: environment variable avoids both. The terminator keeps the value non-empty
 #: (Windows deletes a variable assigned ``""``).
-COMPLETE_WORDS_ENV_VAR = "CYCLOPTS_COMPLETE_WORDS"
+COMPLETION_WORDS_ENV_VAR = "CYCLOPTS_COMPLETION_WORDS"
 
 
 def completion_debug_enabled() -> bool:

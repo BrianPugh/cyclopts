@@ -164,11 +164,11 @@ Register-ArgumentCompleter -Native -CommandName __COMMAND_NAMES__ -ScriptBlock {
             $resolved = Get-Command -Name $elements[0].Value -CommandType Application -ErrorAction Ignore | Select-Object -First 1
             if ($resolved) { $program = $resolved.Source }
         }
-        $savedWords = $env:CYCLOPTS_COMPLETE_WORDS
+        $savedWords = $env:CYCLOPTS_COMPLETION_WORDS
         $savedEncoding = $env:PYTHONIOENCODING
         $savedConsoleEncoding = $null
         try {
-            $env:CYCLOPTS_COMPLETE_WORDS = -join ($words | ForEach-Object { $_ + $separator })
+            $env:CYCLOPTS_COMPLETION_WORDS = -join ($words | ForEach-Object { $_ + $separator })
             $env:PYTHONIOENCODING = 'utf-8'
             try {
                 $savedConsoleEncoding = [Console]::OutputEncoding
@@ -176,7 +176,7 @@ Register-ArgumentCompleter -Native -CommandName __COMMAND_NAMES__ -ScriptBlock {
             } catch { }
             $lines = & $program __complete 2>$null
         } finally {
-            $env:CYCLOPTS_COMPLETE_WORDS = $savedWords
+            $env:CYCLOPTS_COMPLETION_WORDS = $savedWords
             $env:PYTHONIOENCODING = $savedEncoding
             if ($null -ne $savedConsoleEncoding) {
                 try { [Console]::OutputEncoding = $savedConsoleEncoding } catch { }
