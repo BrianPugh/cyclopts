@@ -2745,11 +2745,32 @@ class App:
         To keep those field/line delimiters unambiguous, tabs and newlines in the
         value and description are flattened to spaces, and a leading ``\x1f`` is
         stripped, so completer-supplied data can never forge a field or directive.
+
+        *Full* mode, requested by setting ``CYCLOPTS_COMPLETION_WORDS`` (which then
+        supplies the words, see :data:`~cyclopts.completion._engine.COMPLETION_WORDS_ENV_VAR`),
+        serves the PowerShell script's completer-backed slots. Its records also
+        cover command names, option names, and static choices for that slot,
+        already filtered (case-insensitively) by the typed prefix. Two directives may precede the records:
+        ``\x1fprefix<TAB><text>`` (completing an ``=``-form value: insert ``<text>``,
+        e.g. ``--opt=``, before every candidate) and ``\x1ffiles`` (add the
+        shell's own path completions).
         """
-        from cyclopts.completion._engine import completion_debug_enabled, compute_completions, stdout_to_stderr
+        from cyclopts.completion._engine import (
+            COMPLETION_WORDS_ENV_VAR,
+            FullCompletions,
+            completion_debug_enabled,
+            compute_completions,
+            compute_full_completions,
+            stdout_to_stderr,
+        )
 
         def sanitize(text: str) -> str:
             return text.replace("\t", " ").replace("\n", " ").replace("\r", " ").lstrip("\x1f")
+
+        full_words = os.environ.pop(COMPLETION_WORDS_ENV_VAR, None)
+        if full_words is not None:
+            words = full_words.split("\x1f")[:-1]
+        full: FullCompletions | None = None
 
         # Leading newline: import-time output that ended without one would
         # otherwise glue onto the marker and hide it from the shell readers.
@@ -2758,13 +2779,22 @@ class App:
             # Completers are user code; anything they (or their subprocesses) print
             # must not be parsed as a record.
             with stdout_to_stderr():
-                completions = compute_completions(self, list(words))
+                if full_words is None:
+                    completions = compute_completions(self, list(words))
+                else:
+                    full = compute_full_completions(self, list(words))
+                    completions = full.candidates
         except Exception:
             if completion_debug_enabled():
                 import traceback
 
                 traceback.print_exc()
             return None
+        if full is not None:
+            if full.prefix:
+                print(f"\x1fprefix\t{sanitize(full.prefix)}")
+            if full.files:
+                print("\x1ffiles")
         for completion in completions:
             value = sanitize(completion.value)
             help = sanitize(completion.help)
@@ -2778,7 +2808,7 @@ class App:
         self,
         *,
         prog_name: str | None = None,
-        shell: Literal["zsh", "bash", "fish"] | None = None,
+        shell: Literal["zsh", "bash", "fish", "powershell"] | None = None,
     ) -> str:
         """Generate shell completion script for this application.
 
@@ -2786,9 +2816,9 @@ class App:
         ----------
         prog_name : str | None
             Program name for completion. If None, uses first name from app.name.
-        shell : Literal["zsh", "bash", "fish"] | None
+        shell : Literal["zsh", "bash", "fish", "powershell"] | None
             Shell type. If None, automatically detects current shell.
-            Supported shells: "zsh", "bash", "fish".
+            Supported shells: "zsh", "bash", "fish", "powershell".
 
         Returns
         -------
@@ -2843,13 +2873,17 @@ class App:
             from cyclopts.completion.fish import generate_completion_script
 
             return generate_completion_script(app, prog_name)
+        elif shell == "powershell":
+            from cyclopts.completion.powershell import generate_completion_script
+
+            return generate_completion_script(app, prog_name)
         else:
             raise ValueError(f"Unsupported shell: {shell}")
 
     def install_completion(
         self,
         *,
-        shell: Literal["zsh", "bash", "fish"] | None = None,
+        shell: Literal["zsh", "bash", "fish", "powershell"] | None = None,
         output: Path | None = None,
         add_to_startup: bool = True,
     ) -> Path:
@@ -2859,15 +2893,17 @@ class App:
 
         Parameters
         ----------
-        shell : Literal["zsh", "bash", "fish"] | None
+        shell : Literal["zsh", "bash", "fish", "powershell"] | None
             Shell type for completion. If not specified, attempts to auto-detect current shell.
         output : Path | None
             Output path for the completion script. If not specified, uses shell-specific default:
             - zsh: ~/.zsh/completions/_cyclopts_<prog_name> (or $ZSH_CUSTOM/completions/_cyclopts_<prog_name> with oh-my-zsh)
             - bash: ~/.local/share/bash-completion/completions/<prog_name>
             - fish: ~/.config/fish/completions/<prog_name>.fish
+            - powershell: Completions/<prog_name>.ps1 next to the PowerShell profile
         add_to_startup : bool
             If True (default), adds source line to shell RC file to ensure completion is loaded.
+            For PowerShell, this is the current user's all-hosts profile (``$PROFILE.CurrentUserAllHosts``).
             Set to False if completions are already configured to auto-load.
 
         Returns
@@ -2912,12 +2948,13 @@ class App:
 
         if output is None:
             output = get_default_completion_path(shell, self.name[0])
+        output = output.absolute()
 
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(script_content)
 
         # Fish does not need any startup script changes.
-        if add_to_startup and shell in ("bash", "zsh"):
+        if add_to_startup and shell in ("bash", "zsh", "powershell"):
             add_to_rc_file(output, self.name[0], shell)
 
         return output

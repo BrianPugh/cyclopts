@@ -234,7 +234,7 @@ SCENARIOS = [
 ]
 
 
-@pytest.fixture(params=["bash", "zsh", "fish"])
+@pytest.fixture(params=["bash", "zsh", "fish", "powershell"])
 def shell_tester_factory(request):
     """Pick the right tester factory for this shell parametrization.
 

@@ -1,27 +1,48 @@
 """Runtime engine for dynamic (Python-invoked) shell completion.
 
-The static ``bash``/``zsh``/``fish`` generators bake command, option, and static
-choice names into a script at install time. When an argument has a
-:attr:`.Parameter.completer`, that script also calls back at TAB time through the
-reserved ``__complete`` command, which routes here to run the completer and emit
-its candidate values.
+The static ``bash``/``zsh``/``fish``/``powershell`` generators bake command,
+option, and static choice names into a script at install time. When an argument
+has a :attr:`.Parameter.completer`, that script also calls back at TAB time
+through the reserved ``__complete`` command, which routes here to run the
+completer and emit its candidate values.
+
+The PowerShell script requests *full* completion
+(:func:`compute_full_completions`) for a completer-backed slot, so this engine
+also supplies that slot's static choices, ``=`` prefix, and file directive.
 """
 
 import os
 import sys
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager, redirect_stdout
 from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import _parse_configs, _parse_env, _parse_kw_and_flags, _parse_pos
+from cyclopts.completion._base import (
+    CompletionAction,
+    app_description,
+    get_completion_action,
+    strip_markup,
+    visible_commands,
+)
 from cyclopts.exceptions import CycloptsError, MissingArgumentError, RepeatArgumentError
+from cyclopts.field_info import VAR_KEYWORD
 from cyclopts.utils import UNSET, frozen, is_option_like
 
 if TYPE_CHECKING:
     from cyclopts import App
     from cyclopts.argument import Argument
+    from cyclopts.group_extractors import RegisteredCommand
+
+#: Set by a generated script to request *full* completion from ``__complete``.
+#: Its value carries the command-line words, each terminated by ``\x1f``, in
+#: place of the command's arguments. Windows PowerShell 5.1 drops empty-string
+#: arguments and mangles embedded quotes when calling a native program, and an
+#: environment variable avoids both. The terminator keeps the value non-empty
+#: (Windows deletes a variable assigned ``""``).
+COMPLETION_WORDS_ENV_VAR = "CYCLOPTS_COMPLETION_WORDS"
 
 
 def completion_debug_enabled() -> bool:
@@ -301,7 +322,7 @@ def _assemble_arguments(execution_path: "Sequence[App]") -> ArgumentCollection:
     command_app = execution_path[-1]
     arguments = ArgumentCollection()
     launcher_arguments = ArgumentCollection()
-    for subapp, collection in _iter_resolution_argument_collections(execution_path, parse_docstring=False):
+    for subapp, collection in _iter_resolution_argument_collections(execution_path, parse_docstring=True):
         if subapp is command_app:
             arguments.extend(collection)
             continue
@@ -509,3 +530,100 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     # match, which is why substring/fuzzy completion isn't possible. ``incomplete``
     # is for narrowing expensive lookups, not for filtering the result.
     return [Completion(value, help) for value, help in dynamic_candidates(slot)]
+
+
+def static_candidates(slot: Slot) -> list[tuple[str, "Argument | RegisteredCommand | None"]]:
+    """Command names, option names, and static choices for ``slot``, each with the object it names.
+
+    Pass that object to :func:`describe` for the candidate's description; it is
+    returned instead of the description because rendering help markup is slow
+    enough to be worth skipping for candidates that get filtered out.
+    """
+    root = slot.app
+    commands = visible_commands(slot.command_app)
+    flags = (*slot.command_app.help_flags, *slot.command_app.version_flags)
+
+    if slot.option_name:
+        return [
+            *(
+                (name, a)
+                for a in slot.arguments
+                if a.show and a.field_info.kind is not VAR_KEYWORD and not a.is_positional_only()
+                for name in a.names
+            ),
+            *((name, rc) for rc in commands for name in rc.names if name.startswith("-")),
+            *((flag, None) for flag in flags),
+        ]
+
+    candidates: list[tuple[str, Argument | RegisteredCommand | None]] = []
+    if not slot.unused:
+        candidates += [(name, rc) for rc in commands for name in rc.names if not name.startswith("-")]
+        if not slot.prior and root.app_stack.overrides.get("remap_flags"):
+            # ``interactive_shell`` accepts the bare word (``help`` for ``--help``) at the root.
+            candidates += [(flag[2:], None) for flag in flags if root._is_remappable_flag(flag)]
+    if slot.active is not None:
+        candidates += [(choice, None) for choice in slot.active.get_choices(force=True) or ()]
+    return candidates
+
+
+def describe(source: "Argument | RegisteredCommand | None", help_format: str) -> str:
+    """Plain-text description of a :func:`static_candidates` source."""
+    from cyclopts.argument import Argument
+
+    if isinstance(source, Argument):
+        return strip_markup(source.parameter.help or "", format=help_format)
+    if source is not None:
+        return app_description(source.app, help_format)
+    return ""
+
+
+@frozen
+class FullCompletions:
+    """Every candidate for the word under the cursor, already prefix-filtered.
+
+    ``files`` asks the shell to add its own path completions. ``prefix`` is the
+    ``--opt=`` part of the word (empty unless completing an ``=``-form value);
+    the shell inserts it before each candidate, including paths.
+    """
+
+    candidates: list[Completion]
+    files: bool = False
+    prefix: str = ""
+
+
+def compute_full_completions(app: "App", words: list[str]) -> FullCompletions:
+    """Compute every completion candidate (static and dynamic) for a partial command line.
+
+    Unlike :func:`compute_completions`, this filters by the typed prefix, since
+    its caller hands over the whole active slot and adds no candidates of its own.
+    """
+    slot = resolve_slot(app, words)
+    if slot is None:
+        return FullCompletions([])
+    with slot.app.app_stack(slot.execution_path):
+        help_format = slot.command_app.app_stack.resolve("help_format", fallback="markdown")
+
+    seen: set[str] = set()
+    candidates: list[Completion] = []
+    # PowerShell completion is case-insensitive; the inserted candidate restores the real case.
+    incomplete = slot.incomplete.casefold()
+
+    def add(value: str, description: "str | Callable[[], str]") -> None:
+        if value in seen or not value.casefold().startswith(incomplete):
+            return
+        seen.add(value)
+        if callable(description):
+            description = description()
+        candidates.append(Completion(value, description))
+
+    for value, source in static_candidates(slot):
+        add(value, partial(describe, source, help_format))
+    for value, description in dynamic_candidates(slot):
+        add(value, description)
+
+    files = (
+        slot.active is not None
+        and not slot.option_name
+        and get_completion_action(slot.active.hint) is CompletionAction.FILES
+    )
+    return FullCompletions(candidates, files=files, prefix=slot.prefix)

@@ -11,6 +11,7 @@ from cyclopts.annotations import is_iterable_type
 from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
+    app_description,
     clean_choice_text,
     extract_completion_data,
     get_completion_action,
@@ -19,7 +20,6 @@ from cyclopts.completion._base import (
 
 if TYPE_CHECKING:
     from cyclopts import App
-    from cyclopts.command_spec import CommandSpec
 
 
 def _completer_substitution(prog_name: str) -> str:
@@ -584,7 +584,7 @@ def _generate_subcommand_completions(
             if cmd_name.startswith("-"):
                 continue
 
-            desc = _get_description_from_app(registered_command.app, data.help_format)
+            desc = app_description(registered_command.app, data.help_format)
             escaped_desc = _escape_fish_description(desc)
             escaped_cmd = _escape_fish_string(cmd_name)
 
@@ -766,7 +766,7 @@ def _generate_command_option_completions(
             if not cmd_name.startswith("-"):
                 continue
 
-            desc = _get_description_from_app(registered_command.app, help_format)
+            desc = app_description(registered_command.app, help_format)
             escaped_desc = _escape_fish_description(desc)
 
             if cmd_name.startswith("--"):
@@ -800,29 +800,3 @@ def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str) -> st
     func_name = f"__fish_{prog_name}_using_command"
     escaped_commands = " ".join(_escape_fish_string(cmd) for cmd in command_path)
     return f"-n '{func_name} {escaped_commands}'"
-
-
-def _get_description_from_app(cmd_app: "App | CommandSpec", help_format: str) -> str:
-    """Extract description from App.
-
-    Parameters
-    ----------
-    cmd_app : App | CommandSpec
-        Command app or spec.
-    help_format : str
-        Help text format.
-
-    Returns
-    -------
-    str
-        Description text.
-    """
-    from cyclopts.help.help import docstring_parse
-
-    try:
-        parsed = docstring_parse(cmd_app.help, "plaintext")
-        text = parsed.short_description or ""
-    except Exception:
-        text = str(cmd_app.help or "")
-
-    return strip_markup(text, format=help_format)

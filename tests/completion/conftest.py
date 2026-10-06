@@ -413,6 +413,137 @@ def zsh_tester(zsh_available):
     return _make_tester
 
 
+# --- PowerShell --------------------------------------------------------------
+#
+# PowerShell's ``TabExpansion2`` runs the full completion pipeline (including
+# registered native completers) for a given line and cursor, no TTY needed.
+# Static completions stay in the script; the ``prog`` shim is on PATH for the
+# completer-backed scenarios, which run the program.
+
+_PWSH_DRIVER = r"""
+param([string]$Script, [string]$Line, [int]$Cursor = -1)
+$OutputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
+. $Script
+if ($Cursor -lt 0) { $Cursor = $Line.Length }
+$result = TabExpansion2 -inputScript $Line -cursorColumn $Cursor
+foreach ($match in $result.CompletionMatches) {
+    [Console]::Out.Write(($match.CompletionText, $match.ListItemText, $match.ToolTip, $match.ResultType -join "`t") + "`n")
+}
+"""
+
+
+class PowerShellCompletionTester(CompletionTesterBase):
+    """PowerShell completion tester driving ``TabExpansion2``; ``executable`` is ``pwsh`` or ``powershell``."""
+
+    def __init__(self, completion_script: str, prog_name: str, executable: str = "pwsh"):
+        super().__init__(completion_script, prog_name)
+        self.executable = executable
+
+    def _run(self, driver: str, *args: str) -> subprocess.CompletedProcess:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            driver_file = Path(tmpdir) / "driver.ps1"
+            driver_file.write_text(driver, encoding="utf-8")
+            script_file = Path(tmpdir) / f"{self.prog_name}.ps1"
+            script_file.write_text(self.completion_script, encoding="utf-8")
+            return subprocess.run(
+                [self.executable, "-NoProfile", "-NonInteractive", "-File", str(driver_file), str(script_file), *args],
+                capture_output=True,
+                timeout=15,
+            )
+
+    def validate_script_syntax(self) -> bool:
+        driver = (
+            "param([string]$Script)\n"
+            "$errors = $null\n"
+            "[void][System.Management.Automation.Language.Parser]::ParseFile($Script, [ref]$null, [ref]$errors)\n"
+            "if ($errors.Count) { $errors | ForEach-Object { [Console]::Error.WriteLine($_.Message) }; exit 1 }\n"
+        )
+        return self._run(driver).returncode == 0
+
+    def get_results(self, partial_command: str, cursor: int | None = None) -> list[tuple[str, str, str, str]]:
+        """``(completion_text, list_item_text, tooltip, result_type)`` for each match.
+
+        ``completion_text`` is what TAB inserts in place of the word; ``list_item_text`` is the menu entry.
+        """
+        args = [partial_command] if cursor is None else [partial_command, str(cursor)]
+        result = self._run(_PWSH_DRIVER, *args)
+        stdout = result.stdout.decode("utf-8")
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"{self.executable} driver failed (exit {result.returncode}): "
+                f"{result.stderr.decode('utf-8', 'replace').strip() or stdout.strip()}"
+            )
+        return [tuple(line.split("\t", 3)) for line in stdout.splitlines() if line]  # pyright: ignore[reportReturnType]
+
+    def get_completions(self, partial_command: str) -> list[str]:
+        """Menu entries, comparable to the other shells' listings (``prod`` for ``--env=p``)."""
+        return [item for _, item, _, _ in self.get_results(partial_command)]
+
+
+def _check_executable(executable: str) -> bool:
+    try:
+        result = subprocess.run(
+            [executable, "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.Major"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return result.returncode == 0
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+
+def _check_pwsh_available() -> bool:
+    return _check_executable("pwsh")
+
+
+def _check_windows_powershell_available() -> bool:
+    return sys.platform == "win32" and _check_executable("powershell")
+
+
+@pytest.fixture(scope="session")
+def pwsh_available():
+    return _check_pwsh_available()
+
+
+def write_shim(bindir: Path, prog_name: str, entry: Path) -> None:
+    """Put an executable ``prog_name`` on ``bindir`` that runs ``entry`` with the current interpreter."""
+    bindir.mkdir(exist_ok=True)
+    if sys.platform == "win32":
+        (bindir / f"{prog_name}.cmd").write_text(f'@"{sys.executable}" "{entry}" %*\r\n')
+    else:
+        shim = bindir / prog_name
+        shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{entry}" "$@"\n')
+        shim.chmod(0o755)
+
+
+@pytest.fixture
+def powershell_tester(pwsh_available, tmp_path, monkeypatch):
+    """Tester factory for an app defined in ``tests/completion/apps.py`` (the shim re-imports it by name)."""
+    if not pwsh_available:
+        pytest.skip("pwsh not available")
+    from . import apps
+
+    def _make_tester(app, prog_name="testapp"):
+        names = [name for name, value in vars(apps).items() if value is app]
+        if not names:
+            raise ValueError("powershell_tester needs an app defined in tests/completion/apps.py")
+        entry = tmp_path / f"{prog_name}_entry.py"
+        entry.write_text(
+            "import importlib.util\n"
+            f"spec = importlib.util.spec_from_file_location('_completion_apps', {apps.__file__!r})\n"
+            "module = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(module)\n"
+            f"module.{names[0]}()\n"
+        )
+        write_shim(tmp_path / "bin", prog_name, entry)
+        monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}")
+        script = app.generate_completion(prog_name=prog_name, shell="powershell")
+        return PowerShellCompletionTester(script, prog_name)
+
+    return _make_tester
+
+
 # --- Dynamic completion (Parameter.completer end-to-end) ---------------------
 #
 # Static completion is self-contained (the generated script needs nothing but a
@@ -437,12 +568,14 @@ _TESTER_BY_SHELL = {
     "bash": BashCompletionTester,
     "fish": FishCompletionTester,
     "zsh": ZshCompletionTester,
+    "powershell": PowerShellCompletionTester,
 }
 
 _AVAILABLE_CHECK_BY_SHELL = {
     "bash": _check_bash_available,
     "fish": _check_fish_available,
     "zsh": _check_zsh_available,
+    "powershell": _check_pwsh_available,
 }
 
 
@@ -468,8 +601,9 @@ def dynamic_completion_tester(tmp_path, monkeypatch):
             pytest.skip(f"{shell} not available")
 
         # 1. Write and import the app module (guarded ``app()`` won't run on import).
-        module_path = tmp_path / f"{prog_name}_app.py"
-        module_path.write_text(app_source)
+        # An ASCII name: cmd.exe decodes the .cmd shim in the current console code page, which the completer changes.
+        module_path = tmp_path / "app_module.py"
+        module_path.write_text(app_source, encoding="utf-8")
         spec = importlib.util.spec_from_file_location(f"_dyn_{prog_name}_app", module_path)
         assert spec and spec.loader
         module = importlib.util.module_from_spec(spec)
@@ -480,10 +614,7 @@ def dynamic_completion_tester(tmp_path, monkeypatch):
 
         # 3. Fast executable shim on a temp PATH entry.
         bindir = tmp_path / "bin"
-        bindir.mkdir(exist_ok=True)
-        shim = bindir / prog_name
-        shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{module_path}" "$@"\n')
-        shim.chmod(0o755)
+        write_shim(bindir, prog_name, module_path)
         monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
 
         return _TESTER_BY_SHELL[shell](script, prog_name)

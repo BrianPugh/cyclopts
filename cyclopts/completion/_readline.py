@@ -1,9 +1,10 @@
 """Tab completion for :meth:`.App.interactive_shell` via the stdlib ``readline`` module.
 
-The bash/zsh/fish generators handle command names, option names, static choices,
-and paths in the generated script; only :attr:`.Parameter.completer` values come
-from Python. The interactive shell has no script, so this module produces the
-static candidates in Python and merges in the dynamic ones.
+The bash/zsh/fish/PowerShell generators handle command names, option names,
+static choices, and paths in the generated script; only
+:attr:`.Parameter.completer` values come from Python. The interactive shell has
+no script, so this module takes the static candidates from the engine, adds
+paths, and merges in the dynamic ones.
 """
 
 import glob
@@ -14,9 +15,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from cyclopts.completion._base import CompletionAction, get_completion_action, visible_commands
-from cyclopts.completion._engine import Slot, _exc, debug, dynamic_candidates, resolve_slot
-from cyclopts.field_info import VAR_KEYWORD
+from cyclopts.completion._base import CompletionAction, get_completion_action
+from cyclopts.completion._engine import Slot, _exc, debug, dynamic_candidates, resolve_slot, static_candidates
 
 if TYPE_CHECKING:
     from cyclopts import App
@@ -50,31 +50,9 @@ def _shell_escape(text: str, quote: str) -> str:
 
 
 def _static_candidates(slot: Slot) -> list[str]:
-    root = slot.app
-    command_names = [name for rc in visible_commands(slot.command_app) for name in rc.names]
-    flags = (*root.help_flags, *root.version_flags)
-
-    if slot.option_name:
-        return [
-            *(
-                name
-                for a in slot.arguments
-                if a.show and a.field_info.kind is not VAR_KEYWORD and not a.is_positional_only()
-                for name in a.names
-            ),
-            *(name for name in command_names if name.startswith("-")),
-            *flags,
-        ]
-
-    candidates = []
-    if not slot.unused:
-        candidates += [name for name in command_names if not name.startswith("-")]
-        if not slot.prior and root.app_stack.overrides.get("remap_flags"):
-            # ``interactive_shell`` accepts the bare word (``help`` for ``--help``) at the root.
-            candidates += [flag[2:] for flag in flags if root._is_remappable_flag(flag)]
-    if slot.active is None:
+    candidates = [value for value, _ in static_candidates(slot)]
+    if slot.option_name or slot.active is None:
         return candidates
-    candidates += slot.active.get_choices(force=True) or ()
     if get_completion_action(slot.active.hint) is CompletionAction.FILES:
         # ponytail: no ``~`` expansion; readline inserts the literal path.
         incomplete = slot.incomplete

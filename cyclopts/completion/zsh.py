@@ -13,13 +13,13 @@ from cyclopts.annotations import is_iterable_type
 from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
+    app_description,
     clean_choice_text,
     escape_for_shell_pattern,
     extract_completion_data,
     get_completion_action,
     strip_markup,
 )
-from cyclopts.help.help import docstring_parse
 
 if TYPE_CHECKING:
     from cyclopts import App
@@ -1100,11 +1100,4 @@ def _safe_get_description_from_app(cmd_app: "App | CommandSpec", help_format: st
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    try:
-        parsed = docstring_parse(cmd_app.help, "plaintext")
-        text = parsed.short_description or ""
-    except Exception:
-        text = str(cmd_app.help or "")
-
-    text = strip_markup(text, format=help_format)
-    return _escape_zsh_description(text)
+    return _escape_zsh_description(app_description(cmd_app, help_format))

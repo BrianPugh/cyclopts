@@ -21,6 +21,7 @@ from cyclopts.utils import frozen, is_class_and_subclass
 
 if TYPE_CHECKING:
     from cyclopts import App
+    from cyclopts.command_spec import CommandSpec
 
 
 class CompletionAction(Enum):
@@ -53,6 +54,13 @@ class CompletionData:
         Arguments contributed by *this path's* plain ``@app.default``. These
         are alternatives to the subcommand at the same word slot and must
         never shift it.
+    help_flags : tuple[str, ...]
+        Help flags of the command at this path (dispatch uses the command's own,
+        which may differ from the root's).
+    version_flags : tuple[str, ...]
+        Version flags of the command at this path.
+    end_of_options_delimiter : str
+        Resolved end-of-options delimiter at this path (``""`` when disabled).
     """
 
     arguments: "ArgumentCollection"
@@ -60,6 +68,9 @@ class CompletionData:
     help_format: str
     launcher_arguments: "ArgumentCollection" = field(factory=ArgumentCollection)
     own_arguments: "ArgumentCollection" = field(factory=ArgumentCollection)
+    help_flags: tuple[str, ...] = ()
+    version_flags: tuple[str, ...] = ()
+    end_of_options_delimiter: str = "--"
 
 
 def visible_commands(app: "App") -> list[RegisteredCommand]:
@@ -71,6 +82,19 @@ def visible_commands(app: "App") -> list[RegisteredCommand]:
                 if registered_command.app.show and registered_command not in commands:
                     commands.append(registered_command)
     return commands
+
+
+def app_description(cmd_app: "App | CommandSpec", help_format: str) -> str:
+    """Plain-text short description of a command (not shell-escaped)."""
+    from cyclopts.help.help import docstring_parse
+
+    try:
+        parsed = docstring_parse(cmd_app.help, "plaintext")
+        text = parsed.short_description or ""
+    except Exception:
+        text = str(cmd_app.help or "")
+
+    return strip_markup(text, format=help_format)
 
 
 def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]:
@@ -131,6 +155,7 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
                     launcher_arguments.extend(app_arguments)  # this path's meta launcher
                 else:
                     own_arguments.extend(app_arguments)  # plain @app.default
+            end_of_options_delimiter = app.app_stack.resolve("end_of_options_delimiter", fallback="--") or ""
 
         commands = visible_commands(command_app)
 
@@ -142,6 +167,9 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
             help_format=help_format,
             launcher_arguments=launcher_arguments,
             own_arguments=own_arguments,
+            help_flags=tuple(command_app.help_flags),
+            version_flags=tuple(command_app.version_flags),
+            end_of_options_delimiter=end_of_options_delimiter,
         )
 
         for registered_command in commands:
