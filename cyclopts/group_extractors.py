@@ -170,17 +170,15 @@ def groups_from_app(app: "App", resolve_lazy: bool = False) -> list[tuple[Group,
 
 def inverse_groups_from_app(input_app: "App", resolve_lazy: bool = False) -> list[tuple["App", list[Group]]]:
     out = []
-    seen_apps = []
+    # Keyed by identity: App's attrs-generated __eq__ compares every field, which is slow and on the hot path.
+    index_by_id: dict[int, int] = {}
     for group, registered_commands in groups_from_app(input_app, resolve_lazy=resolve_lazy):
         for registered_command in registered_commands:
             app = registered_command.app
             if isinstance(app, CommandSpec):
                 continue
-            try:
-                index = seen_apps.index(app)
-            except ValueError:
-                index = len(out)
+            index = index_by_id.setdefault(id(app), len(out))
+            if index == len(out):
                 out.append((app, []))
-                seen_apps.append(app)
             out[index][1].append(group)
     return out

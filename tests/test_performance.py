@@ -88,11 +88,13 @@ def test_docstring_parser_not_imported_on_happy_path():
 def test_lazy_modules_not_imported_on_happy_path():
     """Ensure lazy-loaded modules are not imported during happy path execution.
 
-    Modules like types, validators, and _edit should only be imported when explicitly used.
+    Modules like types, validators, config, and _edit should only be imported when explicitly used,
+    and stdlib modules like json and traceback only on the paths that need them.
     This test prevents regressions where these might accidentally get eagerly imported.
     """
     script = textwrap.dedent("""
         import sys
+        preloaded = set(sys.modules)
         import cyclopts
 
         app = cyclopts.App(result_action="return_value")
@@ -107,8 +109,8 @@ def test_lazy_modules_not_imported_on_happy_path():
         assert result == 42
 
         # Check lazy modules were not imported
-        lazy_modules = ["cyclopts.types", "cyclopts.validators", "cyclopts._edit"]
-        imported_lazy = [m for m in lazy_modules if m in sys.modules]
+        lazy_modules = ["cyclopts.types", "cyclopts.validators", "cyclopts.config", "cyclopts._edit", "json", "traceback"]
+        imported_lazy = [m for m in lazy_modules if m in sys.modules and m not in preloaded]
         assert not imported_lazy, f"Lazy modules were imported: {imported_lazy}"
         print("SUCCESS: Lazy modules not imported")
     """)

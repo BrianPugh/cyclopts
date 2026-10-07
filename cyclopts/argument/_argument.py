@@ -1,7 +1,6 @@
 """Argument class and related functionality."""
 
 import inspect
-import json
 import operator
 import re
 import sys
@@ -864,6 +863,8 @@ class Argument:
                 out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags
 
             if self._should_attempt_json_dict():
+                import json
+
                 json_tokens, self.tokens = self.tokens, []
                 for token in json_tokens:
                     try:
@@ -1261,6 +1262,8 @@ class Argument:
             if not self._should_attempt_json_list(token):
                 out.append(token)
                 continue
+            import json
+
             try:
                 parsed_json = json.loads(token.value)
             except json.JSONDecodeError as e:
@@ -1395,6 +1398,8 @@ class Argument:
                         value = token.value
                         # Deserialize JSON strings (from update_argument_collection) back to dict/list
                         if isinstance(value, str) and value.strip() and value.strip()[0] in ("{", "["):
+                            import json
+
                             try:
                                 value = json.loads(value)
                             except json.JSONDecodeError:

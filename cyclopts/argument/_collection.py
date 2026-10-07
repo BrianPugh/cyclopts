@@ -3,7 +3,6 @@
 import copy as copy_module
 import inspect
 import itertools
-import json
 from collections.abc import Callable, Iterable, Sequence
 from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
 
@@ -908,6 +907,8 @@ def update_argument_collection(
                     else:
                         if isinstance(v, dict | list):
                             # Serialize to JSON string; will be deserialized in Argument._json()
+                            import json
+
                             value_str = json.dumps(v)
                         else:
                             value_str = str(v)
