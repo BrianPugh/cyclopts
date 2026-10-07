@@ -94,6 +94,7 @@ def test_lazy_modules_not_imported_on_happy_path():
     """
     script = textwrap.dedent("""
         import sys
+        preloaded = set(sys.modules)
         import cyclopts
 
         app = cyclopts.App(result_action="return_value")
@@ -109,7 +110,7 @@ def test_lazy_modules_not_imported_on_happy_path():
 
         # Check lazy modules were not imported
         lazy_modules = ["cyclopts.types", "cyclopts.validators", "cyclopts.config", "cyclopts._edit", "json", "traceback"]
-        imported_lazy = [m for m in lazy_modules if m in sys.modules]
+        imported_lazy = [m for m in lazy_modules if m in sys.modules and m not in preloaded]
         assert not imported_lazy, f"Lazy modules were imported: {imported_lazy}"
         print("SUCCESS: Lazy modules not imported")
     """)
