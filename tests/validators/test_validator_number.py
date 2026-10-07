@@ -164,6 +164,8 @@ def test_gte(type_, value, gte, expectation):
         (float, 1.5, Decimal("0.5"), None),
         (float, 1.6, Decimal("0.5"), raises(ValueError, match=MOD_PAT)),
         (Fraction, Fraction(9, 10), Fraction(3, 10), None),
+        (Decimal, Decimal("1E30"), Decimal("0.1"), None),
+        (Decimal, Decimal("1000000000000000000000000000000.05"), Decimal("0.1"), raises(ValueError, match=MOD_PAT)),
         *(
             (type(value), value, 4, raises(ValueError, match=MOD_PAT))
             for value in [
@@ -200,3 +202,11 @@ def test_app_decimal_accepted(app, assert_parse_args):
         pass
 
     assert_parse_args(main, "100.10", Decimal("100.10"))
+
+
+def test_app_optional_omitted(app, assert_parse_args):
+    @app.default
+    def main(x: Annotated[int | None, Parameter(validator=Number(gte=0))] = None):
+        pass
+
+    assert_parse_args(main, "")

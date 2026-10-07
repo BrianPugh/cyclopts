@@ -69,6 +69,9 @@ class Number:
             for v in elements:
                 self(type_, v)
         else:
+            if not isinstance(value, int | float | Decimal | Fraction):
+                return
+
             # Ordering comparisons against a Decimal NaN raise decimal.InvalidOperation,
             # so detect NaN quietly up front and treat it as out of bounds.
             is_nan = _is_nan(value)
@@ -105,7 +108,8 @@ def _is_finite(value: Any) -> bool:
 
 
 def _remainder(value: Any, divisor: int | float | Decimal | Fraction) -> Any:
-    # Decimal refuses % with float and Fraction; Fraction converts both exactly.
-    if isinstance(value, Decimal) != isinstance(divisor, Decimal):
+    # Decimal refuses % with float and Fraction, and Decimal % Decimal raises InvalidOperation
+    # once the quotient exceeds the context precision; Fraction is exact in every case.
+    if isinstance(value, Decimal) or isinstance(divisor, Decimal):
         return Fraction(value) % Fraction(divisor)
     return value % divisor
