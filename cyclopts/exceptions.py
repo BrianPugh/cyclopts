@@ -1,5 +1,4 @@
 import inspect
-import json
 from collections.abc import Callable, Iterator, Sequence
 from enum import Enum
 from itertools import chain
@@ -374,6 +373,8 @@ class CoercionError(CycloptsError):
             return
 
         # Branch 2: JSONDecodeError verbosifier path. Plain, like branch 1.
+        import json
+
         if isinstance(self.__cause__, json.JSONDecodeError):
             verbosified = json_decode_error_verbosifier(self.__cause__)  # pyright: ignore[reportArgumentType]
             if not self.token or self.token.keyword is None:

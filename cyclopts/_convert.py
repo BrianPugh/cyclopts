@@ -1,6 +1,5 @@
 import collections.abc
 import inspect
-import json
 import operator
 import re
 import sys
@@ -42,6 +41,8 @@ else:  # pragma: no cover
     TypeAliasType = None
 
 if TYPE_CHECKING:
+    import json
+
     from cyclopts.argument import Token
 
 
@@ -424,7 +425,7 @@ def _convert_json_dict(type_: Any, token: "Token", name_transform: Callable[[str
 def _create_json_decode_error_message(
     token: "Token",
     type_: Any,
-    error: json.JSONDecodeError,
+    error: "json.JSONDecodeError",
 ) -> str:
     """Create a helpful error message for JSON decode errors.
 
@@ -820,6 +821,8 @@ def _convert(
             if isinstance(token, Sequence) and len(token) == 1 and isinstance(token[0], Token):
                 token = token[0]
             if isinstance(token, Token) and token.value.strip().startswith("{") and type_ is not str:
+                import json
+
                 try:
                     data = json.loads(token.value)
                 except json.JSONDecodeError as e:
