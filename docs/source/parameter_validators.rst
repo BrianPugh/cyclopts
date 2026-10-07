@@ -89,4 +89,8 @@ The :class:`.Number` validator can set minimum and maximum input values.
    │ Invalid value "16" for "N". Must be < 16.                          │
    ╰────────────────────────────────────────────────────────────────────╯
 
+:class:`.Number` also validates :class:`~decimal.Decimal` and :class:`~fractions.Fraction` values, and its bounds and ``modulo`` accept those types too.
+NaN fails every check, and infinity is never a multiple of ``modulo``.
+A ``modulo`` whose type cannot interoperate with the value (e.g. a :class:`float` against a :class:`~decimal.Decimal`) is compared exactly via :class:`~fractions.Fraction`, so pass ``modulo=Decimal("0.1")`` to get decimal semantics.
+
 See :ref:`Annotated Number Types <Annotated Number Types>` for Annotated-Type equivalents of common Number converter/validators.
