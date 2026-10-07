@@ -1,10 +1,14 @@
 import math
-from decimal import Decimal
-from fractions import Fraction
-from typing import Any
+import numbers
+import sys
+from typing import TYPE_CHECKING, Any
 
 from cyclopts.utils import frozen
 from cyclopts.validators._utils import iter_container_elements
+
+if TYPE_CHECKING:
+    from decimal import Decimal
+    from fractions import Fraction
 
 
 @frozen(kw_only=True)
@@ -48,19 +52,19 @@ class Number:
         ╰───────────────────────────────────────────────────────────────╯
     """
 
-    lt: int | float | Decimal | Fraction | None = None
+    lt: "int | float | Decimal | Fraction | None" = None
     """Input value must be **less than** this value."""
 
-    lte: int | float | Decimal | Fraction | None = None
+    lte: "int | float | Decimal | Fraction | None" = None
     """Input value must be **less than or equal** this value."""
 
-    gt: int | float | Decimal | Fraction | None = None
+    gt: "int | float | Decimal | Fraction | None" = None
     """Input value must be **greater than** this value."""
 
-    gte: int | float | Decimal | Fraction | None = None
+    gte: "int | float | Decimal | Fraction | None" = None
     """Input value must be **greater than or equal** this value."""
 
-    modulo: int | float | Decimal | Fraction | None = None
+    modulo: "int | float | Decimal | Fraction | None" = None
     """Input value must be a multiple of this value."""
 
     def __call__(self, type_: Any, value: Any):
@@ -69,7 +73,7 @@ class Number:
             for v in elements:
                 self(type_, v)
         else:
-            if not isinstance(value, int | float | Decimal | Fraction):
+            if not _is_number(value):
                 return
 
             # Ordering comparisons against a Decimal NaN raise decimal.InvalidOperation,
@@ -91,10 +95,21 @@ class Number:
                 raise ValueError(f"Must be a multiple of {self.modulo}.")
 
 
+def _is_number(value: Any) -> bool:
+    return isinstance(value, numbers.Real) or _is_decimal(value)
+
+
+def _is_decimal(value: Any) -> bool:
+    # A Decimal can only exist once its module is imported, so checking sys.modules
+    # avoids importing decimal for apps that never use it.
+    decimal = sys.modules.get("decimal")
+    return decimal is not None and isinstance(value, decimal.Decimal)
+
+
 def _is_nan(value: Any) -> bool:
     if isinstance(value, float):
         return math.isnan(value)
-    if isinstance(value, Decimal):
+    if _is_decimal(value):
         return value.is_nan()
     return value != value
 
@@ -102,14 +117,16 @@ def _is_nan(value: Any) -> bool:
 def _is_finite(value: Any) -> bool:
     if isinstance(value, float):
         return math.isfinite(value)
-    if isinstance(value, Decimal):
+    if _is_decimal(value):
         return value.is_finite()
     return True
 
 
-def _remainder(value: Any, divisor: int | float | Decimal | Fraction) -> Any:
+def _remainder(value: Any, divisor: "int | float | Decimal | Fraction") -> Any:
     # Decimal refuses % with float and Fraction, and Decimal % Decimal raises InvalidOperation
     # once the quotient exceeds the context precision; Fraction is exact in every case.
-    if isinstance(value, Decimal) or isinstance(divisor, Decimal):
+    if _is_decimal(value) or _is_decimal(divisor):
+        from fractions import Fraction
+
         return Fraction(value) % Fraction(divisor)
     return value % divisor
