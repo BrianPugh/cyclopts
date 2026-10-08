@@ -6,7 +6,17 @@ from typing import Annotated, Literal
 
 import pydantic
 import pytest
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, SecretBytes, SecretStr, model_validator, validate_call
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    SecretBytes,
+    SecretStr,
+    model_validator,
+    validate_call,
+)
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
@@ -1228,7 +1238,16 @@ class _FlagModel(BaseModel):
 
 
 @pytest.mark.parametrize("hint", [_FlagModel | bool, bool | _FlagModel])
-@pytest.mark.parametrize("cmd,expected", [("--x", True), ("--no-x", False), ("--x.a 1", _FlagModel(a=1))])
+@pytest.mark.parametrize(
+    "cmd,expected",
+    [
+        ("--x", True),
+        ("--no-x", False),
+        ("--x=true", True),
+        ("--x false", False),
+        ("--x.a 1", _FlagModel(a=1)),
+    ],
+)
 def test_pydantic_union_bool_flag(app, assert_parse_args, hint, cmd, expected):
     """A union of ``bool`` and a pydantic model acts as a flag when given no keys (#990)."""
 
@@ -1237,3 +1256,38 @@ def test_pydantic_union_bool_flag(app, assert_parse_args, hint, cmd, expected):
         pass
 
     assert_parse_args(default, cmd, x=expected)
+
+
+@pytest.mark.parametrize("cmd", ["--x --x.a 1", "--x.a 1 --x", "--no-x --x.a 1", "--x=false --x.a 1"])
+def test_pydantic_union_bool_flag_mixed_with_keys(app, cmd):
+    """A bool value alongside ``--x.<field>`` is rejected, not silently dropped."""
+
+    @app.default
+    def default(*, x: _FlagModel | bool = False):
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(cmd, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize("cmd,expected", [("--x", True), ("--no-x", False)])
+def test_pydantic_union_bool_required_flag(app, assert_parse_args, cmd, expected):
+    @app.default
+    def default(*, x: _FlagModel | bool):
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
+
+
+def test_pydantic_union_bool_flag_runs_annotation_validators(app):
+    def reject_true(value):
+        if value is True:
+            raise ValueError("bare flag not allowed")
+        return value
+
+    @app.default
+    def default(*, x: Annotated[_FlagModel | bool, AfterValidator(reject_true)] = False):
+        pass
+
+    with pytest.raises(ValidationError, match="bare flag not allowed"):
+        app.parse_args("--x", print_error=False, exit_on_error=False)

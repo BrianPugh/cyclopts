@@ -721,6 +721,20 @@ class Argument:
             out.extend(child.children_recursive)
         return out
 
+    def _claim_children_for_keyless_value(self):
+        """A keyless value (e.g. ``--x`` on ``Foo | bool``) is the whole value; no ``--x.<field>`` may join it."""
+        if any(child.has_tokens for child in self.children):
+            raise self._keyless_and_keyed_error()
+        for child in self.children_recursive:
+            child._marked = True
+
+    def _keyless_and_keyed_error(self) -> CoercionError:
+        return CoercionError(
+            msg=f"Cannot combine a value for {self.name} with its {self.name}.<field> options.",
+            argument=self,
+            target_type=self.hint,
+        )
+
     def _convert_pydantic(self):
         if self.has_tokens:
             import pydantic
@@ -730,11 +744,20 @@ class Argument:
                     # Persist the canonicalized tokens so ``_json`` (and pydantic) see the
                     # listed spelling rather than the raw input (e.g. Enum ``RED`` -> ``red``).
                     child.tokens = child._validate_choices(child._expand_json_list_tokens(child.tokens))
-            unstructured_data = self._json()
+            keyless = [token for token in self.tokens if not token.keys and not isinstance(token.implicit_value, dict)]
+            if keyless:
+                # e.g. ``--x`` or ``--x=false`` on ``Model | bool``; ``_json`` only handles keyed tokens.
+                self._claim_children_for_keyless_value()
+                if len(keyless) != len(self.tokens):
+                    raise self._keyless_and_keyed_error()
+                values = [token.value if token.implicit_value is UNSET else token.implicit_value for token in keyless]
+                unstructured_data = values[0] if len(values) == 1 else values
+            else:
+                unstructured_data = self._json()
             try:
                 return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
             except pydantic.ValidationError as e:
-                self._handle_pydantic_validation_error(e)
+                self._handle_pydantic_validation_error(e, value=unstructured_data if keyless else UNSET)
         else:
             return UNSET
 
@@ -887,13 +910,6 @@ class Argument:
                         self.tokens.append(token.evolve(value="", implicit_value={}))
 
             if self._use_pydantic_type_adapter:
-                if (
-                    len(self.tokens) == 1
-                    and not self.tokens[0].keys
-                    and self._is_whole_implicit_value(self.tokens[0].implicit_value)
-                ):
-                    # e.g. ``--x`` on ``Model | bool``; ``_json`` only handles keyed tokens.
-                    return self.tokens[0].implicit_value
                 return self._convert_pydantic()
 
             if self.tokens and not self._enum_flag_type:
@@ -903,6 +919,8 @@ class Argument:
                     positional_tokens = [
                         token for token in positional_tokens if not isinstance(token.implicit_value, dict)
                     ]
+                if positional_tokens:
+                    self._claim_children_for_keyless_value()
                 if len(positional_tokens) == 1 and self._is_whole_implicit_value(positional_tokens[0].implicit_value):
                     return positional_tokens[0].implicit_value
                 if positional_tokens:
@@ -1529,7 +1547,7 @@ class Argument:
                 f'Required field "{missing_description}" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements.'
             )
 
-    def _handle_pydantic_validation_error(self, exc):
+    def _handle_pydantic_validation_error(self, exc, value: Any = UNSET):
         import pydantic
 
         error = exc.errors()[0]
@@ -1559,6 +1577,6 @@ class Argument:
             # Fall through to ValidationError.
 
         if isinstance(exc, pydantic.ValidationError):
-            raise ValidationError(exception_message=str(exc), argument=self) from exc
+            raise ValidationError(exception_message=str(exc), argument=self, value=value) from exc
         else:
             raise exc
