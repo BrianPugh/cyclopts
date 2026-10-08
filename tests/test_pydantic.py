@@ -1299,3 +1299,20 @@ def test_pydantic_config_null_non_nullable_model():
 
     with pytest.raises(CoercionError, match='unable to convert "null"'):
         app([], exit_on_error=False)
+
+
+class _FlagModel(BaseModel):
+    a: int
+    b: int = 2
+
+
+@pytest.mark.parametrize("hint", [_FlagModel | bool, bool | _FlagModel])
+@pytest.mark.parametrize("cmd,expected", [("--x", True), ("--no-x", False), ("--x.a 1", _FlagModel(a=1))])
+def test_pydantic_union_bool_flag(app, assert_parse_args, hint, cmd, expected):
+    """A union of ``bool`` and a pydantic model acts as a flag when given no keys (#990)."""
+
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, x=expected)

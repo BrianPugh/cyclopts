@@ -5,6 +5,7 @@ from textwrap import dedent
 from typing import Annotated, Literal, NamedTuple, NewType, TypedDict, Union
 
 import pytest
+from attrs import define
 
 from cyclopts import Parameter
 from cyclopts.exceptions import CoercionError, MissingArgumentError, RepeatArgumentError
@@ -338,6 +339,42 @@ def test_union_bool_class_member_first(app, assert_parse_args, hint, cmd, expect
         pass
 
     assert_parse_args(default, cmd, x=expected)
+
+
+@define
+class _FlagAttrs:
+    a: int
+    b: int = 2
+
+
+@pytest.mark.parametrize(
+    "hint,cls",
+    [
+        (_FlagDataclass | bool, _FlagDataclass),
+        (bool | _FlagDataclass, _FlagDataclass),
+        (_FlagAttrs | bool, _FlagAttrs),
+        (bool | _FlagAttrs, _FlagAttrs),
+    ],
+)
+def test_union_bool_class_member_keys(app, assert_parse_args, hint, cls):
+    """``--x.<field>`` options build the class member of a union with ``bool`` (#990)."""
+
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, "--x.a 1", x=cls(a=1))
+    assert_parse_args(default, "--x", x=True)
+
+
+@pytest.mark.parametrize("hint", [_FlagAttrs | bool, bool | _FlagAttrs])
+def test_union_bool_class_member_keys_missing_field(app, hint):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("--x.b 3", print_error=False, exit_on_error=False)
 
 
 @pytest.mark.parametrize(
