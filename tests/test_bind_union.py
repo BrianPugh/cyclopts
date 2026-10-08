@@ -377,6 +377,45 @@ def test_union_bool_class_member_keys_missing_field(app, hint):
         app.parse_args("--x.b 3", print_error=False, exit_on_error=False)
 
 
+@pytest.mark.parametrize("hint", [_FlagDataclass | bool, _FlagAttrs | bool])
+@pytest.mark.parametrize("cmd", ["--x --x.a 1", "--x.a 1 --x", "--no-x --x.a 1", "--x=false --x.a 1"])
+def test_union_bool_class_member_flag_mixed_with_keys(app, hint, cmd):
+    """A bool value alongside ``--x.<field>`` is rejected, not silently dropped."""
+
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(cmd, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize("hint", [_FlagDataclass | bool, _FlagAttrs | bool])
+@pytest.mark.parametrize("cmd,expected", [("--x", True), ("--no-x", False)])
+def test_union_bool_class_member_required_flag(app, assert_parse_args, hint, cmd, expected):
+    @app.default
+    def default(*, x: hint):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
+
+
+class _FlagTypedDictPair(TypedDict):
+    a: int
+    b: int
+
+
+@pytest.mark.parametrize("hint", [_FlagTypedDictPair | bool, bool | _FlagTypedDictPair])
+def test_union_bool_typeddict_keys(app, assert_parse_args, hint):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, "--x.a 1 --x.b 2", x={"a": 1, "b": 2})
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("--x.a 1", print_error=False, exit_on_error=False)
+
+
 @pytest.mark.parametrize(
     "hint,cmd",
     [
