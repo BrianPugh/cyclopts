@@ -1220,3 +1220,20 @@ def test_pydantic_default_factory_help(app, console):
         actual = capture.get()
         assert "[default: [1, 2, 3]]" in actual
         assert "factory" not in actual
+
+
+class _FlagModel(BaseModel):
+    a: int
+    b: int = 2
+
+
+@pytest.mark.parametrize("hint", [_FlagModel | bool, bool | _FlagModel])
+@pytest.mark.parametrize("cmd,expected", [("--x", True), ("--no-x", False), ("--x.a 1", _FlagModel(a=1))])
+def test_pydantic_union_bool_flag(app, assert_parse_args, hint, cmd, expected):
+    """A union of ``bool`` and a pydantic model acts as a flag when given no keys (#990)."""
+
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
