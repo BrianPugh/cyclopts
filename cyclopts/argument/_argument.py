@@ -289,11 +289,12 @@ class Argument:
                     self._update_lookup({field_info.name: field_info})
 
         if self._accepts_keywords and len(hints) > 1:
-            # Genuine multi-branch ``Union`` of keyword-accepting types (not ``Foo | None``,
-            # whose only composite branch collapses to a single dict). Record each branch's
-            # type and fields so requiredness can be evaluated per-branch at conversion time.
+            # Genuine ``Union`` with a keyword-accepting member (not ``Foo | None``, whose only
+            # composite branch collapses to a single dict); e.g. ``Foo | Bar`` or ``Foo | bool``.
+            # Record each branch's type and fields so requiredness can be evaluated per-branch
+            # at conversion time.
             branches = [(member, fis) for member in hints if (fis := get_field_infos(member))]
-            if len(branches) > 1:
+            if branches:
                 self._union_branches = branches
                 # The generic checker would introspect the ``typing.Union`` alias itself
                 # (yielding phantom fields like ``origin``); branch-aware gating in
@@ -886,6 +887,13 @@ class Argument:
                         self.tokens.append(token.evolve(value="", implicit_value={}))
 
             if self._use_pydantic_type_adapter:
+                if (
+                    len(self.tokens) == 1
+                    and not self.tokens[0].keys
+                    and self._is_whole_implicit_value(self.tokens[0].implicit_value)
+                ):
+                    # e.g. ``--x`` on ``Model | bool``; ``_json`` only handles keyed tokens.
+                    return self.tokens[0].implicit_value
                 return self._convert_pydantic()
 
             if self.tokens and not self._enum_flag_type:
