@@ -971,7 +971,7 @@ class Argument:
                     for descendant in child.children_recursive:
                         descendant._marked = True
 
-            self._run_missing_keys_checker(data)
+            self._run_missing_keys_checker(data, explicit_empty_mapping=explicit_empty_mapping)
 
             member = None
             if self._union_branches and (data or explicit_empty_mapping):
@@ -1612,8 +1612,8 @@ class Argument:
         first_branch_required = {k for k, v in self._union_branches[0][1].items() if v.required}
         return [child for child in self.children if not child.has_tokens and child.keys[-1] in first_branch_required]
 
-    def _run_missing_keys_checker(self, data):
-        if not self._missing_keys_checker or (not self.required and not data):
+    def _run_missing_keys_checker(self, data, explicit_empty_mapping: bool = False):
+        if not self._missing_keys_checker or (not self.required and not data and not explicit_empty_mapping):
             return
         for keys, argument in self._resolve_missing_keys(data):
             if argument is not None:
