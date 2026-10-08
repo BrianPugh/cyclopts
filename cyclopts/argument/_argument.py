@@ -954,10 +954,21 @@ class Argument:
             self._run_missing_keys_checker(data)
 
             member = None
-            if self._union_branches and data:
+            if self._union_branches and (data or explicit_empty_mapping):
                 # ``instantiate_from_dict`` cannot build a bare ``Union``; pick the branch
                 # whose fields accept the supplied data.
                 member = self._resolve_union_member(set(data))
+                if member is None and not data:
+                    # ``{}`` with no default-constructible branch: report the first branch's
+                    # missing field, matching the declaration-order preference above.
+                    first_branch_fields = self._union_branches[0][1]
+                    raise MissingArgumentError(
+                        argument=next(
+                            child
+                            for child in self.children
+                            if (fi := first_branch_fields.get(child.keys[-1])) and fi.required
+                        )
+                    )
                 if member is None or (member is not self._enum_flag_type and out):
                     # Supplied fields span multiple branches / match no single one, or
                     # sibling-member fields were mixed with enum.Flag values.

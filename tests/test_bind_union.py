@@ -400,6 +400,45 @@ def test_union_bool_class_member_required_flag(app, assert_parse_args, hint, cmd
     assert_parse_args(default, cmd, x=expected)
 
 
+@dataclass
+class _DefaultsA:
+    a: int = 1
+
+
+@dataclass
+class _DefaultsB:
+    b: int = 2
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        (_DefaultsA | bool, _DefaultsA()),
+        (bool | _DefaultsA, _DefaultsA()),
+        (_DefaultsA | _DefaultsB, _DefaultsA()),
+    ],
+)
+@pytest.mark.parametrize("cmd", ["--x={}", "--x {}"])
+def test_union_class_member_explicit_empty_mapping(app, assert_parse_args, hint, expected, cmd):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
+
+
+@pytest.mark.parametrize("hint", [_FlagAttrs | bool, bool | _FlagAttrs])
+def test_union_class_member_explicit_empty_mapping_missing_field(app, hint):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(MissingArgumentError) as e:
+        app.parse_args("--x={}", print_error=False, exit_on_error=False)
+    assert e.value.argument is not None
+    assert e.value.argument.name == "--x.a"
+
+
 class _FlagTypedDictPair(TypedDict):
     a: int
     b: int
