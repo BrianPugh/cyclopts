@@ -5,6 +5,7 @@ from typing import Annotated
 import pytest
 
 from cyclopts import CycloptsError, Parameter
+from cyclopts.exceptions import MissingArgumentError
 
 
 @dataclass
@@ -72,6 +73,18 @@ def test_bind_dataclass_from_cli_json_empty(app, assert_parse_args):
         pass
 
     assert_parse_args(main, "--origin={}", Coordinate())
+
+
+@pytest.mark.parametrize("hint", [User, User | None])
+def test_bind_dataclass_from_cli_json_empty_missing_field(app, hint):
+    @app.default
+    def main(user: hint = None):  # pyright: ignore
+        pass
+
+    with pytest.raises(MissingArgumentError) as exc_info:
+        app.parse_args("--user={}", print_error=False, exit_on_error=False)
+    assert exc_info.value.argument is not None
+    assert exc_info.value.argument.name == "--user.id"
 
 
 def test_nested_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
