@@ -1178,6 +1178,16 @@ class Argument:
         """Split a given value with :meth:`.Parameter.env_var_split`."""
         return self.parameter.env_var_split(self.hint, value, delimiter=delimiter)
 
+    def _split_env_value(self, value: str, keys: tuple[str, ...] = ()) -> list[str]:
+        """Split an environment-variable value into token values.
+
+        A JSON-looking value is a single token (mirrors the CLI path); otherwise it is split per
+        :meth:`.Parameter.env_var_split` (e.g. whitespace for iterables, ``os.pathsep`` for path iterables).
+        """
+        if self._should_attempt_json_dict([value]) or self._should_attempt_json_list([value], keys):
+            return [value]
+        return self.env_var_split(value)
+
     @property
     def show(self) -> bool:
         """Show this argument on the help page.

@@ -135,3 +135,38 @@ def test_config_env_kwargs(app, assert_parse_args, monkeypatch):
     app.config = Env("CYCLOPTS_TEST_APP_")
 
     assert_parse_args(default, "a_value", a="a_value", two_words="test value")
+
+
+@pytest.mark.parametrize(
+    "env_value, expected",
+    [
+        ("[1, 2]", [1, 2]),
+        ("1 2", [1, 2]),
+    ],
+)
+def test_config_env_json_list_with_spaces(app, monkeypatch, env_value, expected):
+    """A JSON value containing whitespace is one token, matching ``Parameter(env_var=...)``."""
+    app.config = Env("CYCLOPTS_TEST_APP_", command=False)
+
+    @app.default
+    def main(bar: list[int]):
+        return bar
+
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR", env_value)
+    assert app([], result_action="return_value") == expected
+
+
+def test_config_env_json_dict_in_list_with_spaces(app, monkeypatch):
+    @dataclass
+    class Server:
+        host: str
+        port: int = 80
+
+    app.config = Env("CYCLOPTS_TEST_APP_", command=False)
+
+    @app.default
+    def main(servers: list[Server]):
+        return servers
+
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_SERVERS", '{"host": "a", "port": 1}')
+    assert app([], result_action="return_value") == [Server("a", 1)]
