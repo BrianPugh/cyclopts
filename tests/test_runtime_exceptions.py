@@ -1,8 +1,9 @@
 from textwrap import dedent
+from typing import Annotated
 
 import pytest
 
-from cyclopts import CycloptsError
+from cyclopts import App, CycloptsError, Parameter
 from cyclopts.exceptions import MissingArgumentError, UnknownCommandError
 
 
@@ -142,6 +143,54 @@ def test_runtime_exception_bad_command_list_ellipsis(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
+
+
+@pytest.fixture
+def users_app(app):
+    app.command(users := App(name="users"))
+
+    @users.command
+    def add():
+        pass
+
+    return app
+
+
+@pytest.mark.parametrize("cmd", ["users ad --help", "users ad -h", "users --help ad", "--help users ad"])
+def test_runtime_exception_bad_command_with_help(users_app, console, cmd):
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
+        users_app(cmd, exit_on_error=False, error_console=console)
+
+    actual = capture.get()
+    assert actual == dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Unknown command "ad". Did you mean "add"? Available commands: add. │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+
+def test_runtime_exception_bad_root_command_with_help(users_app, console):
+    with pytest.raises(UnknownCommandError):
+        users_app("--help userz", exit_on_error=False, error_console=console)
+
+
+@pytest.mark.parametrize("cmd", ["--help users", "users --help", "users add --help", "users --verbose --help"])
+def test_help_with_valid_command(users_app, console, cmd):
+    with console.capture() as capture:
+        users_app(cmd, exit_on_error=False, console=console, error_console=console)
+
+    assert "Usage:" in capture.get()
+
+
+def test_runtime_exception_bad_command_with_help_meta(users_app, console):
+    @users_app.meta.default
+    def meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
+        users_app(tokens)
+
+    with pytest.raises(UnknownCommandError):
+        users_app.meta("users ad --help", exit_on_error=False, error_console=console)
 
 
 def test_runtime_exception_bad_parameter_recommend(app, console):
