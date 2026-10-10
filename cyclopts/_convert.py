@@ -302,8 +302,9 @@ def _convert_tuple(
     *tokens: "Token",
     converter: Callable[[type, str], Any] | None,
     name_transform: Callable[[str], str],
+    json_name: str | None = None,
 ) -> tuple:
-    convert = partial(_convert, converter=converter, name_transform=name_transform)
+    convert = partial(_convert, converter=converter, name_transform=name_transform, json_name=json_name)
     inner_types = tuple(x for x in get_args(type_) if x is not ...)
     inner_token_count, consume_all = token_count(type_)
     # Elements like boolean-flags will have an inner_token_count of 0.
@@ -378,7 +379,7 @@ def _validate_json_extra_keys(
         )
 
 
-def _convert_json_dict(type_: Any, token: "Token", name_transform: Callable[[str], str]):
+def _convert_json_dict(type_: Any, token: "Token", name_transform: Callable[[str], str], json_name: str | None = None):
     """Convert a JSON-object token into ``type_`` via the Argument machinery.
 
     Building a throwaway :class:`ArgumentCollection` for ``type_`` reuses the same
@@ -394,6 +395,9 @@ def _convert_json_dict(type_: Any, token: "Token", name_transform: Callable[[str
         Token whose value is a JSON object.
     name_transform : Callable[[str], str]
         Function to transform field names.
+    json_name : str | None
+        Option name of the owning parameter, used in error messages when the token
+        did not come from the CLI (e.g. a config file or environment variable).
 
     Returns
     -------
@@ -404,8 +408,10 @@ def _convert_json_dict(type_: Any, token: "Token", name_transform: Callable[[str
     from cyclopts.parameter import Parameter
 
     # Reuse the originating option name so nested error messages read ``--outer.field``.
-    name = token.keyword if token.keyword and token.keyword.startswith("-") else "--json"
-    field_info = FieldInfo(names=("json",), kind=FieldInfo.POSITIONAL_OR_KEYWORD, annotation=type_, required=True)
+    name = token.keyword if token.keyword and token.keyword.startswith("-") else (json_name or "--json")
+    field_info = FieldInfo(
+        names=(name.lstrip("-"),), kind=FieldInfo.POSITIONAL_OR_KEYWORD, annotation=type_, required=True
+    )
     collection = ArgumentCollection._from_type(
         field_info,
         (),
@@ -593,6 +599,7 @@ def _convert(
     *,
     converter: Callable[[Any, str], Any] | None,
     name_transform: Callable[[str], str],
+    json_name: str | None = None,
 ):
     """Inner recursive conversion function for public ``convert``.
 
@@ -637,8 +644,8 @@ def _convert(
     else:
         cparam = None
 
-    convert = partial(_convert, converter=converter, name_transform=name_transform)
-    convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
+    convert = partial(_convert, converter=converter, name_transform=name_transform, json_name=json_name)
+    convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform, json_name=json_name)
 
     origin_type = get_origin(type_)
     # Normalize abstract origin types to concrete types early
@@ -829,7 +836,7 @@ def _convert(
                     msg = _create_json_decode_error_message(token, type_, e)
                     raise CoercionError(msg=msg, token=token, target_type=type_) from e
                 assert isinstance(data, dict)
-                out = _convert_json_dict(type_, token, name_transform)
+                out = _convert_json_dict(type_, token, name_transform, json_name)
             else:
                 # Standard positional argument parsing
                 if not isinstance(token, Sequence):
@@ -913,6 +920,17 @@ def convert(
     Any
         Coerced version of input ``*args``.
     """
+    return _convert_entry(type_, tokens, converter, name_transform)
+
+
+def _convert_entry(
+    type_: Any,
+    tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
+    converter: Callable[[type, str], Any] | None = None,
+    name_transform: Callable[[str], str] | None = None,
+    json_name: str | None = None,
+):
+    """:func:`convert`, plus ``json_name``: the owning parameter's name for errors inside JSON values."""
     from cyclopts.argument import Token
 
     if not tokens:
@@ -924,8 +942,8 @@ def convert(
     if name_transform is None:
         name_transform = default_name_transform
 
-    convert_priv = partial(_convert, converter=converter, name_transform=name_transform)
-    convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
+    convert_priv = partial(_convert, converter=converter, name_transform=name_transform, json_name=json_name)
+    convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform, json_name=json_name)
     # ``_convert`` applies a type's own ``Parameter`` metadata (converter/validator), but
     # ``resolve`` discards it. Stash the metadata so it can be re-attached to the
     # *normalized* type for the scalar dispatch below; this is what lets a container's
@@ -974,7 +992,7 @@ def convert(
         except IndexError:
             value_type = str
         dict_converted = {
-            k: convert(value_type, v, converter=converter, name_transform=name_transform) for k, v in tokens.items()
+            k: _convert_entry(value_type, v, converter, name_transform, json_name) for k, v in tokens.items()
         }
         return dict(**dict_converted)
     elif isinstance(tokens, dict):
