@@ -413,12 +413,26 @@ def test_bind_dataclass_star_parameter_better_error_message(app, console):
     expected_message = (
         r'Parameter "foo" in function .* has all optional values, uses Parameter\(name="\*"\), but itself has no default value\. Consider either:\n'
         r'    1\) If immutable, providing a default value "foo: Foo = Foo\(\)"\n'
-        r'    2\) Otherwise, declaring it optional like "foo: Foo \| None = None" and instanting the foo object in the function body:\n'
+        r'    2\) Otherwise, declaring it optional like "foo: Foo \| None = None" and instantiating the foo object in the function body:\n'
         r"           if foo is None:\n"
         r"               foo = Foo\(\)"
     )
 
     with pytest.raises(ValueError, match=expected_message):
+        app.default(cmd)
+
+
+def test_bind_dataclass_star_parameter_error_message_annotated(app):
+    """The no-default error names the class, not ``Annotated``, when ``Parameter(name="*")`` is in the hint."""
+
+    @dataclass
+    class Foo:
+        bar: int = 12
+
+    def cmd(foo: Annotated[Foo, Parameter(name="*")]):
+        print(foo)
+
+    with pytest.raises(ValueError, match=r'providing a default value "foo: Foo = Foo\(\)"'):
         app.default(cmd)
 
 

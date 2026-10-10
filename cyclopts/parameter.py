@@ -683,13 +683,14 @@ def validate_command(f: Callable):
             if all_fields_optional:
                 param_name = field_info.names[0] if field_info.names else ""
                 quoted_param_name = f'"{param_name}" ' if param_name else ""
+                class_name = annotated.__name__
                 raise ValueError(
                     f'Parameter {quoted_param_name}in function {f} has all optional values, uses Parameter(name="*"), but itself has no default value. '
                     "Consider either:\n"
-                    f'    1) If immutable, providing a default value "{param_name}: {field_info.annotation.__name__} = {field_info.annotation.__name__}()"\n'
-                    f'    2) Otherwise, declaring it optional like "{param_name}: {field_info.annotation.__name__} | None = None" and instanting the {param_name} object in the function body:\n'
+                    f'    1) If immutable, providing a default value "{param_name}: {class_name} = {class_name}()"\n'
+                    f'    2) Otherwise, declaring it optional like "{param_name}: {class_name} | None = None" and instantiating the {param_name} object in the function body:\n'
                     f"           if {param_name} is None:\n"
-                    f"               {param_name} = {field_info.annotation.__name__}()"
+                    f"               {param_name} = {class_name}()"
                 )
 
 
