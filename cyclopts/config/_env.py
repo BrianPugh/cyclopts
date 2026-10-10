@@ -63,7 +63,7 @@ class Env:
                 remaining_keys = (delimiter.join(remaining_keys),)
 
             remaining_keys = tuple(x.lower() for x in remaining_keys)
-            for i, value in enumerate(argument.env_var_split(os.environ[candidate_env_key])):
+            for i, value in enumerate(argument._split_env_value(os.environ[candidate_env_key], remaining_keys)):
                 token = Token(keyword=candidate_env_key, value=value, source=self.source, index=i, keys=remaining_keys)
                 argument.append(token)
                 added_tokens.add(token)
