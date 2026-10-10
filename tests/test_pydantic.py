@@ -1220,3 +1220,26 @@ def test_pydantic_default_factory_help(app, console):
         actual = capture.get()
         assert "[default: [1, 2, 3]]" in actual
         assert "factory" not in actual
+
+
+@pytest.mark.parametrize(
+    "cmd_str, expected_a",
+    [
+        ("--outer.inner='{\"a\": 2}'", 2),
+        ("--outer.inner={}", 1),
+    ],
+)
+def test_pydantic_nested_model_field_from_cli_json(app, cmd_str, expected_a):
+    """A JSON object supplied to a nested model field binds like a top-level one."""
+
+    class Inner(BaseModel):
+        a: int = 1
+
+    class Outer(BaseModel):
+        inner: Inner = Inner()
+
+    @app.default
+    def main(outer: Outer):
+        return outer
+
+    assert app(cmd_str, result_action="return_value") == Outer(inner=Inner(a=expected_a))
