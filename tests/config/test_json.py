@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from textwrap import dedent
 
@@ -154,3 +155,49 @@ def test_config_empty_json(tmp_path, console):
         """
     )
     assert actual == expected
+
+
+@pytest.mark.parametrize("same_named_neighbor", [True, False])
+def test_config_json_symlink_uses_target_contents(app, tmp_path, same_named_neighbor):
+    """Symlinked configs supply CLI defaults and still reload after the target changes."""
+    target = tmp_path / "settings" / "stored-settings.json"
+    target.parent.mkdir()
+    target.write_text('{"port": 8123}')
+    config_path = tmp_path / "config.json"
+    if same_named_neighbor:
+        (target.parent / config_path.name).write_text('{"port": 9000}')
+    try:
+        config_path.symlink_to(target)
+    except OSError:
+        pytest.skip("Creating symlinks is not supported on this platform")
+    app.config = Json(config_path)
+
+    @app.default
+    def main(port: int = 1234):
+        return port
+
+    assert app([]) == 8123
+    assert app([]) == 8123  # Cached contents still come from the symlink target.
+    target.write_text('{"port": 12345}')
+    assert app([]) == 12345
+
+
+def test_config_json_symlink_retarget_invalidates_cache(tmp_path):
+    """Retargeting a config symlink invalidates equal-size, equal-mtime cached data."""
+    targets = [tmp_path / name / "config.json" for name in ("first", "second")]
+    for target, port in zip(targets, (8123, 9000), strict=True):
+        target.parent.mkdir()
+        target.write_text(json.dumps({"port": port}))
+    stat = targets[0].stat()
+    os.utime(targets[1], ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    config_path = tmp_path / "config.json"
+    try:
+        config_path.symlink_to(targets[0])
+    except OSError:
+        pytest.skip("Creating symlinks is not supported on this platform")
+    config = Json(config_path)
+
+    assert config.config == {"port": 8123}
+    config_path.unlink()
+    config_path.symlink_to(targets[1])
+    assert config.config == {"port": 9000}

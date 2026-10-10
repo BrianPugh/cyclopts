@@ -108,7 +108,8 @@ class FileCacheKey:
     """
 
     def __init__(self, path: str | Path):
-        self.path = Path(path).absolute()
+        # Track the target identity so retargeting a symlink invalidates the cache.
+        self.path = Path(path).resolve()
         if self.path.exists():
             stat = self.path.stat()
             self._mtime = stat.st_mtime
@@ -163,7 +164,10 @@ class ConfigFromFile(ConfigBase):
     @property
     def config(self) -> dict[str, Any]:
         assert isinstance(self.path, Path)
-        for parent in self.path.expanduser().resolve().absolute().parents:
+        # Resolve the directory only: resolving the file itself can change its basename
+        # when it is a symlink, causing us to load a different file or miss it entirely.
+        directory = self.path.expanduser().parent.resolve()
+        for parent in (directory, *directory.parents):
             candidate = parent / self.path.name
             if candidate.exists():
                 cache_key = FileCacheKey(candidate)

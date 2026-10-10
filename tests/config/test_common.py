@@ -324,3 +324,40 @@ def test_config_common_empty_document_is_empty_mapping(tmp_path):
 
     assert config.config == {}  # freshly loaded
     assert config.config == {}  # served from the cache
+
+
+@pytest.mark.parametrize("must_exist", [True, False])
+@pytest.mark.parametrize("search_parents", [True, False])
+def test_config_common_symlink_to_renamed_file(tmp_path, config, mocker, must_exist, search_parents):
+    """Load the requested symlink rather than reconstructing a path beside its target."""
+    target = tmp_path / "settings" / "renamed.dummy"
+    target.parent.mkdir()
+    target.touch()
+    try:
+        config.path.symlink_to(target)
+    except OSError:
+        pytest.skip("Creating symlinks is not supported on this platform")
+    config.must_exist = must_exist
+    config.search_parents = search_parents
+    spy_load_config = mocker.spy(config, "_load_config")
+
+    assert config.config["key1"] == "foo1"
+    spy_load_config.assert_called_once_with(config.path)
+
+
+@pytest.mark.parametrize("search_parents", [True, False])
+def test_config_common_symlink_ignores_same_named_file_beside_target(tmp_path, config, mocker, search_parents):
+    """A same-named file in the target directory must not replace the requested config."""
+    target = tmp_path / "settings" / "renamed.dummy"
+    target.parent.mkdir()
+    target.touch()
+    (target.parent / config.path.name).touch()
+    try:
+        config.path.symlink_to(target)
+    except OSError:
+        pytest.skip("Creating symlinks is not supported on this platform")
+    config.search_parents = search_parents
+    spy_load_config = mocker.spy(config, "_load_config")
+
+    _ = config.config
+    spy_load_config.assert_called_once_with(config.path)
