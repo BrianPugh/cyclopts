@@ -135,3 +135,26 @@ def test_config_env_kwargs(app, assert_parse_args, monkeypatch):
     app.config = Env("CYCLOPTS_TEST_APP_")
 
     assert_parse_args(default, "a_value", a="a_value", two_words="test value")
+
+
+def test_config_env_list_of_dataclass_error_names_parameter(app, monkeypatch):
+    """An error inside an env-sourced list element names the real parameter, not a placeholder."""
+    from cyclopts import MissingArgumentError
+
+    @dataclass
+    class Server:
+        host: str
+        port: int = 80
+
+    app.config = Env("CYCLOPTS_TEST_APP_", command=False)
+
+    @app.default
+    def main(servers: list[Server]):
+        return servers
+
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_SERVERS", '{"port":1}')
+    with pytest.raises(MissingArgumentError) as e:
+        app([], exit_on_error=False, print_error=False)
+
+    assert e.value.argument is not None
+    assert e.value.argument.name == "--servers.host"

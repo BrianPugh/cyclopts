@@ -1080,3 +1080,34 @@ def test_config_dict_root_non_mapping_node_with_root_keys():
         app([], exit_on_error=False)
 
     assert str(e.value) == 'Configuration in "dict" must be a mapping, but got int.'
+
+
+@pytest.mark.parametrize(
+    "element, expected_name",
+    [
+        ({"port": 1}, "--servers.host"),
+        ({"host": "a", "port": "abc"}, "[servers][port]"),
+    ],
+)
+def test_config_dict_list_of_dataclass_error_names_parameter(element, expected_name):
+    """An error inside a list element from config names the real parameter, not a placeholder."""
+    from dataclasses import dataclass
+
+    from cyclopts import CycloptsError
+
+    @dataclass
+    class Server:
+        host: str
+        port: int = 80
+
+    app = App(config=Dict({"servers": [element]}), result_action="return_value")
+
+    @app.default
+    def main(servers: list[Server]):
+        return servers
+
+    with pytest.raises(CycloptsError) as e:
+        app([], exit_on_error=False)
+
+    assert expected_name in str(e.value)
+    assert "json" not in str(e.value)

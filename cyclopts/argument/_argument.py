@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
 from attrs import define, field
 
 from cyclopts._convert import (
+    _convert_entry,
     _validate_json_extra_keys,
-    convert,
     create_empty_instance,
     instantiate_from_dict,
     token_count,
@@ -742,8 +742,14 @@ class Argument:
 
         if self.parameter.converter:
             converter = self.parameter.resolve_converter(self.hint)
-        elif converter is None:
-            converter = partial(convert, name_transform=self.parameter.name_transform)
+        # Children build their own default converter so it carries their own name.
+        child_converter = converter
+        if converter is None:
+            converter = partial(
+                _convert_entry,
+                name_transform=self.parameter.name_transform,
+                json_name=self.names[0] if self.names else None,
+            )
 
         assert converter is not None  # Ensure converter is set at this point
 
@@ -908,7 +914,7 @@ class Argument:
                 # than by the (cross-branch, over-counting) static ``child.required``.
                 child_required = child.keys[-1] in active_required if active_required is not None else child.required
                 if child.has_tokens:
-                    data[child.keys[-1]] = child.convert_and_validate(converter=converter)
+                    data[child.keys[-1]] = child.convert_and_validate(converter=child_converter)
                 elif child_required:
                     obj = data
                     for k in child.keys:
