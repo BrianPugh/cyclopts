@@ -980,6 +980,26 @@ def _convert_entry(
             dispatch_type = resolved
             dispatch_origin = get_origin(resolved) or resolved
 
+    if (
+        not isinstance(tokens, dict)
+        and len(tokens) == 1
+        and isinstance(tokens[0], Token)
+        and isinstance(tokens[0].implicit_value, dict | list)
+        and not tokens[0].implicit_value
+    ):
+        # An empty container from a config file, e.g. ``x = []`` or ``x = {k = {}}``.
+        token = tokens[0]
+        container_origin = _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin)
+        if isinstance(token.implicit_value, dict) and container_origin is dict:
+            return {}
+        if isinstance(token.implicit_value, list) and container_origin in ITERABLE_TYPES:
+            if container_origin is tuple:
+                return convert_tuple(dispatch_type)
+            return container_origin()
+        # Wrong kind of container (e.g. ``[]`` for a dataclass); convert its text so
+        # classes and scalars take their usual path (and error) instead.
+        tokens = (token.evolve(value="{}" if isinstance(token.implicit_value, dict) else "[]", implicit_value=UNSET),)
+
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
     elif dispatch_origin in ITERABLE_TYPES:
