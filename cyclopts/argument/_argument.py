@@ -1370,9 +1370,10 @@ class Argument:
         out = {}
         if self._accepts_keywords:
             for token in self.tokens:
-                if not token.keys and isinstance(token.implicit_value, dict):
-                    # An explicitly-supplied empty mapping (e.g. ``x = {}`` in a config file);
-                    # contributes no keys, but ``has_tokens`` already marks the argument as supplied.
+                if not token.keys:
+                    # A whole-value mapping: an explicit ``{}`` from a config file, or a JSON object
+                    # given to a nested field (the top-level argument decodes its own before this).
+                    out.update(self._decode_json_object(token))
                     continue
                 node = out
                 for key in token.keys[:-1]:
@@ -1387,8 +1388,8 @@ class Argument:
                 out[keys[0]] = None
             elif child._accepts_keywords:
                 result = child._json()
-                if result:
-                    out[keys[0]] = result
+                if result or any(not token.keys for token in child.tokens):
+                    out.setdefault(keys[0], {}).update(result)
             # Use resolved_hint for checking iterable types (e.g., list[str] | None -> list[str])
             elif (get_origin(child.resolved_hint) or child.resolved_hint) in ITERABLE_TYPES:
                 for token in child.tokens:
@@ -1409,6 +1410,20 @@ class Argument:
                 token = child.tokens[0]
                 out[keys[0]] = token.value if token.implicit_value is UNSET else token.implicit_value
         return out
+
+    def _decode_json_object(self, token: Token) -> dict:
+        if isinstance(token.implicit_value, dict):
+            return token.implicit_value
+        import json
+
+        try:
+            data = json.loads(token.value)
+        except json.JSONDecodeError as e:
+            raise CoercionError(token=token, target_type=self.hint, argument=self) from e
+        if not isinstance(data, dict):
+            raise CoercionError(token=token, target_type=self.hint, argument=self)
+        _validate_json_extra_keys(data, self.resolved_hint, token)
+        return data
 
     def _resolve_missing_keys(self, data) -> "list[tuple[tuple[str, ...], Argument | None]]":
         """Map each required-but-absent key reported by the checker to its child ``Argument``.
