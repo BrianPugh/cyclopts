@@ -795,7 +795,7 @@ class Argument:
             if self.parameter.choices:
                 expanded_tokens = self._validate_choices(expanded_tokens)
             for token in expanded_tokens:
-                if self._is_whole_implicit_value(token.implicit_value):
+                if not token.keys and self._is_whole_implicit_value(token.implicit_value):
                     assert len(expanded_tokens) == 1
                     return token.implicit_value
 
