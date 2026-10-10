@@ -923,6 +923,31 @@ def convert(
     return _convert_entry(type_, tokens, converter, name_transform)
 
 
+def _json_object_tokens(token: "Token", type_: Any) -> dict[str, Any]:
+    """Split a JSON-object token for a ``dict[...]`` type into per-key tokens, like a config file's."""
+    import json
+
+    try:
+        data = json.loads(token.value)
+    except json.JSONDecodeError as e:
+        raise CoercionError(token=token, target_type=type_, msg=str(e)) from e
+    if not isinstance(data, dict):
+        raise CoercionError(token=token, target_type=type_)
+
+    def to_token(key: str, index: int, value: Any) -> "Token":
+        keys = (*token.keys, key)
+        if value is None or (isinstance(value, dict | list) and not value):
+            return token.evolve(keys=keys, index=index, value="", implicit_value=value)
+        return token.evolve(keys=keys, index=index, value=value if isinstance(value, str) else json.dumps(value))
+
+    return {
+        key: [to_token(key, i, v) for i, v in enumerate(value)]
+        if isinstance(value, list) and value
+        else [to_token(key, 0, value)]
+        for key, value in data.items()
+    }
+
+
 def _convert_entry(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
@@ -979,6 +1004,25 @@ def _convert_entry(
             # Optional pattern (T | None): dispatch based on T's requirements
             dispatch_type = resolved
             dispatch_origin = get_origin(resolved) or resolved
+
+    if not isinstance(tokens, dict) and len(tokens) == 1 and isinstance(tokens[0], Token):
+        token = tokens[0]
+        container_origin = _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin)
+        if isinstance(token.implicit_value, dict | list) and not token.implicit_value:
+            # An empty container from a config file, e.g. ``x = []`` or ``x = {k = {}}``.
+            if isinstance(token.implicit_value, dict) and container_origin is dict:
+                return {}
+            if isinstance(token.implicit_value, list) and container_origin in ITERABLE_TYPES:
+                if container_origin is tuple:
+                    return convert_tuple(dispatch_type)
+                return container_origin()
+            # Wrong kind of container (e.g. ``[]`` for a dataclass); convert its text so
+            # classes and scalars take their usual path (and error) instead.
+            tokens = (
+                token.evolve(value="{}" if isinstance(token.implicit_value, dict) else "[]", implicit_value=UNSET),
+            )
+        elif container_origin is dict and token.implicit_value is UNSET and token.value.strip().startswith("{"):
+            tokens = _json_object_tokens(token, dispatch_type)
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
