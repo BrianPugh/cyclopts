@@ -42,7 +42,7 @@ def subapp(app):
     return subapp
 
 
-@pytest.mark.parametrize("cmd", ["foo --help"])
+@pytest.mark.parametrize("cmd", ["--help"])
 def test_root_console(app, mock_console, cmd):
     app.console = mock_console
 
