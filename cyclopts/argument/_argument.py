@@ -665,10 +665,8 @@ class Argument:
             if self.parameter.allow_repeating is False:
                 raise RepeatArgumentError(token=token)
             _, consume_all = self.token_count(token.keys)
-            is_flag_repeat = not token.keys and any(
-                self._is_whole_implicit_value(x.implicit_value)
-                for x in (token, *self.tokens)
-                if x.address == token.address
+            is_flag_repeat = any(
+                self._is_whole_implicit_value(x) for x in (token, *self.tokens) if x.address == token.address
             )
             if self.parameter.allow_repeating is True:
                 if is_flag_repeat:
@@ -685,12 +683,14 @@ class Argument:
                 raise MixedArgumentError(argument=self)
         self.tokens.append(token)
 
-    def _is_whole_implicit_value(self, value: Any) -> bool:
+    def _is_whole_implicit_value(self, token: Token) -> bool:
         """Whether a flag's implicit value is this argument's complete value.
 
-        ``False`` for an element of an iterable, like each ``--flag`` of a ``list[bool]``.
+        ``False`` for an element of an iterable, like each ``--flag`` of a ``list[bool]``,
+        and for a keyed token, whose value belongs to a sub-key.
         """
-        if value is UNSET:
+        value = token.implicit_value
+        if value is UNSET or token.keys:
             return False
         hint = self.resolved_hint
         for member in get_args(hint) if is_union(hint) else (hint,):
@@ -795,7 +795,7 @@ class Argument:
             if self.parameter.choices:
                 expanded_tokens = self._validate_choices(expanded_tokens)
             for token in expanded_tokens:
-                if not token.keys and self._is_whole_implicit_value(token.implicit_value):
+                if self._is_whole_implicit_value(token):
                     assert len(expanded_tokens) == 1
                     return token.implicit_value
 
@@ -856,7 +856,7 @@ class Argument:
                 # e.g. ``bool | MyFlag``; the other members need a chance at the tokens.
                 # With ``--x.<key>`` tokens too, the Flag path below combines or rejects them.
                 positional_tokens = self.tokens
-                if len(positional_tokens) == 1 and self._is_whole_implicit_value(positional_tokens[0].implicit_value):
+                if len(positional_tokens) == 1 and self._is_whole_implicit_value(positional_tokens[0]):
                     return positional_tokens[0].implicit_value
                 if positional_tokens:
                     return safe_converter(self.hint, tuple(positional_tokens))
@@ -901,7 +901,7 @@ class Argument:
                     positional_tokens = [
                         token for token in positional_tokens if not isinstance(token.implicit_value, dict)
                     ]
-                if len(positional_tokens) == 1 and self._is_whole_implicit_value(positional_tokens[0].implicit_value):
+                if len(positional_tokens) == 1 and self._is_whole_implicit_value(positional_tokens[0]):
                     return positional_tokens[0].implicit_value
                 if positional_tokens:
                     return safe_converter(self.hint, tuple(positional_tokens))
