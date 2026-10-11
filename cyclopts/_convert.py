@@ -32,7 +32,7 @@ from cyclopts.annotations import (
     resolve_optional,
 )
 from cyclopts.exceptions import CoercionError, CycloptsError, ValidationError
-from cyclopts.field_info import FieldInfo, get_field_infos
+from cyclopts.field_info import FieldInfo, get_field_infos, is_structured_type
 from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
 
 if sys.version_info >= (3, 12):  # pragma: no cover
@@ -923,12 +923,6 @@ def convert(
     return _convert_entry(type_, tokens, converter, name_transform)
 
 
-def _is_structured_type(type_: Any) -> bool:
-    """Whether ``type_`` (or a member of a union) is a class built from fields, like a dataclass."""
-    type_ = resolve(type_)
-    return any(not is_builtin(t) and get_field_infos(t) for t in (get_args(type_) if is_union(type_) else (type_,)))
-
-
 def _convert_entry(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
@@ -994,23 +988,18 @@ def _convert_entry(
         and not tokens[0].implicit_value
     ):
         # An empty container from a config file, e.g. ``x = []`` or ``x = {k = {}}``.
-        token = tokens[0]
+        is_dict = isinstance(tokens[0].implicit_value, dict)
         container_origin = _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin)
-        if isinstance(token.implicit_value, dict) and container_origin is dict:
+        is_iterable = container_origin in ITERABLE_TYPES
+        if is_dict and container_origin is dict:
             return {}
-        if isinstance(token.implicit_value, list) and container_origin in ITERABLE_TYPES:
-            if container_origin is tuple:
-                return convert_tuple(dispatch_type)
-            return container_origin()
-        # Wrong kind of container. Only ``{}`` for a class (or an iterable of them) has a meaning:
-        # its JSON text builds an all-defaults instance. As text, ``[]``/``{}`` would otherwise bind
-        # into a ``str`` (or a class's first ``str`` field).
-        is_dict = isinstance(token.implicit_value, dict)
-        token = token.evolve(value="{}" if is_dict else "[]", implicit_value=UNSET)
-        element = get_args(dispatch_type)[0] if container_origin in ITERABLE_TYPES else dispatch_type
-        if not is_dict or not _is_structured_type(element):
-            raise CoercionError(token=token, target_type=dispatch_type)
-        tokens = (token,)
+        if not is_dict and is_iterable:
+            return convert_tuple(dispatch_type) if container_origin is tuple else container_origin()
+        # ``{}`` for a class (or an iterable of them) builds an all-defaults instance from its JSON text.
+        # Anything else would bind that text into a ``str`` (or a class's first ``str`` field).
+        tokens = (tokens[0].evolve(value="{}" if is_dict else "[]", implicit_value=UNSET),)
+        if not (is_dict and is_structured_type(get_args(dispatch_type)[0] if is_iterable else dispatch_type)):
+            raise CoercionError(token=tokens[0], target_type=dispatch_type)
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore

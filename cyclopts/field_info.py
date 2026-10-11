@@ -26,6 +26,7 @@ from cyclopts.annotations import (
     is_pydantic,
     is_pydantic_secret,
     is_typeddict,
+    is_union,
     resolve,
     resolve_annotated,
 )
@@ -371,6 +372,12 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
         return {}
     else:
         return _generic_class_field_infos(hint)
+
+
+def is_structured_type(hint) -> bool:
+    """Whether ``hint`` (or a member of a union) is a class built from fields, like a dataclass."""
+    hint = resolve(hint)
+    return any(get_field_infos(t) for t in (get_args(hint) if is_union(hint) else (hint,)))
 
 
 def signature_parameters(f: Any) -> dict[str, FieldInfo]:
