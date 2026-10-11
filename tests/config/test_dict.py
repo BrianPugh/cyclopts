@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from cyclopts import App
@@ -1177,10 +1179,70 @@ def test_config_dict_empty_list_value_dataclass(first_field, nested):
         (list[str], {}),
         (dict[str, str], {"k": []}),
         (dict[str, str], {"k": {}}),
+        (Any, []),
+        (dict[str, Any], {"k": []}),
+        (dict[str, Any], {"k": {}}),
     ],
 )
 def test_config_dict_empty_container_into_str(hint, value):
-    """An empty container is an error for a ``str`` instead of binding as the text ``"[]"``/``"{}"``."""
+    """An empty container is an error for a ``str`` (or ``Any``, which converts like ``str``)."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (dict[str, dict[str, int] | list[int]], {"k": {}}),
+        (dict[str, dict[str, int] | list[int]], {"k": []}),
+        (dict[str, list[int] | None], {"k": []}),
+    ],
+)
+def test_config_dict_empty_container_union(hint, value):
+    """An empty container binds through whichever union member can hold it."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == value
+
+
+def test_config_dict_empty_dict_union_str_first():
+    """``{}`` for ``str | Options`` builds ``Options`` instead of binding the text ``"{}"`` into ``str``."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        threshold: int = 5
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, str | Options]):
+        return x
+
+    assert app([]) == {"k": Options()}
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (dict[str, int | None], {"k": []}),
+        (dict[str, int | list[int]], {"k": {}}),
+    ],
+)
+def test_config_dict_empty_container_union_no_member(hint, value):
+    """An empty container is an error when no union member can hold it."""
     from cyclopts import CoercionError
 
     app = App(config=Dict({"x": value}), result_action="return_value")

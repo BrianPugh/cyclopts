@@ -923,6 +923,37 @@ def convert(
     return _convert_entry(type_, tokens, converter, name_transform)
 
 
+def _convert_empty_container(type_: Any, token: "Token", convert: Callable, convert_tuple: Callable) -> Any:
+    """Convert an empty container from a config file, e.g. ``x = []`` or ``x = {k = {}}``.
+
+    ``{}`` for a class (or an iterable of them) builds an all-defaults instance. For a union, the
+    first member that can hold the container wins.
+    """
+    value = token.implicit_value
+    resolved = resolve(type_, optional=False)
+    if resolved is Any:
+        resolved = str
+    if is_union(resolved):
+        for member in get_args(resolved):
+            try:
+                return _convert_empty_container(member, token, convert, convert_tuple)
+            except CoercionError:
+                pass
+    else:
+        origin = get_origin(resolved) or resolved
+        origin = _abstract_to_concrete_type_mapping.get(origin, origin)
+        is_iterable = origin in ITERABLE_TYPES
+        if isinstance(value, dict) and origin is dict:
+            return {}
+        if isinstance(value, list) and is_iterable:
+            return convert_tuple(resolved) if origin is tuple else origin()
+        if isinstance(value, dict) and is_structured_type(get_args(resolved)[0] if is_iterable else resolved):
+            text = token.evolve(value="{}", implicit_value=UNSET)
+            return convert(type_, (text,) if is_iterable else text)
+    # Converted as text, ``[]``/``{}`` would bind into a ``str`` (or a class's first ``str`` field).
+    raise CoercionError(token=token.evolve(value="{}" if isinstance(value, dict) else "[]"), target_type=resolved)
+
+
 def _convert_entry(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
@@ -944,6 +975,16 @@ def _convert_entry(
 
     convert_priv = partial(_convert, converter=converter, name_transform=name_transform, name=name)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform, name=name)
+
+    if (
+        not isinstance(tokens, dict)
+        and len(tokens) == 1
+        and isinstance(tokens[0], Token)
+        and isinstance(tokens[0].implicit_value, dict | list)
+        and not tokens[0].implicit_value
+    ):
+        return _convert_empty_container(type_, tokens[0], convert_priv, convert_tuple)
+
     # ``_convert`` applies a type's own ``Parameter`` metadata (converter/validator), but
     # ``resolve`` discards it. Stash the metadata so it can be re-attached to the
     # *normalized* type for the scalar dispatch below; this is what lets a container's
@@ -979,27 +1020,6 @@ def _convert_entry(
             # Optional pattern (T | None): dispatch based on T's requirements
             dispatch_type = resolved
             dispatch_origin = get_origin(resolved) or resolved
-
-    if (
-        not isinstance(tokens, dict)
-        and len(tokens) == 1
-        and isinstance(tokens[0], Token)
-        and isinstance(tokens[0].implicit_value, dict | list)
-        and not tokens[0].implicit_value
-    ):
-        # An empty container from a config file, e.g. ``x = []`` or ``x = {k = {}}``.
-        is_dict = isinstance(tokens[0].implicit_value, dict)
-        container_origin = _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin)
-        is_iterable = container_origin in ITERABLE_TYPES
-        if is_dict and container_origin is dict:
-            return {}
-        if not is_dict and is_iterable:
-            return convert_tuple(dispatch_type) if container_origin is tuple else container_origin()
-        # ``{}`` for a class (or an iterable of them) builds an all-defaults instance from its JSON text.
-        # Anything else would bind that text into a ``str`` (or a class's first ``str`` field).
-        tokens = (tokens[0].evolve(value="{}" if is_dict else "[]", implicit_value=UNSET),)
-        if not (is_dict and is_structured_type(get_args(dispatch_type)[0] if is_iterable else dispatch_type)):
-            raise CoercionError(token=tokens[0], target_type=dispatch_type)
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
