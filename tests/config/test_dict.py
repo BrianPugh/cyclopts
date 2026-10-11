@@ -1457,6 +1457,10 @@ def test_config_dict_null_non_nullable_dataclass_field():
         (dict[str, Any | None], {"k": None}, {"k": None}),
         (dict[str, Any], {"k": None}, {"k": None}),
         (list[int | None], [1, None], [1, None]),
+        (Any | int, None, None),
+        (dict[str, Any | int], {"k": None}, {"k": None}),
+        (list[Any], [None], [None]),
+        (tuple[Any, ...], [None], (None,)),
     ],
 )
 def test_config_dict_null_nullable(hint, value, expected):
@@ -1468,6 +1472,23 @@ def test_config_dict_null_nullable(hint, value, expected):
         return x
 
     assert app([]) == expected
+
+
+def test_config_dict_null_annotated_any_validator():
+    """A config ``null`` for an ``Annotated[Any, ...]`` dict value still runs its validator."""
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    validated = []
+    app = App(config=Dict({"x": {"k": None}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[Any, Parameter(validator=lambda _, v: validated.append(v))]]):
+        return x
+
+    assert app([]) == {"k": None}
+    assert validated == [None]
 
 
 def test_config_dict_null_none_default():

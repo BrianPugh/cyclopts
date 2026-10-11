@@ -388,7 +388,7 @@ class Argument:
         if annotation is FieldInfo.empty:
             return True
         hint = resolve(annotation, optional=False)
-        return hint is Any or is_nonetype(hint) or (is_union(hint) and any(is_nonetype(arg) for arg in get_args(hint)))
+        return any(member is Any or is_nonetype(member) for member in (get_args(hint) if is_union(hint) else (hint,)))
 
     @property
     def _use_pydantic_type_adapter(self) -> bool:

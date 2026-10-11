@@ -52,6 +52,9 @@ F = TypeVar("F", bound=Flag)
 
 # Mapping from bare concrete types to their default parameterized versions.
 # Used when type parameters are not specified (e.g., bare `list` becomes `list[str]`).
+# Types a config/JSON ``null`` converts into as ``None``.
+_NULLABLE_TYPES: tuple[Any, ...] = (NoneType, Any)
+
 _implicit_iterable_type_mapping: dict[type, type] = {
     frozenset: frozenset[str],
     list: list[str],
@@ -804,7 +807,7 @@ def _convert(
         # TODO: This doesn't respect the type-annotation of ``*args``.
         if is_builtin(type_) or not field_infos:
             assert isinstance(token, Token)
-            if token.implicit_value is None and type_ is not NoneType:
+            if token.implicit_value is None and type_ not in _NULLABLE_TYPES:
                 # e.g. a config file's ``null`` for an ``int``.
                 raise CoercionError(token=token.evolve(value="null"), target_type=type_)
             try:
@@ -970,6 +973,15 @@ def _convert_empty_container(
     raise CoercionError(token=token.evolve(value="{}" if isinstance(value, dict) else "[]"), target_type=resolved)
 
 
+def _lone_token(tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs) -> "Token | None":
+    """The only token of an unkeyed token sequence, e.g. from a config file's ``x = null`` or ``x = []``."""
+    from cyclopts.argument import Token
+
+    if not isinstance(tokens, dict) and len(tokens) == 1 and isinstance(tokens[0], Token):
+        return tokens[0]
+    return None
+
+
 def _convert_entry(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
@@ -992,14 +1004,9 @@ def _convert_entry(
     convert_priv = partial(_convert, converter=converter, name_transform=name_transform, name=name)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform, name=name)
 
-    if (
-        not isinstance(tokens, dict)
-        and len(tokens) == 1
-        and isinstance(tokens[0], Token)
-        and isinstance(tokens[0].implicit_value, dict | list)
-        and not tokens[0].implicit_value
-    ):
-        return _convert_empty_container(type_, tokens[0], convert_priv, convert_tuple, name)
+    lone = _lone_token(tokens)
+    if lone and isinstance(lone.implicit_value, dict | list) and not lone.implicit_value:
+        return _convert_empty_container(type_, lone, convert_priv, convert_tuple, name)
 
     # ``_convert`` applies a type's own ``Parameter`` metadata (converter/validator), but
     # ``resolve`` discards it. Stash the metadata so it can be re-attached to the
@@ -1009,8 +1016,9 @@ def _convert_entry(
     type_ = resolve(type_, optional=False)
 
     if type_ is Any:
-        if not isinstance(tokens, dict) and len(tokens) == 1 and getattr(tokens[0], "implicit_value", UNSET) is None:
-            return None  # ``Any`` admits a config ``null``; anything else converts like ``str``.
+        if lone and lone.implicit_value is None:
+            # ``Any`` admits a config ``null``; anything else converts like ``str``.
+            return convert_priv(Annotated[(Any, *annotations_)] if annotations_ else Any, lone)
         type_ = str
 
     type_ = _implicit_iterable_type_mapping.get(type_, type_)
