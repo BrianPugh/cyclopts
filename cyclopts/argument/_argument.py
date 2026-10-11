@@ -369,13 +369,22 @@ class Argument:
 
     @property
     def _explicit_none(self) -> bool:
-        """A lone keyless ``None`` token (a JSON/config ``null``) with no populated children."""
+        """A lone keyless ``None`` token (a JSON/config ``null``) with no populated children.
+
+        Only when ``None`` is a valid value: the hint allows it, or it's the default (``x: int = None``).
+        """
         return (
             len(self.tokens) == 1
             and not self.tokens[0].keys
             and self.tokens[0].implicit_value is None
             and not any(child.has_tokens for child in self.children)
+            and (self.field_info.default is None or self._allows_none)
         )
+
+    @property
+    def _allows_none(self) -> bool:
+        hint = resolve(self.hint, optional=False)
+        return is_nonetype(hint) or (is_union(hint) and any(is_nonetype(arg) for arg in get_args(hint)))
 
     @property
     def _use_pydantic_type_adapter(self) -> bool:
@@ -798,18 +807,6 @@ class Argument:
                 if self._is_whole_implicit_value(token):
                     assert len(expanded_tokens) == 1
                     return token.implicit_value
-
-                # Handle negative_none flag: implicit_value=None for Optional types
-                # Use self.hint (not self.resolved_hint) to preserve Optional/Union
-                if token.implicit_value is None:
-                    hint = self.hint
-                    if is_union(hint):
-                        if any(is_nonetype(arg) or arg is None for arg in get_args(hint)):
-                            assert len(expanded_tokens) == 1
-                            return None
-                    elif is_nonetype(hint) or hint is None:
-                        assert len(expanded_tokens) == 1
-                        return None
 
                 if token.keys:
                     lookup = keyword

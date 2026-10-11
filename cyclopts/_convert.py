@@ -804,6 +804,9 @@ def _convert(
         # TODO: This doesn't respect the type-annotation of ``*args``.
         if is_builtin(type_) or not field_infos:
             assert isinstance(token, Token)
+            if token.implicit_value is None and type_ is not NoneType:
+                # e.g. a config file's ``null`` for an ``int``.
+                raise CoercionError(token=token.evolve(value="null"), target_type=type_)
             try:
                 if token.implicit_value is not UNSET:
                     out = token.implicit_value
