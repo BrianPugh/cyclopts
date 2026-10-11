@@ -1577,3 +1577,31 @@ def test_config_dict_null_any_dataclass_field():
         return x
 
     assert app([]) == Options(a=None)
+
+
+def test_config_dict_null_unannotated_typed_default():
+    """An unannotated parameter is typed by its default, so ``null`` errors for ``x=0`` like for ``x: int = 0``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x=0):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_null_any_typed_default():
+    """``x: Any = 5`` is typed by its default (see rules.rst), so ``null`` errors like for ``x: int = 5``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x: Any = 5):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
