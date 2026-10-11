@@ -1262,6 +1262,17 @@ def _union_conversion(
     raise CoercionError(token=token, target_type=Union[union_args])  # pyright: ignore  # noqa: UP007
 
 
+def takes_scalar(hint: Any) -> bool:
+    """Whether ``hint`` only takes a single value, so an array (e.g. from a config file) can't bind to it."""
+    hint = resolve(hint)
+    if is_union(hint):
+        return all(takes_scalar(member) for member in get_args(hint) if not is_nonetype(member))
+    if hint is Any or is_structured_type(hint) or (get_origin(hint) or hint) is tuple:
+        return False
+    count, consume_all = token_count(hint)
+    return count <= 1 and not consume_all
+
+
 def token_count(
     type_: Any,
     skip_converter_params: bool = False,

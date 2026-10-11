@@ -9,10 +9,9 @@ from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, get_args, get_ori
 if TYPE_CHECKING:
     from cyclopts.core import App
 
-from cyclopts._convert import token_count
+from cyclopts._convert import takes_scalar
 from cyclopts.annotations import (
     get_hint_name,
-    is_nonetype,
     is_typeddict,
     is_union,
     is_unpack,
@@ -25,7 +24,6 @@ from cyclopts.exceptions import (
 )
 from cyclopts.field_info import (
     get_field_infos,
-    is_structured_type,
     signature_parameters,
 )
 from cyclopts.group import Group
@@ -808,17 +806,6 @@ def _hint_at_keys(hint: Any, keys: tuple[str, ...]) -> Any:
     return hint
 
 
-def _takes_scalar(hint: Any) -> bool:
-    """Whether ``hint`` only takes a single value, so a config array can't bind to it."""
-    hint = resolve(hint)
-    if is_union(hint):
-        return all(_takes_scalar(member) for member in get_args(hint) if not is_nonetype(member))
-    if hint is Any or is_structured_type(hint) or (get_origin(hint) or hint) is tuple:
-        return False
-    count, consume_all = token_count(hint)
-    return count <= 1 and not consume_all
-
-
 def update_argument_collection(
     config: dict,
     source: str,
@@ -933,7 +920,7 @@ def update_argument_collection(
                 root_hint = Any if resolve(argument.field_info.annotation) is Any else argument.hint
                 hint = _hint_at_keys(root_hint, remaining_keys)
                 count, consume_all = argument.token_count(remaining_keys)
-                if count <= 1 and not consume_all and _takes_scalar(hint):
+                if count <= 1 and not consume_all and takes_scalar(hint):
                     import json
 
                     raise CoercionError(
