@@ -1471,19 +1471,24 @@ def test_config_dict_null_nullable(hint, value, expected):
 
 
 def test_config_dict_null_none_default():
-    """A config ``null`` binds ``None`` for ``x: int = None``, matching the default."""
+    """A ``None`` default doesn't make ``x: int`` nullable: a config ``null`` is still an error."""
+    from cyclopts import CoercionError
+
     app = App(config=Dict({"x": None}), result_action="return_value")
 
     @app.default
     def main(x: int = None):  # pyright: ignore[reportArgumentType]
         return x
 
-    assert app([]) is None
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
 
 
 def test_config_dict_null_none_default_dataclass_field():
-    """A config ``null`` binds ``None`` for a dataclass field defaulting to ``None``."""
+    """A ``None`` default doesn't make a dataclass field ``n: int`` nullable."""
     from dataclasses import dataclass
+
+    from cyclopts import CoercionError
 
     @dataclass
     class Options:
@@ -1495,7 +1500,8 @@ def test_config_dict_null_none_default_dataclass_field():
     def main(x: Options):
         return x
 
-    assert app([]) == Options(n=None)  # pyright: ignore[reportArgumentType]
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
 
 
 @pytest.mark.parametrize("value", [{"k": None}, {"a": 1, "k": None}])

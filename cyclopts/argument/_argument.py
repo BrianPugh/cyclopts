@@ -371,14 +371,14 @@ class Argument:
     def _explicit_none(self) -> bool:
         """A lone keyless ``None`` token (a JSON/config ``null``) with no populated children.
 
-        Only when ``None`` is a valid value: the hint allows it, or it's the default (``x: int = None``).
+        Only when the annotation allows ``None``; a ``None`` default alone (``x: int = None``) doesn't.
         """
         return (
             len(self.tokens) == 1
             and not self.tokens[0].keys
             and self.tokens[0].implicit_value is None
             and not any(child.has_tokens for child in self.children)
-            and (self.field_info.default is None or self._allows_none)
+            and self._allows_none
         )
 
     @property
