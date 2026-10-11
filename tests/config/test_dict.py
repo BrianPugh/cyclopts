@@ -1148,20 +1148,45 @@ def test_config_dict_empty_dict_value_list_of_pydantic():
     assert app([]) == [Options()]
 
 
-def test_config_dict_empty_list_value_dataclass():
+@pytest.mark.parametrize("first_field", [int, str])
+@pytest.mark.parametrize("nested", [False, True])
+def test_config_dict_empty_list_value_dataclass(first_field, nested):
     """``x = []`` on a dataclass is an error instead of being bound into the first field."""
-    from dataclasses import dataclass
+    from dataclasses import make_dataclass
 
     from cyclopts import CoercionError
 
-    @dataclass
-    class Options:
-        threshold: int = 5
+    Options = make_dataclass("Options", [("first", first_field), ("threshold", int, 5)])
+    hint = dict[str, Options] if nested else Options
 
-    app = App(config=Dict({"x": []}), result_action="return_value")
+    app = App(config=Dict({"x": {"k": []} if nested else []}), result_action="return_value")
 
     @app.default
-    def main(x: Options):
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (str, []),
+        (str, {}),
+        (list[str], {}),
+        (dict[str, str], {"k": []}),
+        (dict[str, str], {"k": {}}),
+    ],
+)
+def test_config_dict_empty_container_into_str(hint, value):
+    """An empty container is an error for a ``str`` instead of binding as the text ``"[]"``/``"{}"``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
         return x
 
     with pytest.raises(CoercionError):

@@ -923,6 +923,12 @@ def convert(
     return _convert_entry(type_, tokens, converter, name_transform)
 
 
+def _is_structured_type(type_: Any) -> bool:
+    """Whether ``type_`` (or a member of a union) is a class built from fields, like a dataclass."""
+    type_ = resolve(type_)
+    return any(not is_builtin(t) and get_field_infos(t) for t in (get_args(type_) if is_union(type_) else (type_,)))
+
+
 def _convert_entry(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
@@ -996,9 +1002,15 @@ def _convert_entry(
             if container_origin is tuple:
                 return convert_tuple(dispatch_type)
             return container_origin()
-        # Wrong kind of container (e.g. ``[]`` for a dataclass); convert its text so
-        # classes and scalars take their usual path (and error) instead.
-        tokens = (token.evolve(value="{}" if isinstance(token.implicit_value, dict) else "[]", implicit_value=UNSET),)
+        # Wrong kind of container. Only ``{}`` for a class (or an iterable of them) has a meaning:
+        # its JSON text builds an all-defaults instance. As text, ``[]``/``{}`` would otherwise bind
+        # into a ``str`` (or a class's first ``str`` field).
+        is_dict = isinstance(token.implicit_value, dict)
+        token = token.evolve(value="{}" if is_dict else "[]", implicit_value=UNSET)
+        element = get_args(dispatch_type)[0] if container_origin in ITERABLE_TYPES else dispatch_type
+        if not is_dict or not _is_structured_type(element):
+            raise CoercionError(token=token, target_type=dispatch_type)
+        tokens = (token,)
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
