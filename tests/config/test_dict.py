@@ -1451,7 +1451,11 @@ def test_config_dict_null_non_nullable_dataclass_field():
     "hint, value, expected",
     [
         (int | None, None, None),
+        (Any | None, None, None),
+        (Any, None, None),
         (dict[str, int | None], {"k": None}, {"k": None}),
+        (dict[str, Any | None], {"k": None}, {"k": None}),
+        (dict[str, Any], {"k": None}, {"k": None}),
         (list[int | None], [1, None], [1, None]),
     ],
 )
@@ -1518,3 +1522,31 @@ def test_config_dict_null_keyed_nullable_in_optional_dict():
         return x
 
     assert app([]) == {"a": 1, "k": None}
+
+
+def test_config_dict_null_unannotated():
+    """A config ``null`` binds ``None`` for an unannotated parameter, like ``Any``."""
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x):
+        return x
+
+    assert app([]) is None
+
+
+def test_config_dict_null_any_dataclass_field():
+    """A config ``null`` binds ``None`` for an ``Any`` dataclass field."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        a: Any
+
+    app = App(config=Dict({"x": {"a": None}}), result_action="return_value")
+
+    @app.default
+    def main(x: Options):
+        return x
+
+    assert app([]) == Options(a=None)

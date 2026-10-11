@@ -383,8 +383,12 @@ class Argument:
 
     @property
     def _allows_none(self) -> bool:
-        hint = resolve(self.hint, optional=False)
-        return is_nonetype(hint) or (is_union(hint) and any(is_nonetype(arg) for arg in get_args(hint)))
+        # The raw annotation, since ``self.hint`` reads ``Any`` (and ``Any | None``) as ``str``.
+        annotation = self.field_info.annotation
+        if annotation is FieldInfo.empty:
+            return True
+        hint = resolve(annotation, optional=False)
+        return hint is Any or is_nonetype(hint) or (is_union(hint) and any(is_nonetype(arg) for arg in get_args(hint)))
 
     @property
     def _use_pydantic_type_adapter(self) -> bool:

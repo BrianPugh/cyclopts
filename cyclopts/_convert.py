@@ -1009,6 +1009,8 @@ def _convert_entry(
     type_ = resolve(type_, optional=False)
 
     if type_ is Any:
+        if not isinstance(tokens, dict) and len(tokens) == 1 and getattr(tokens[0], "implicit_value", UNSET) is None:
+            return None  # ``Any`` admits a config ``null``; anything else converts like ``str``.
         type_ = str
 
     type_ = _implicit_iterable_type_mapping.get(type_, type_)
