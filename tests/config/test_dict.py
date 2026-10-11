@@ -1181,15 +1181,12 @@ def test_config_dict_empty_list_value_dataclass(first_field, nested):
         (list[str], {}),
         (dict[str, str], {"k": []}),
         (dict[str, str], {"k": {}}),
-        (Any, []),
-        (dict[str, Any], {"k": []}),
-        (dict[str, Any], {"k": {}}),
         (list, {}),
         (dict[str, list], {"k": {}}),
     ],
 )
 def test_config_dict_empty_container_into_str(hint, value):
-    """An empty container is an error for a ``str`` (or ``Any``, which converts like ``str``)."""
+    """An empty container is an error for a ``str`` instead of binding as the text ``"[]"``/``"{}"``."""
     from cyclopts import CoercionError
 
     app = App(config=Dict({"x": value}), result_action="return_value")
@@ -1666,3 +1663,36 @@ def test_config_dict_null_optional_class(hint, value, expected):
         return x
 
     assert app([]) == expected
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (Any, []),
+        (Any, {}),
+        (Any | None, []),
+        (dict[str, Any], {"k": []}),
+        (dict[str, Any], {"k": {}}),
+    ],
+)
+def test_config_dict_empty_container_any(hint, value):
+    """An empty container binds as-is for ``Any``."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == value
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_unannotated(value):
+    """An empty container binds as-is for an unannotated parameter, like ``Any``."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x):
+        return x
+
+    assert app([]) == value

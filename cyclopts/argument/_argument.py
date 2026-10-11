@@ -712,6 +712,10 @@ class Argument:
         value = token.implicit_value
         if value is UNSET or token.keys:
             return False
+        annotation = self.field_info.annotation
+        if annotation is FieldInfo.empty or resolve(annotation) is Any:
+            # ``self.hint`` reads ``Any`` (or no annotation) as ``str``, but any value is whole for ``Any``.
+            return True
         hint = self.resolved_hint
         for member in get_args(hint) if is_union(hint) else (hint,):
             member = resolve_annotated(member)
