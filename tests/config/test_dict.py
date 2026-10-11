@@ -1790,3 +1790,74 @@ def test_config_dict_kwargs_any_passthrough(main, value):
     app.default(main)
 
     assert app([]) == {"k": value}
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (int, [1]),
+        (int, [1, 2]),
+        (str, ["a"]),
+        (bool, [True]),
+        (int | None, [1]),
+        (dict[str, int], {"k": [1]}),
+        (dict[str, int], {"k": [1, 2]}),
+        (dict[str, dict[str, int]], {"k": {"j": [1]}}),
+    ],
+)
+def test_config_dict_array_for_scalar(hint, value):
+    """A config array for a scalar type is an error instead of binding its first element or a list."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_array_for_scalar_dataclass_field():
+    """A config array for a scalar dataclass field is an error."""
+    from dataclasses import dataclass
+
+    from cyclopts import CoercionError
+
+    @dataclass
+    class Options:
+        n: int
+
+    app = App(config=Dict({"x": {"n": [1]}}), result_action="return_value")
+
+    @app.default
+    def main(x: Options):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value, expected",
+    [
+        (list[int], [1, 2], [1, 2]),
+        (tuple[int], [1], (1,)),
+        (tuple[int, int], [1, 2], (1, 2)),
+        (int | list[int], [1, 2], [1, 2]),
+        (dict[str, list[int]], {"k": [1, 2]}, {"k": [1, 2]}),
+        (dict[str, int | list[int]], {"k": [1, 2]}, {"k": [1, 2]}),
+        (Any, [1, 2], ["1", "2"]),
+        (dict[str, Any], {"k": [1, 2]}, {"k": ["1", "2"]}),
+    ],
+)
+def test_config_dict_array_for_sequence(hint, value, expected):
+    """A config array still binds for types that take a sequence (and for ``Any``)."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == expected

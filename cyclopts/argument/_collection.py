@@ -3,23 +3,35 @@
 import copy as copy_module
 import inspect
 import itertools
-from collections.abc import Callable, Iterable, Sequence
-from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, get_args, get_origin, overload
 
 if TYPE_CHECKING:
     from cyclopts.core import App
 
-from cyclopts.annotations import get_hint_name, is_typeddict, is_unpack, resolve, resolve_unpack
+from cyclopts._convert import token_count
+from cyclopts.annotations import (
+    get_hint_name,
+    is_nonetype,
+    is_typeddict,
+    is_union,
+    is_unpack,
+    resolve,
+    resolve_unpack,
+)
 from cyclopts.exceptions import (
+    CoercionError,
     UnknownOptionError,
 )
 from cyclopts.field_info import (
+    get_field_infos,
+    is_structured_type,
     signature_parameters,
 )
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, is_iterable
+from cyclopts.utils import UNSET, is_class_and_subclass, is_iterable
 
 from ._argument import Argument
 from .utils import (
@@ -782,6 +794,31 @@ def _is_valid_option_key(option_key: str, arguments: "ArgumentCollection") -> bo
     )
 
 
+def _hint_at_keys(hint: Any, keys: tuple[str, ...]) -> Any:
+    """The type a config value under ``keys`` binds to, e.g. ``int`` for ``dict[str, int]`` and ``("k",)``."""
+    for key in keys:
+        hint = resolve(hint)
+        if is_class_and_subclass(get_origin(hint) or hint, Mapping) and not is_typeddict(hint):
+            args = get_args(hint)
+            hint = args[1] if len(args) == 2 else str
+        elif not is_union(hint) and (field_info := get_field_infos(hint).get(key)):
+            hint = field_info.annotation
+        else:
+            return Any
+    return hint
+
+
+def _takes_scalar(hint: Any) -> bool:
+    """Whether ``hint`` only takes a single value, so a config array can't bind to it."""
+    hint = resolve(hint)
+    if is_union(hint):
+        return all(_takes_scalar(member) for member in get_args(hint) if not is_nonetype(member))
+    if hint is Any or is_structured_type(hint) or (get_origin(hint) or hint) is tuple:
+        return False
+    count, consume_all = token_count(hint)
+    return count <= 1 and not consume_all
+
+
 def update_argument_collection(
     config: dict,
     source: str,
@@ -890,6 +927,25 @@ def update_argument_collection(
 
             if do_not_update.setdefault(id(argument), bool(argument.tokens)):
                 continue
+
+            if isinstance(value, list) and value:
+                # ``argument.hint`` reads ``Any`` as ``str``; arrays still bind to ``Any`` as before.
+                root_hint = Any if resolve(argument.field_info.annotation) is Any else argument.hint
+                hint = _hint_at_keys(root_hint, remaining_keys)
+                count, consume_all = argument.token_count(remaining_keys)
+                if count <= 1 and not consume_all and _takes_scalar(hint):
+                    import json
+
+                    raise CoercionError(
+                        token=Token(
+                            keyword=complete_keyword,
+                            value=json.dumps(value, default=str),
+                            source=source,
+                            keys=remaining_keys,
+                        ),
+                        argument=argument,
+                        target_type=hint,
+                    )
 
             if not is_iterable(value):
                 value = (value,)
