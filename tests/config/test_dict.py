@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -1605,3 +1606,49 @@ def test_config_dict_null_any_typed_default():
 
     with pytest.raises(CoercionError):
         app([], exit_on_error=False)
+
+
+@dataclass
+class _NullFirstStr:
+    first: str
+    n: int = 0
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (dict[str, _NullFirstStr], {"k": None}),
+        (list[_NullFirstStr], [None]),
+        (_NullFirstStr, None),
+    ],
+)
+def test_config_dict_null_non_nullable_class(hint, value):
+    """A config ``null`` for a non-nullable class is an error instead of constructing it from an empty value."""
+    from cyclopts import CycloptsError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CycloptsError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value, expected",
+    [
+        (dict[str, _NullFirstStr | None], {"k": None}, {"k": None}),
+        (_NullFirstStr | None, None, None),
+    ],
+)
+def test_config_dict_null_optional_class(hint, value, expected):
+    """A config ``null`` for an optional class binds ``None`` instead of an instance or a missing-field error."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == expected

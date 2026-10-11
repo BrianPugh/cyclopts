@@ -801,15 +801,15 @@ def _convert(
         else:
             out = converter(type_, token.value)
     else:
+        if isinstance(token, Token) and token.implicit_value is None and type_ not in _NULLABLE_TYPES:
+            # e.g. a config file's ``null`` for an ``int`` or a dataclass.
+            raise CoercionError(token=token.evolve(value="null"), target_type=type_)
         field_infos = get_field_infos(type_)
         # Hope that if there is no field_info, that it takes `*args` and would be happy with a single ``str`` input.
         # This is common for many types, such as libraries that try to mimic pathlib.Path interface.
         # TODO: This doesn't respect the type-annotation of ``*args``.
         if is_builtin(type_) or not field_infos:
             assert isinstance(token, Token)
-            if token.implicit_value is None and type_ not in _NULLABLE_TYPES:
-                # e.g. a config file's ``null`` for an ``int``.
-                raise CoercionError(token=token.evolve(value="null"), target_type=type_)
             try:
                 if token.implicit_value is not UNSET:
                     out = token.implicit_value

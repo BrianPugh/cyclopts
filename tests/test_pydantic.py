@@ -1243,3 +1243,21 @@ def test_pydantic_nested_model_field_from_cli_json(app, cmd_str, expected_a):
         return outer
 
     assert app(cmd_str, result_action="return_value") == Outer(inner=Inner(a=expected_a))
+
+
+def test_pydantic_config_null_non_nullable_model():
+    """A config ``null`` for a non-nullable model names the value instead of a JSON decode error."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    class Model(BaseModel):
+        first: str
+
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x: Model):
+        return x
+
+    with pytest.raises(CoercionError, match='unable to convert "null"'):
+        app([], exit_on_error=False)

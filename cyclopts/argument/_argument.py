@@ -368,18 +368,19 @@ class Argument:
             return self.parameter.show_default
 
     @property
-    def _explicit_none(self) -> bool:
-        """A lone keyless ``None`` token (a JSON/config ``null``) with no populated children.
-
-        Only when the annotation allows ``None``; a ``None`` default alone (``x: int = None``) doesn't.
-        """
+    def _lone_null(self) -> bool:
+        """A lone keyless ``None`` token (a JSON/config ``null``) with no populated children."""
         return (
             len(self.tokens) == 1
             and not self.tokens[0].keys
             and self.tokens[0].implicit_value is None
             and not any(child.has_tokens for child in self.children)
-            and self._allows_none
         )
+
+    @property
+    def _explicit_none(self) -> bool:
+        """A lone ``null`` whose annotation allows ``None``; a ``None`` default alone (``x: int = None``) doesn't."""
+        return self._lone_null and self._allows_none
 
     @property
     def _allows_none(self) -> bool:
@@ -799,7 +800,13 @@ class Argument:
         elif self.parameter.count:
             out = sum(token.implicit_value for token in self.tokens if token.implicit_value is not UNSET)
         elif self._explicit_none:
+            # The whole value is ``None``, so no child (e.g. a required field of ``Foo | None``) converts alone.
+            for child in self.children_recursive:
+                child._marked = True
             return None
+        elif self._lone_null and self.children:
+            # A ``null`` for a non-nullable class; its fields would otherwise each report missing.
+            raise CoercionError(token=self.tokens[0].evolve(value="null"), argument=self, target_type=self.hint)
         elif not self.children:
             positional: list[Token] = []
             keyword = {}
