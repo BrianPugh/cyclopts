@@ -748,7 +748,7 @@ class Argument:
             converter = partial(
                 _convert_entry,
                 name_transform=self.parameter.name_transform,
-                json_name=self.names[0] if self.names else None,
+                name=self.names[0] if self.names else None,
             )
 
         assert converter is not None  # Ensure converter is set at this point
