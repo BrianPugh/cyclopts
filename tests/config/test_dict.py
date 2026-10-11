@@ -1182,6 +1182,8 @@ def test_config_dict_empty_list_value_dataclass(first_field, nested):
         (Any, []),
         (dict[str, Any], {"k": []}),
         (dict[str, Any], {"k": {}}),
+        (list, {}),
+        (dict[str, list], {"k": {}}),
     ],
 )
 def test_config_dict_empty_container_into_str(hint, value):
@@ -1232,6 +1234,65 @@ def test_config_dict_empty_dict_union_str_first():
         return x
 
     assert app([]) == {"k": Options()}
+
+
+def test_config_dict_empty_dict_union_bare_list_first():
+    """``{}`` for ``list | Options`` skips the bare ``list`` (whose elements are ``str``) and builds ``Options``."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        threshold: int = 5
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, list | Options]):
+        return x
+
+    assert app([]) == {"k": Options()}
+
+
+def test_config_dict_empty_dict_annotated_union_validator():
+    """``{}`` for an ``Annotated`` union still runs the annotation's validator, like ``--x.k {}`` does."""
+    from dataclasses import dataclass
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    @dataclass
+    class Options:
+        threshold: int = 5
+
+    validated = []
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[Options | None, Parameter(validator=lambda _, v: validated.append(v))]]):
+        return x
+
+    assert app([]) == {"k": Options()}
+    assert validated == [Options()]
+
+
+def test_config_dict_empty_dict_missing_field_names_key():
+    """A required field missing from ``k = {}`` is reported under the dict key, like ``--x.k {}`` does."""
+    from dataclasses import dataclass
+
+    from cyclopts import MissingArgumentError
+
+    @dataclass
+    class Options:
+        threshold: int
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Options]):
+        return x
+
+    with pytest.raises(MissingArgumentError, match=r"--x\.k\.threshold"):
+        app([], exit_on_error=False)
 
 
 @pytest.mark.parametrize(

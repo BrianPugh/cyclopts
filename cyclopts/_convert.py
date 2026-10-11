@@ -923,20 +923,24 @@ def convert(
     return _convert_entry(type_, tokens, converter, name_transform)
 
 
-def _convert_empty_container(type_: Any, token: "Token", convert: Callable, convert_tuple: Callable) -> Any:
+def _convert_empty_container(
+    type_: Any, token: "Token", convert: Callable, convert_tuple: Callable, name: str | None = None
+) -> Any:
     """Convert an empty container from a config file, e.g. ``x = []`` or ``x = {k = {}}``.
 
     ``{}`` for a class (or an iterable of them) builds an all-defaults instance. For a union, the
     first member that can hold the container wins.
     """
     value = token.implicit_value
+    annotations = get_args(type_)[1:] if is_annotated(type_) else ()
     resolved = resolve(type_, optional=False)
     if resolved is Any:
         resolved = str
     if is_union(resolved):
         for member in get_args(resolved):
+            member = Annotated[(member, *annotations)] if annotations else member
             try:
-                return _convert_empty_container(member, token, convert, convert_tuple)
+                return _convert_empty_container(member, token, convert, convert_tuple, name)
             except CoercionError:
                 pass
     else:
@@ -947,9 +951,12 @@ def _convert_empty_container(type_: Any, token: "Token", convert: Callable, conv
             return {}
         if isinstance(value, list) and is_iterable:
             return convert_tuple(resolved) if origin is tuple else origin()
-        if isinstance(value, dict) and is_structured_type(get_args(resolved)[0] if is_iterable else resolved):
+        element = next(iter(get_args(resolved)), str) if is_iterable else resolved
+        if isinstance(value, dict) and is_structured_type(element):
             text = token.evolve(value="{}", implicit_value=UNSET)
-            return convert(type_, (text,) if is_iterable else text)
+            if name and token.keys:
+                name = ".".join((name, *token.keys))
+            return convert(type_, (text,) if is_iterable else text, name=name)
     # Converted as text, ``[]``/``{}`` would bind into a ``str`` (or a class's first ``str`` field).
     raise CoercionError(token=token.evolve(value="{}" if isinstance(value, dict) else "[]"), target_type=resolved)
 
@@ -983,7 +990,7 @@ def _convert_entry(
         and isinstance(tokens[0].implicit_value, dict | list)
         and not tokens[0].implicit_value
     ):
-        return _convert_empty_container(type_, tokens[0], convert_priv, convert_tuple)
+        return _convert_empty_container(type_, tokens[0], convert_priv, convert_tuple, name)
 
     # ``_convert`` applies a type's own ``Parameter`` metadata (converter/validator), but
     # ``resolve`` discards it. Stash the metadata so it can be re-attached to the
