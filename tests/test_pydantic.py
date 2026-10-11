@@ -1243,3 +1243,30 @@ def test_pydantic_nested_model_field_from_cli_json(app, cmd_str, expected_a):
         return outer
 
     assert app(cmd_str, result_action="return_value") == Outer(inner=Inner(a=expected_a))
+
+
+def test_pydantic_loaded_none_default_without_optional(app):
+    """With pydantic imported, ``x: int = None`` still defaults to ``None`` (PEP 484 implicit Optional)."""
+
+    @app.default
+    def main(x: int = None):  # pyright: ignore[reportArgumentType]
+        return x
+
+    assert app([], result_action="return_value") is None
+    assert app(["5"], result_action="return_value") == 5
+
+
+def test_pydantic_loaded_none_default_dataclass_field(app):
+    """With pydantic imported, a dataclass field ``n: int = None`` still defaults to ``None``."""
+
+    @dataclass
+    class Options:
+        m: int
+        n: int = None  # pyright: ignore[reportAssignmentType]
+
+    @app.default
+    def main(options: Options):
+        return options
+
+    assert app(["--options.m", "1"], result_action="return_value") == Options(m=1)
+    assert app(["--options.m", "1", "--options.n", "5"], result_action="return_value") == Options(m=1, n=5)

@@ -1071,7 +1071,11 @@ class Argument:
                         validator(value)
                     else:
                         validator(hint, value)
-                validate_pydantic(self.field_info.annotation, value)
+                annotation = self.field_info.annotation
+                if self.field_info.default is None:
+                    # PEP 484 implicit Optional: ``x: int = None`` accepts ``None``.
+                    annotation = annotation | None
+                validate_pydantic(annotation, value)
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
 
