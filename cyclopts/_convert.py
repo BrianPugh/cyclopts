@@ -982,6 +982,31 @@ def _lone_token(tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs) -> "T
     return None
 
 
+def _json_object_tokens(token: "Token", type_: Any) -> dict[str, Any]:
+    """Split a JSON-object token for a ``dict[...]`` type into per-key tokens, like a config file's."""
+    import json
+
+    try:
+        data = json.loads(token.value)
+    except json.JSONDecodeError as e:
+        raise CoercionError(token=token, target_type=type_, msg=str(e)) from e
+    if not isinstance(data, dict):
+        raise CoercionError(token=token, target_type=type_)
+
+    def to_token(key: str, index: int, value: Any) -> "Token":
+        keys = (*token.keys, key)
+        if value is None or (isinstance(value, dict | list) and not value):
+            return token.evolve(keys=keys, index=index, value="", implicit_value=value)
+        return token.evolve(keys=keys, index=index, value=value if isinstance(value, str) else json.dumps(value))
+
+    return {
+        key: [to_token(key, i, v) for i, v in enumerate(value)]
+        if isinstance(value, list) and value
+        else [to_token(key, 0, value)]
+        for key, value in data.items()
+    }
+
+
 def _convert_entry(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
@@ -1046,6 +1071,16 @@ def _convert_entry(
             # Optional pattern (T | None): dispatch based on T's requirements
             dispatch_type = resolved
             dispatch_origin = get_origin(resolved) or resolved
+
+    if (
+        not isinstance(tokens, dict)
+        and len(tokens) == 1
+        and isinstance(tokens[0], Token)
+        and _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin) is dict
+        and tokens[0].implicit_value is UNSET
+        and tokens[0].value.strip().startswith("{")
+    ):
+        tokens = _json_object_tokens(tokens[0], dispatch_type)
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore

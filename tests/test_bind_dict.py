@@ -100,3 +100,74 @@ def test_bind_dict_value_type_validator_nested_in_dataclass(app):
 
     with pytest.raises(ValidationError):
         app("foo --config.d.a=-5", exit_on_error=False, result_action="return_value")
+
+
+@pytest.mark.parametrize(
+    "cmd_str, expected",
+    [
+        ('--d=\'{"a": 1, "b": 2}\'', {"a": 1, "b": 2}),
+        ("--d={}", {}),
+    ],
+)
+def test_bind_dict_from_cli_json(app, assert_parse_args, cmd_str, expected):
+    @app.default
+    def main(d: dict[str, int]):
+        pass
+
+    assert_parse_args(main, cmd_str, d=expected)
+
+
+@pytest.mark.parametrize(
+    "hint, cmd_str, expected",
+    [
+        (dict[str, list[int]], '--d=\'{"k": [1, 2], "j": []}\'', {"k": [1, 2], "j": []}),
+        (dict[str, dict[str, int]], '--d=\'{"k": {"a": 1}, "j": {}}\'', {"k": {"a": 1}, "j": {}}),
+    ],
+)
+def test_bind_dict_from_cli_json_nested_values(app, assert_parse_args, hint, cmd_str, expected):
+    @app.default
+    def main(d: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(main, cmd_str, d=expected)
+
+
+def test_bind_dict_of_dataclass_from_cli_json(app, assert_parse_args):
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        a: int = 1
+
+    @app.default
+    def main(d: dict[str, Options]):
+        pass
+
+    assert_parse_args(main, '--d=\'{"k": {"a": 2}, "j": {}}\'', d={"k": Options(a=2), "j": Options()})
+
+
+def test_bind_dict_field_from_cli_json(app, assert_parse_args):
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class Options:
+        mapping: dict[str, int] = field(default_factory=dict)
+
+    @app.default
+    def main(options: Options):
+        pass
+
+    assert_parse_args(main, "--options.mapping='{\"a\": 1}'", options=Options(mapping={"a": 1}))
+
+
+def test_bind_dict_from_env_json(app, assert_parse_args, monkeypatch):
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    @app.default
+    def main(d: Annotated[dict[str, int], Parameter(env_var="D")]):
+        pass
+
+    monkeypatch.setenv("D", '{"a": 1}')
+    assert_parse_args(main, "", d={"a": 1})
