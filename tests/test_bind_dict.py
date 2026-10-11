@@ -171,3 +171,39 @@ def test_bind_dict_from_env_json(app, assert_parse_args, monkeypatch):
 
     monkeypatch.setenv("D", '{"a": 1}')
     assert_parse_args(main, "", d={"a": 1})
+
+
+@pytest.mark.parametrize("value", ['{"k": {"z": 1}}', '{"k": {}}'])
+@pytest.mark.parametrize("source", ["cli", "env"])
+def test_bind_dict_of_dataclass_json_missing_field_names_key(app, monkeypatch, value, source):
+    """A required field missing under a JSON-object key is reported as ``--d.k.t``, like ``--d.k.z=1`` does."""
+    from dataclasses import dataclass
+    from typing import Annotated
+
+    from cyclopts import MissingArgumentError, Parameter
+
+    @dataclass
+    class Options:
+        t: int
+        z: int = 0
+
+    @app.default
+    def main(d: Annotated[dict[str, Options], Parameter(env_var="D")]):
+        pass
+
+    if source == "env":
+        monkeypatch.setenv("D", value)
+    with pytest.raises(MissingArgumentError, match=r"--d\.k\.t"):
+        app(["--d", value] if source == "cli" else [], exit_on_error=False)
+
+
+def test_bind_dict_json_coercion_error_names_key(app):
+    """A bad value under a JSON-object key names that key."""
+    from cyclopts import CoercionError
+
+    @app.default
+    def main(d: dict[str, int]):
+        pass
+
+    with pytest.raises(CoercionError, match=r"--d\.k"):
+        app(["--d", '{"k": "abc"}'], exit_on_error=False)

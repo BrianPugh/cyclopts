@@ -929,9 +929,7 @@ def convert(
     return _convert_entry(type_, tokens, converter, name_transform)
 
 
-def _convert_empty_container(
-    type_: Any, token: "Token", convert: Callable, convert_tuple: Callable, name: str | None = None
-) -> Any:
+def _convert_empty_container(type_: Any, token: "Token", convert: Callable, convert_tuple: Callable) -> Any:
     """Convert an empty container from a config file, e.g. ``x = []`` or ``x = {k = {}}``.
 
     ``{}`` for a class (or an iterable of them) builds an all-defaults instance. For a union, the
@@ -947,7 +945,7 @@ def _convert_empty_container(
         for member in get_args(resolved):
             try:
                 return _convert_empty_container(
-                    Annotated[(member, *annotations)] if annotations else member, token, convert, convert_tuple, name
+                    Annotated[(member, *annotations)] if annotations else member, token, convert, convert_tuple
                 )
             except ValidationError:
                 raise
@@ -966,9 +964,7 @@ def _convert_empty_container(
         element = next(iter(get_args(resolved)), str) if is_iterable else resolved
         if isinstance(value, dict) and is_structured_type(element):
             text = token.evolve(value="{}", implicit_value=UNSET)
-            if name and token.keys:
-                name = ".".join((name, *token.keys))
-            return convert(type_, (text,) if is_iterable else text, name=name)
+            return convert(type_, (text,) if is_iterable else text)
     # Converted as text, ``[]``/``{}`` would bind into a ``str`` (or a class's first ``str`` field).
     raise CoercionError(token=token.evolve(value="{}" if isinstance(value, dict) else "[]"), target_type=resolved)
 
@@ -994,10 +990,12 @@ def _json_object_tokens(token: "Token", type_: Any) -> dict[str, Any]:
         raise CoercionError(token=token, target_type=type_)
 
     def to_token(key: str, index: int, value: Any) -> "Token":
-        keys = (*token.keys, key)
+        child = token.evolve(keys=(*token.keys, key), index=index)
+        if token.keyword and token.keyword.startswith("-"):
+            child = child.evolve(keyword=f"{token.keyword}.{key}")
         if value is None or (isinstance(value, dict | list) and not value):
-            return token.evolve(keys=keys, index=index, value="", implicit_value=value)
-        return token.evolve(keys=keys, index=index, value=value if isinstance(value, str) else json.dumps(value))
+            return child.evolve(value="", implicit_value=value)
+        return child.evolve(value=value if isinstance(value, str) else json.dumps(value))
 
     return {
         key: [to_token(key, i, v) for i, v in enumerate(value)]
@@ -1031,7 +1029,7 @@ def _convert_entry(
 
     lone = _lone_token(tokens)
     if lone and isinstance(lone.implicit_value, dict | list) and not lone.implicit_value:
-        return _convert_empty_container(type_, lone, convert_priv, convert_tuple, name)
+        return _convert_empty_container(type_, lone, convert_priv, convert_tuple)
 
     # ``_convert`` applies a type's own ``Parameter`` metadata (converter/validator), but
     # ``resolve`` discards it. Stash the metadata so it can be re-attached to the
@@ -1093,7 +1091,10 @@ def _convert_entry(
             value_type = get_args(dispatch_type)[1]
         except IndexError:
             value_type = str
-        dict_converted = {k: _convert_entry(value_type, v, converter, name_transform, name) for k, v in tokens.items()}
+        dict_converted = {
+            k: _convert_entry(value_type, v, converter, name_transform, f"{name}.{k}" if name else None)
+            for k, v in tokens.items()
+        }
         return dict(**dict_converted)
     elif isinstance(tokens, dict):
         raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
