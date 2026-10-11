@@ -937,12 +937,18 @@ def _convert_empty_container(
     if resolved is Any:
         resolved = str
     if is_union(resolved):
+        value_member = _sole_value_member(get_args(resolved))
         for member in get_args(resolved):
-            member = Annotated[(member, *annotations)] if annotations else member
             try:
-                return _convert_empty_container(member, token, convert, convert_tuple, name)
-            except CoercionError:
-                pass
+                return _convert_empty_container(
+                    Annotated[(member, *annotations)] if annotations else member, token, convert, convert_tuple, name
+                )
+            except ValidationError:
+                raise
+            except Exception as e:
+                # Like ``_convert``'s union probing: a lone value member's error (e.g. a missing field) is the useful one.
+                if member is value_member and isinstance(e, CycloptsError):
+                    raise
     else:
         origin = get_origin(resolved) or resolved
         origin = _abstract_to_concrete_type_mapping.get(origin, origin)

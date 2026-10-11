@@ -1253,6 +1253,43 @@ def test_config_dict_empty_dict_union_bare_list_first():
     assert app([]) == {"k": Options()}
 
 
+def test_config_dict_empty_dict_union_required_class_first():
+    """``{}`` skips a union's class member that has a missing required field, falling back to ``dict``."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        threshold: int
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Options | dict[str, int]]):
+        return x
+
+    assert app([]) == {"k": {}}
+
+
+def test_config_dict_empty_dict_optional_required_class():
+    """With no fallback member, ``{}`` for ``Options | None`` reports the missing field itself."""
+    from dataclasses import dataclass
+
+    from cyclopts import MissingArgumentError
+
+    @dataclass
+    class Options:
+        threshold: int
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Options | None]):
+        return x
+
+    with pytest.raises(MissingArgumentError, match=r"--x\.k\.threshold"):
+        app([], exit_on_error=False)
+
+
 def test_config_dict_empty_dict_annotated_union_validator():
     """``{}`` for an ``Annotated`` union still runs the annotation's validator, like ``--x.k {}`` does."""
     from dataclasses import dataclass
