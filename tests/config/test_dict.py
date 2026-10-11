@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from cyclopts import App
@@ -1080,6 +1082,294 @@ def test_config_dict_root_non_mapping_node_with_root_keys():
         app([], exit_on_error=False)
 
     assert str(e.value) == 'Configuration in "dict" must be a mapping, but got int.'
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (dict[str, dict[str, int]], {"k": {}}),
+        (dict[str, list[int]], {"k": []}),
+        (dict[str, dict[str, int]], {"k": {"a": 1}, "j": {}}),
+    ],
+)
+def test_config_dict_empty_container_inside_dict(hint, value):
+    """An empty container under a key binds as that key's value instead of replacing the whole dict."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == value
+
+
+def test_config_dict_empty_dict_inside_dict_of_scalars():
+    """An empty dict where a dict value must be a scalar is a clean coercion error."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": {"k": 1, "j": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, int]):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_empty_dict_value_list_of_dataclass():
+    """``x = {}`` on a list of dataclasses binds a single all-defaults element, like ``--x={}`` does."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        threshold: int = 5
+
+    app = App(config=Dict({"x": {}}), result_action="return_value")
+
+    @app.default
+    def main(x: list[Options]):
+        return x
+
+    assert app([]) == [Options()]
+
+
+def test_config_dict_empty_dict_value_list_of_pydantic():
+    """``x = {}`` on a list of pydantic models binds a single all-defaults element, like ``--x={}`` does."""
+    pydantic = pytest.importorskip("pydantic")
+
+    class Options(pydantic.BaseModel):
+        threshold: int = 5
+
+    app = App(config=Dict({"x": {}}), result_action="return_value")
+
+    @app.default
+    def main(x: list[Options]):
+        return x
+
+    assert app([]) == [Options()]
+
+
+@pytest.mark.parametrize("first_field", [int, str])
+@pytest.mark.parametrize("nested", [False, True])
+def test_config_dict_empty_list_value_dataclass(first_field, nested):
+    """``x = []`` on a dataclass is an error instead of being bound into the first field."""
+    from dataclasses import make_dataclass
+
+    from cyclopts import CoercionError
+
+    Options = make_dataclass("Options", [("first", first_field), ("threshold", int, 5)])
+    hint = dict[str, Options] if nested else Options
+
+    app = App(config=Dict({"x": {"k": []} if nested else []}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (str, []),
+        (str, {}),
+        (list[str], {}),
+        (dict[str, str], {"k": []}),
+        (dict[str, str], {"k": {}}),
+        (Any, []),
+        (dict[str, Any], {"k": []}),
+        (dict[str, Any], {"k": {}}),
+        (list, {}),
+        (dict[str, list], {"k": {}}),
+    ],
+)
+def test_config_dict_empty_container_into_str(hint, value):
+    """An empty container is an error for a ``str`` (or ``Any``, which converts like ``str``)."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (dict[str, dict[str, int] | list[int]], {"k": {}}),
+        (dict[str, dict[str, int] | list[int]], {"k": []}),
+        (dict[str, list[int] | None], {"k": []}),
+    ],
+)
+def test_config_dict_empty_container_union(hint, value):
+    """An empty container binds through whichever union member can hold it."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == value
+
+
+def test_config_dict_empty_dict_union_str_first():
+    """``{}`` for ``str | Options`` builds ``Options`` instead of binding the text ``"{}"`` into ``str``."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        threshold: int = 5
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, str | Options]):
+        return x
+
+    assert app([]) == {"k": Options()}
+
+
+def test_config_dict_empty_dict_union_bare_list_first():
+    """``{}`` for ``list | Options`` skips the bare ``list`` (whose elements are ``str``) and builds ``Options``."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        threshold: int = 5
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, list | Options]):
+        return x
+
+    assert app([]) == {"k": Options()}
+
+
+def test_config_dict_empty_dict_union_required_class_first():
+    """``{}`` skips a union's class member that has a missing required field, falling back to ``dict``."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        threshold: int
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Options | dict[str, int]]):
+        return x
+
+    assert app([]) == {"k": {}}
+
+
+def test_config_dict_empty_dict_optional_required_class():
+    """With no fallback member, ``{}`` for ``Options | None`` reports the missing field itself."""
+    from dataclasses import dataclass
+
+    from cyclopts import MissingArgumentError
+
+    @dataclass
+    class Options:
+        threshold: int
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Options | None]):
+        return x
+
+    with pytest.raises(MissingArgumentError, match=r"--x\.k\.threshold"):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_empty_dict_annotated_union_validator():
+    """``{}`` for an ``Annotated`` union still runs the annotation's validator, like ``--x.k {}`` does."""
+    from dataclasses import dataclass
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    @dataclass
+    class Options:
+        threshold: int = 5
+
+    validated = []
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[Options | None, Parameter(validator=lambda _, v: validated.append(v))]]):
+        return x
+
+    assert app([]) == {"k": Options()}
+    assert validated == [Options()]
+
+
+def test_config_dict_empty_dict_missing_field_names_key():
+    """A required field missing from ``k = {}`` is reported under the dict key, like ``--x.k {}`` does."""
+    from dataclasses import dataclass
+
+    from cyclopts import MissingArgumentError
+
+    @dataclass
+    class Options:
+        threshold: int
+
+    app = App(config=Dict({"x": {"k": {}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Options]):
+        return x
+
+    with pytest.raises(MissingArgumentError, match=r"--x\.k\.threshold"):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (dict[str, int | None], {"k": []}),
+        (dict[str, int | list[int]], {"k": {}}),
+    ],
+)
+def test_config_dict_empty_container_union_no_member(hint, value):
+    """An empty container is an error when no union member can hold it."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, expected",
+    [
+        (tuple[int, ...], ()),
+        (set[int], set()),
+        (frozenset[int], frozenset()),
+    ],
+)
+def test_config_dict_empty_list_value_iterables(hint, expected):
+    """``x = []`` binds an empty container for every iterable kind, like it does for ``list``."""
+    app = App(config=Dict({"x": []}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == expected
 
 
 @pytest.mark.parametrize(

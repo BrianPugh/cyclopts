@@ -32,7 +32,7 @@ from cyclopts.annotations import (
     resolve_optional,
 )
 from cyclopts.exceptions import CoercionError, CycloptsError, ValidationError
-from cyclopts.field_info import FieldInfo, get_field_infos
+from cyclopts.field_info import FieldInfo, get_field_infos, is_structured_type
 from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
 
 if sys.version_info >= (3, 12):  # pragma: no cover
@@ -923,6 +923,50 @@ def convert(
     return _convert_entry(type_, tokens, converter, name_transform)
 
 
+def _convert_empty_container(
+    type_: Any, token: "Token", convert: Callable, convert_tuple: Callable, name: str | None = None
+) -> Any:
+    """Convert an empty container from a config file, e.g. ``x = []`` or ``x = {k = {}}``.
+
+    ``{}`` for a class (or an iterable of them) builds an all-defaults instance. For a union, the
+    first member that can hold the container wins.
+    """
+    value = token.implicit_value
+    annotations = get_args(type_)[1:] if is_annotated(type_) else ()
+    resolved = resolve(type_, optional=False)
+    if resolved is Any:
+        resolved = str
+    if is_union(resolved):
+        value_member = _sole_value_member(get_args(resolved))
+        for member in get_args(resolved):
+            try:
+                return _convert_empty_container(
+                    Annotated[(member, *annotations)] if annotations else member, token, convert, convert_tuple, name
+                )
+            except ValidationError:
+                raise
+            except Exception as e:
+                # Like ``_convert``'s union probing: a lone value member's error (e.g. a missing field) is the useful one.
+                if member is value_member and isinstance(e, CycloptsError):
+                    raise
+    else:
+        origin = get_origin(resolved) or resolved
+        origin = _abstract_to_concrete_type_mapping.get(origin, origin)
+        is_iterable = origin in ITERABLE_TYPES
+        if isinstance(value, dict) and origin is dict:
+            return {}
+        if isinstance(value, list) and is_iterable:
+            return convert_tuple(resolved) if origin is tuple else origin()
+        element = next(iter(get_args(resolved)), str) if is_iterable else resolved
+        if isinstance(value, dict) and is_structured_type(element):
+            text = token.evolve(value="{}", implicit_value=UNSET)
+            if name and token.keys:
+                name = ".".join((name, *token.keys))
+            return convert(type_, (text,) if is_iterable else text, name=name)
+    # Converted as text, ``[]``/``{}`` would bind into a ``str`` (or a class's first ``str`` field).
+    raise CoercionError(token=token.evolve(value="{}" if isinstance(value, dict) else "[]"), target_type=resolved)
+
+
 def _convert_entry(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
@@ -944,6 +988,16 @@ def _convert_entry(
 
     convert_priv = partial(_convert, converter=converter, name_transform=name_transform, name=name)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform, name=name)
+
+    if (
+        not isinstance(tokens, dict)
+        and len(tokens) == 1
+        and isinstance(tokens[0], Token)
+        and isinstance(tokens[0].implicit_value, dict | list)
+        and not tokens[0].implicit_value
+    ):
+        return _convert_empty_container(type_, tokens[0], convert_priv, convert_tuple, name)
+
     # ``_convert`` applies a type's own ``Parameter`` metadata (converter/validator), but
     # ``resolve`` discards it. Stash the metadata so it can be re-attached to the
     # *normalized* type for the scalar dispatch below; this is what lets a container's
