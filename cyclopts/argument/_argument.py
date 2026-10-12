@@ -73,6 +73,15 @@ _CHOICES_UNSUPPORTED = (
 )
 
 
+def _admits_none(hint: Any) -> bool:
+    hint = resolve(hint, optional=False)
+    if is_union(hint):
+        return any(member is Any or _admits_none(member) for member in get_args(hint))
+    if get_origin(hint) is Literal:
+        return None in get_args(hint)
+    return is_nonetype(hint)
+
+
 @define(kw_only=True)
 class Argument:
     """Encapsulates functionality and additional contextual information for parsing a parameter.
@@ -368,7 +377,7 @@ class Argument:
             return self.parameter.show_default
 
     @property
-    def _explicit_none(self) -> bool:
+    def _lone_null(self) -> bool:
         """A lone keyless ``None`` token (a JSON/config ``null``) with no populated children."""
         return (
             len(self.tokens) == 1
@@ -376,6 +385,17 @@ class Argument:
             and self.tokens[0].implicit_value is None
             and not any(child.has_tokens for child in self.children)
         )
+
+    @property
+    def _explicit_none(self) -> bool:
+        """A lone ``null`` whose annotation allows ``None``, or whose default is ``None`` (``x: int = None``)."""
+        return self._lone_null and (self._allows_none or self.field_info.default is None)
+
+    @property
+    def _allows_none(self) -> bool:
+        if self.field_info.is_any:  # ``self.hint`` reads these as ``str``.
+            return True
+        return _admits_none(self.field_info.annotation)
 
     @property
     def _use_pydantic_type_adapter(self) -> bool:
@@ -786,7 +806,13 @@ class Argument:
         elif self.parameter.count:
             out = sum(token.implicit_value for token in self.tokens if token.implicit_value is not UNSET)
         elif self._explicit_none:
+            # The whole value is ``None``, so no child (e.g. a required field of ``Foo | None``) converts alone.
+            for child in self.children_recursive:
+                child._marked = True
             return None
+        elif self._lone_null and self.children:
+            # A ``null`` for a non-nullable class; its fields would otherwise each report missing.
+            raise CoercionError(token=self.tokens[0].evolve(value="null"), argument=self, target_type=self.hint)
         elif not self.children:
             positional: list[Token] = []
             keyword = {}
@@ -798,18 +824,6 @@ class Argument:
                 if self._is_whole_implicit_value(token):
                     assert len(expanded_tokens) == 1
                     return token.implicit_value
-
-                # Handle negative_none flag: implicit_value=None for Optional types
-                # Use self.hint (not self.resolved_hint) to preserve Optional/Union
-                if token.implicit_value is None:
-                    hint = self.hint
-                    if is_union(hint):
-                        if any(is_nonetype(arg) or arg is None for arg in get_args(hint)):
-                            assert len(expanded_tokens) == 1
-                            return None
-                    elif is_nonetype(hint) or hint is None:
-                        assert len(expanded_tokens) == 1
-                        return None
 
                 if token.keys:
                     lookup = keyword

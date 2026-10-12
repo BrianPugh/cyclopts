@@ -1,4 +1,6 @@
-from typing import Any
+import sys
+from dataclasses import dataclass
+from typing import Any, Literal
 
 import pytest
 
@@ -1401,3 +1403,266 @@ def test_config_dict_list_of_dataclass_error_names_parameter(element, expected_n
 
     assert expected_name in str(e.value)
     assert "json" not in str(e.value)
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (int, None),
+        (str, None),
+        (dict[str, int], {"k": None}),
+        (dict[str, str], {"k": None}),
+        (list[int], [None]),
+    ],
+)
+def test_config_dict_null_non_nullable(hint, value):
+    """A config ``null`` is an error for a type that doesn't allow ``None``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_null_non_nullable_dataclass_field():
+    """A config ``null`` for a required non-nullable dataclass field is an error."""
+    from dataclasses import dataclass
+
+    from cyclopts import CoercionError
+
+    @dataclass
+    class Options:
+        n: int
+
+    app = App(config=Dict({"x": {"n": None}}), result_action="return_value")
+
+    @app.default
+    def main(x: Options):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value, expected",
+    [
+        (int | None, None, None),
+        (Any | None, None, None),
+        (Any, None, None),
+        (dict[str, int | None], {"k": None}, {"k": None}),
+        (dict[str, Any | None], {"k": None}, {"k": None}),
+        (dict[str, Any], {"k": None}, {"k": None}),
+        (list[int | None], [1, None], [1, None]),
+        (Any | int, None, None),
+        (dict[str, Any | int], {"k": None}, {"k": None}),
+        (list[Any], [None], [None]),
+        (tuple[Any, ...], [None], (None,)),
+    ],
+)
+def test_config_dict_null_nullable(hint, value, expected):
+    """A config ``null`` binds ``None`` when the type allows it."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == expected
+
+
+def test_config_dict_null_annotated_any_validator():
+    """A config ``null`` for an ``Annotated[Any, ...]`` dict value still runs its validator."""
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    validated = []
+    app = App(config=Dict({"x": {"k": None}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[Any, Parameter(validator=lambda _, v: validated.append(v))]]):
+        return x
+
+    assert app([]) == {"k": None}
+    assert validated == [None]
+
+
+def test_config_dict_null_none_default(monkeypatch):
+    """A config ``null`` for ``x: int = None`` binds the ``None`` default, as when the key is absent."""
+    monkeypatch.delitem(sys.modules, "pydantic", raising=False)  # Pydantic rejects the ``None`` default itself.
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x: int = None):  # pyright: ignore[reportArgumentType]
+        return x
+
+    assert app([], exit_on_error=False) is None
+
+
+def test_config_dict_null_none_default_dataclass_field(monkeypatch):
+    """A config ``null`` for a dataclass field ``n: int = None`` binds the ``None`` default."""
+    monkeypatch.delitem(sys.modules, "pydantic", raising=False)
+
+    @dataclass
+    class Options:
+        n: int = None  # pyright: ignore[reportAssignmentType]
+
+    app = App(config=Dict({"x": {"n": None}}), result_action="return_value")
+
+    @app.default
+    def main(x: Options):
+        return x
+
+    assert app([], exit_on_error=False) == Options(n=None)  # pyright: ignore[reportArgumentType]
+
+
+def test_config_dict_null_non_none_default():
+    """Only a ``None`` default makes a config ``null`` acceptable for ``x: int``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x: int = 5):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize("value", [{"k": None}, {"a": 1, "k": None}])
+def test_config_dict_null_keyed_in_optional_dict(value):
+    """A keyed ``null`` for a non-nullable value is an error instead of replacing the whole ``dict | None``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, int] | None = None):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_null_keyed_nullable_in_optional_dict():
+    """A keyed ``null`` binds ``None`` under its key when the value type allows it."""
+    app = App(config=Dict({"x": {"a": 1, "k": None}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, int | None] | None = None):
+        return x
+
+    assert app([]) == {"a": 1, "k": None}
+
+
+def test_config_dict_null_unannotated():
+    """A config ``null`` binds ``None`` for an unannotated parameter, like ``Any``."""
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x):
+        return x
+
+    assert app([]) is None
+
+
+def test_config_dict_null_any_dataclass_field():
+    """A config ``null`` binds ``None`` for an ``Any`` dataclass field."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        a: Any
+
+    app = App(config=Dict({"x": {"a": None}}), result_action="return_value")
+
+    @app.default
+    def main(x: Options):
+        return x
+
+    assert app([]) == Options(a=None)
+
+
+def test_config_dict_null_unannotated_typed_default():
+    """An unannotated parameter is typed by its default, so ``null`` errors for ``x=0`` like for ``x: int = 0``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x=0):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_null_any_typed_default():
+    """``x: Any = 5`` is typed by its default (see rules.rst), so ``null`` errors like for ``x: int = 5``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x: Any = 5):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@dataclass
+class _NullFirstStr:
+    first: str
+    n: int = 0
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (dict[str, _NullFirstStr], {"k": None}),
+        (list[_NullFirstStr], [None]),
+        (_NullFirstStr, None),
+    ],
+)
+def test_config_dict_null_non_nullable_class(hint, value):
+    """A config ``null`` for a non-nullable class is an error instead of constructing it from an empty value."""
+    from cyclopts import CycloptsError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CycloptsError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value, expected",
+    [
+        (dict[str, _NullFirstStr | None], {"k": None}, {"k": None}),
+        (_NullFirstStr | None, None, None),
+        (_NullFirstStr | Literal[None], None, None),
+        (Literal[None] | _NullFirstStr, None, None),
+        (_NullFirstStr | Literal["null-first-str", None], None, None),
+        (dict[str, _NullFirstStr | Literal[None]], {"k": None}, {"k": None}),
+    ],
+)
+def test_config_dict_null_optional_class(hint, value, expected):
+    """A config ``null`` for an optional class binds ``None`` instead of an instance or a missing-field error."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == expected

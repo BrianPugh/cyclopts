@@ -95,10 +95,18 @@ class FieldInfo:
         """Annotation with cyclopts type-inferring."""
         hint = self.annotation
         if hint is inspect.Parameter.empty or resolve(hint) is Any:
-            hint = _replace_annotated_type(
-                hint, str if self.default is inspect.Parameter.empty or self.default is None else type(self.default)
-            )
+            hint = _replace_annotated_type(hint, str if self.is_any else type(self.default))
         return hint
+
+    @property
+    def is_any(self) -> bool:
+        """Whether this takes any value: annotated ``Any`` (or not at all) with no default to infer a type from.
+
+        :attr:`hint` reads such a parameter as ``str``.
+        """
+        return (self.annotation is inspect.Parameter.empty or resolve(self.annotation) is Any) and (
+            self.default is inspect.Parameter.empty or self.default is None
+        )
 
     @property
     def name(self):
