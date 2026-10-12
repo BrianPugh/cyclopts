@@ -1,6 +1,6 @@
 import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 
@@ -1651,6 +1651,10 @@ def test_config_dict_null_non_nullable_class(hint, value):
     [
         (dict[str, _NullFirstStr | None], {"k": None}, {"k": None}),
         (_NullFirstStr | None, None, None),
+        (_NullFirstStr | Literal[None], None, None),
+        (Literal[None] | _NullFirstStr, None, None),
+        (_NullFirstStr | Literal["null-first-str", None], None, None),
+        (dict[str, _NullFirstStr | Literal[None]], {"k": None}, {"k": None}),
     ],
 )
 def test_config_dict_null_optional_class(hint, value, expected):

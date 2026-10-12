@@ -73,6 +73,15 @@ _CHOICES_UNSUPPORTED = (
 )
 
 
+def _admits_none(hint: Any) -> bool:
+    hint = resolve(hint, optional=False)
+    if is_union(hint):
+        return any(member is Any or _admits_none(member) for member in get_args(hint))
+    if get_origin(hint) is Literal:
+        return None in get_args(hint)
+    return is_nonetype(hint)
+
+
 @define(kw_only=True)
 class Argument:
     """Encapsulates functionality and additional contextual information for parsing a parameter.
@@ -386,10 +395,7 @@ class Argument:
     def _allows_none(self) -> bool:
         if self.field_info.is_any:  # ``self.hint`` reads these as ``str``.
             return True
-        hint = resolve(self.field_info.annotation, optional=False)
-        if is_union(hint):
-            return any(member is Any or is_nonetype(member) for member in get_args(hint))
-        return is_nonetype(hint)
+        return _admits_none(self.field_info.annotation)
 
     @property
     def _use_pydantic_type_adapter(self) -> bool:
