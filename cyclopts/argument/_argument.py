@@ -379,8 +379,8 @@ class Argument:
 
     @property
     def _explicit_none(self) -> bool:
-        """A lone ``null`` whose annotation allows ``None``; a ``None`` default alone (``x: int = None``) doesn't."""
-        return self._lone_null and self._allows_none
+        """A lone ``null`` whose annotation allows ``None``, or whose default is ``None`` (``x: int = None``)."""
+        return self._lone_null and (self._allows_none or self.field_info.default is None)
 
     @property
     def _allows_none(self) -> bool:

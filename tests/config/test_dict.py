@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -1492,25 +1493,21 @@ def test_config_dict_null_annotated_any_validator():
     assert validated == [None]
 
 
-def test_config_dict_null_none_default():
-    """A ``None`` default doesn't make ``x: int`` nullable: a config ``null`` is still an error."""
-    from cyclopts import CoercionError
-
+def test_config_dict_null_none_default(monkeypatch):
+    """A config ``null`` for ``x: int = None`` binds the ``None`` default, as when the key is absent."""
+    monkeypatch.delitem(sys.modules, "pydantic", raising=False)  # Pydantic rejects the ``None`` default itself.
     app = App(config=Dict({"x": None}), result_action="return_value")
 
     @app.default
     def main(x: int = None):  # pyright: ignore[reportArgumentType]
         return x
 
-    with pytest.raises(CoercionError):
-        app([], exit_on_error=False)
+    assert app([], exit_on_error=False) is None
 
 
-def test_config_dict_null_none_default_dataclass_field():
-    """A ``None`` default doesn't make a dataclass field ``n: int`` nullable."""
-    from dataclasses import dataclass
-
-    from cyclopts import CoercionError
+def test_config_dict_null_none_default_dataclass_field(monkeypatch):
+    """A config ``null`` for a dataclass field ``n: int = None`` binds the ``None`` default."""
+    monkeypatch.delitem(sys.modules, "pydantic", raising=False)
 
     @dataclass
     class Options:
@@ -1520,6 +1517,19 @@ def test_config_dict_null_none_default_dataclass_field():
 
     @app.default
     def main(x: Options):
+        return x
+
+    assert app([], exit_on_error=False) == Options(n=None)  # pyright: ignore[reportArgumentType]
+
+
+def test_config_dict_null_non_none_default():
+    """Only a ``None`` default makes a config ``null`` acceptable for ``x: int``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": None}), result_action="return_value")
+
+    @app.default
+    def main(x: int = 5):
         return x
 
     with pytest.raises(CoercionError):
