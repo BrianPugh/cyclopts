@@ -1756,3 +1756,37 @@ def test_config_dict_empty_container_any_value_validator(value):
 
     assert app([]) == {"k": value}
     assert validated == [value]
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_any_converter(value):
+    """A ``converter`` on an ``Any`` parameter still receives an empty container."""
+
+    def converter(type_, tokens):
+        return "converted"
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: Annotated[Any, Parameter(converter=converter)] = None):
+        return x
+
+    assert app([]) == "converted"
+
+
+def _kwargs_unannotated(**kwargs):
+    return kwargs
+
+
+def _kwargs_any(**kwargs: Any):
+    return kwargs
+
+
+@pytest.mark.parametrize("main", [_kwargs_unannotated, _kwargs_any])
+@pytest.mark.parametrize("value", [[], {}, None])
+def test_config_dict_kwargs_any_passthrough(main, value):
+    """``**kwargs`` values take any value like ``Any``: empty containers and ``null`` bind as-is."""
+    app = App(config=Dict({"k": value}), result_action="return_value")
+    app.default(main)
+
+    assert app([]) == {"k": value}
