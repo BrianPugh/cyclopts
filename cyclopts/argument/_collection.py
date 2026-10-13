@@ -798,7 +798,7 @@ def _hint_at_keys(hint: Any, keys: tuple[str, ...]) -> Any:
         hint = resolve(hint)
         if is_class_and_subclass(get_origin(hint) or hint, Mapping) and not is_typeddict(hint):
             args = get_args(hint)
-            hint = args[1] if len(args) == 2 else str
+            hint = args[1] if len(args) == 2 else Any
         elif not is_union(hint) and (field_info := get_field_infos(hint).get(key)):
             hint = field_info.annotation
         else:

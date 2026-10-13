@@ -1,4 +1,5 @@
 import sys
+import typing
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
@@ -1892,6 +1893,43 @@ def test_config_dict_array_for_any_typed_default(value):
 
     @app.default
     def main(x: Any = 5):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value, expected",
+    [
+        (dict, {"k": [1, 2]}, {"k": ["1", "2"]}),
+        (typing.Dict, {"k": [1, 2]}, {"k": ["1", "2"]}),  # noqa: UP006
+        (dict | None, {"k": [1, 2]}, {"k": ["1", "2"]}),
+        (dict[str, dict], {"a": {"b": [1, 2]}}, {"a": {"b": ["1", "2"]}}),
+    ],
+)
+def test_config_dict_array_for_bare_dict_value(hint, value, expected):
+    """A config array binds for a bare ``dict`` value, like ``dict[str, Any]``."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == expected
+
+
+def test_config_dict_array_for_scalar_with_converter():
+    """A converter doesn't make a single-value type take a config array."""
+    from cyclopts import CoercionError
+
+    def converter(type_, tokens):
+        return ",".join(t.value for t in tokens)
+
+    app = App(config=Dict({"x": ["a", "b"]}), result_action="return_value")
+
+    @app.default
+    def main(x: Annotated[str, Parameter(converter=converter)] = ""):
         return x
 
     with pytest.raises(CoercionError):
