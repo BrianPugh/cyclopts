@@ -1,10 +1,10 @@
 import sys
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import pytest
 
-from cyclopts import App
+from cyclopts import App, Parameter
 from cyclopts.config import Dict
 
 
@@ -1696,3 +1696,63 @@ def test_config_dict_empty_container_unannotated(value):
         return x
 
     assert app([]) == value
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_unannotated_typed_default(value):
+    """An unannotated parameter is typed by its default, so an empty container errors for ``x=0``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x=0):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_any_typed_default(value):
+    """``x: Any = 5`` is typed by its default (see rules.rst), so an empty container errors like for ``x: int = 5``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: Any = 5):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_any_none_default(value):
+    """``x: Any = None`` takes any value, so an empty container binds as-is."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: Any = None):
+        return x
+
+    assert app([]) == value
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_any_value_validator(value):
+    """An empty container for an ``Annotated[Any, ...]`` dict value still runs that value's validator."""
+    validated = []
+
+    def validator(type_, v):
+        validated.append(v)
+
+    app = App(config=Dict({"x": {"k": value}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[Any, Parameter(validator=validator)]]):
+        return x
+
+    assert app([]) == {"k": value}
+    assert validated == [value]
