@@ -917,7 +917,7 @@ def update_argument_collection(
 
             if isinstance(value, list) and value:
                 # ``argument.hint`` reads ``Any`` as ``str``; arrays still bind to ``Any`` as before.
-                root_hint = Any if resolve(argument.field_info.annotation) is Any else argument.hint
+                root_hint = Any if argument.field_info.is_any else argument.hint
                 hint = _hint_at_keys(root_hint, remaining_keys)
                 count, consume_all = argument.token_count(remaining_keys)
                 if count <= 1 and not consume_all and takes_scalar(hint):

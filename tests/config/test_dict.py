@@ -1861,3 +1861,38 @@ def test_config_dict_array_for_sequence(hint, value, expected):
         return x
 
     assert app([]) == expected
+
+
+@pytest.mark.parametrize("main", [_kwargs_unannotated, _kwargs_any])
+def test_config_dict_array_for_kwargs_any(main):
+    """A config array binds for ``**kwargs`` values, which take any value like ``Any``."""
+    app = App(config=Dict({"k": [1, 2]}), result_action="return_value")
+    app.default(main)
+
+    assert app([]) == {"k": ["1", "2"]}
+
+
+def test_config_dict_array_for_unannotated():
+    """A config array binds for an unannotated parameter, like ``Any``."""
+    app = App(config=Dict({"x": [1, 2]}), result_action="return_value")
+
+    @app.default
+    def main(x=None):
+        return x
+
+    assert app([]) == ["1", "2"]
+
+
+@pytest.mark.parametrize("value", [[1], [1, 2]])
+def test_config_dict_array_for_any_typed_default(value):
+    """``x: Any = 5`` is typed by its default (see rules.rst), so an array errors like for ``x: int = 5``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: Any = 5):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
