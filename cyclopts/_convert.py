@@ -941,7 +941,7 @@ def _convert_empty_container(
     annotations = get_args(type_)[1:] if is_annotated(type_) else ()
     resolved = resolve(type_, optional=False)
     if resolved is Any:
-        resolved = str
+        return convert(type_, token)
     if is_union(resolved):
         value_member = _sole_value_member(get_args(resolved))
         for member in get_args(resolved):

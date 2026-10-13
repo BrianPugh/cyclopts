@@ -1,10 +1,10 @@
 import sys
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import pytest
 
-from cyclopts import App
+from cyclopts import App, Parameter
 from cyclopts.config import Dict
 
 
@@ -1181,15 +1181,12 @@ def test_config_dict_empty_list_value_dataclass(first_field, nested):
         (list[str], {}),
         (dict[str, str], {"k": []}),
         (dict[str, str], {"k": {}}),
-        (Any, []),
-        (dict[str, Any], {"k": []}),
-        (dict[str, Any], {"k": {}}),
         (list, {}),
         (dict[str, list], {"k": {}}),
     ],
 )
 def test_config_dict_empty_container_into_str(hint, value):
-    """An empty container is an error for a ``str`` (or ``Any``, which converts like ``str``)."""
+    """An empty container is an error for a ``str`` instead of binding as the text ``"[]"``/``"{}"``."""
     from cyclopts import CoercionError
 
     app = App(config=Dict({"x": value}), result_action="return_value")
@@ -1666,3 +1663,130 @@ def test_config_dict_null_optional_class(hint, value, expected):
         return x
 
     assert app([]) == expected
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (Any, []),
+        (Any, {}),
+        (Any | None, []),
+        (dict[str, Any], {"k": []}),
+        (dict[str, Any], {"k": {}}),
+    ],
+)
+def test_config_dict_empty_container_any(hint, value):
+    """An empty container binds as-is for ``Any``."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == value
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_unannotated(value):
+    """An empty container binds as-is for an unannotated parameter, like ``Any``."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x):
+        return x
+
+    assert app([]) == value
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_unannotated_typed_default(value):
+    """An unannotated parameter is typed by its default, so an empty container errors for ``x=0``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x=0):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_any_typed_default(value):
+    """``x: Any = 5`` is typed by its default (see rules.rst), so an empty container errors like for ``x: int = 5``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: Any = 5):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_any_none_default(value):
+    """``x: Any = None`` takes any value, so an empty container binds as-is."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: Any = None):
+        return x
+
+    assert app([]) == value
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_any_value_validator(value):
+    """An empty container for an ``Annotated[Any, ...]`` dict value still runs that value's validator."""
+    validated = []
+
+    def validator(type_, v):
+        validated.append(v)
+
+    app = App(config=Dict({"x": {"k": value}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[Any, Parameter(validator=validator)]]):
+        return x
+
+    assert app([]) == {"k": value}
+    assert validated == [value]
+
+
+@pytest.mark.parametrize("value", [[], {}])
+def test_config_dict_empty_container_any_converter(value):
+    """A ``converter`` on an ``Any`` parameter still receives an empty container."""
+
+    def converter(type_, tokens):
+        return "converted"
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: Annotated[Any, Parameter(converter=converter)] = None):
+        return x
+
+    assert app([]) == "converted"
+
+
+def _kwargs_unannotated(**kwargs):
+    return kwargs
+
+
+def _kwargs_any(**kwargs: Any):
+    return kwargs
+
+
+@pytest.mark.parametrize("main", [_kwargs_unannotated, _kwargs_any])
+@pytest.mark.parametrize("value", [[], {}, None])
+def test_config_dict_kwargs_any_passthrough(main, value):
+    """``**kwargs`` values take any value like ``Any``: empty containers and ``null`` bind as-is."""
+    app = App(config=Dict({"k": value}), result_action="return_value")
+    app.default(main)
+
+    assert app([]) == {"k": value}

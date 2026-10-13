@@ -712,6 +712,9 @@ class Argument:
         value = token.implicit_value
         if value is UNSET or token.keys:
             return False
+        if self.field_info.is_any and not self.parameter.converter:
+            # ``self.hint`` reads these as ``str``, but any value is whole for ``Any``.
+            return True
         hint = self.resolved_hint
         for member in get_args(hint) if is_union(hint) else (hint,):
             member = resolve_annotated(member)
@@ -847,7 +850,8 @@ class Argument:
                     out = safe_converter(self.hint, tuple(positional))
             elif keyword:
                 if self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD and not self.keys:
-                    out = {key: safe_converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
+                    value_hint = Any if self.field_info.is_any else get_args(self.hint)[1]
+                    out = {key: safe_converter(value_hint, value) for key, value in keyword.items()}
                 else:
                     out = safe_converter(self.hint, keyword)
             elif self.required:
