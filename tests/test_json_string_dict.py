@@ -171,3 +171,19 @@ def test_complex_nested_type_validation_env_var(app, monkeypatch):
 
     with pytest.raises(CycloptsError):
         app([], exit_on_error=False)
+
+
+def test_json_empty_object_optional_namedtuple_missing_field(app):
+    """An explicit ``{}`` for an optional NamedTuple reports its missing required field."""
+    from typing import NamedTuple
+
+    class Point(NamedTuple):
+        a: int
+        b: int = 2
+
+    @app.default
+    def main(x: Point | None = None):
+        return x
+
+    with pytest.raises(MissingArgumentError, match=r"--x\.a"):
+        app(["--x", "{}"], exit_on_error=False)
