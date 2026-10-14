@@ -15,8 +15,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from cyclopts import CoercionError, Token
-from cyclopts._convert import convert, token_count
+from cyclopts import CoercionError, Parameter, Token
+from cyclopts._convert import convert, takes_scalar, token_count
 from cyclopts.utils import default_name_transform
 
 # Case variations of "none" and "null" strings that should be parsed as None
@@ -769,3 +769,20 @@ def test_coerce_set_of_unhashable_elements_error(container):
         match=rf"{container.__name__}\[Item\] requires hashable elements, but Item is not hashable\. Use a list",
     ):
         convert(container[Item], ['{"a": "x"}'])
+
+
+@pytest.mark.parametrize(
+    "hint, expected",
+    [
+        (int, True),
+        (int | None, True),
+        (list[int], False),
+        (tuple[int], False),
+        (int | list[int], False),
+        (Any, False),
+        (Annotated[int, Parameter(n_tokens=2)], False),
+        (Optional[Annotated[int, Parameter(n_tokens=2)]], False),
+    ],
+)
+def test_takes_scalar(hint, expected):
+    assert takes_scalar(hint) is expected

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 from cyclopts.annotations import get_hint_name, is_typeddict, is_unpack, resolve, resolve_unpack
 from cyclopts.exceptions import (
+    CoercionError,
     UnknownOptionError,
 )
 from cyclopts.field_info import (
@@ -890,6 +891,20 @@ def update_argument_collection(
 
             if do_not_update.setdefault(id(argument), bool(argument.tokens)):
                 continue
+
+            if isinstance(value, list) and value and (hint := argument._scalar_hint(remaining_keys)) is not None:
+                import json
+
+                raise CoercionError(
+                    token=Token(
+                        keyword=complete_keyword,
+                        value=json.dumps(value, default=str),
+                        source=source,
+                        keys=remaining_keys,
+                    ),
+                    argument=argument,
+                    target_type=hint,
+                )
 
             if not is_iterable(value):
                 value = (value,)

@@ -1,4 +1,5 @@
 import sys
+import typing
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
@@ -1790,3 +1791,172 @@ def test_config_dict_kwargs_any_passthrough(main, value):
     app.default(main)
 
     assert app([]) == {"k": value}
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (int, [1]),
+        (int, [1, 2]),
+        (str, ["a"]),
+        (bool, [True]),
+        (int | None, [1]),
+        (dict[str, int], {"k": [1]}),
+        (dict[str, int], {"k": [1, 2]}),
+        (dict[str, dict[str, int]], {"k": {"j": [1]}}),
+    ],
+)
+def test_config_dict_array_for_scalar(hint, value):
+    """A config array for a scalar type is an error instead of binding its first element or a list."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_array_for_scalar_dataclass_field():
+    """A config array for a scalar dataclass field is an error."""
+    from dataclasses import dataclass
+
+    from cyclopts import CoercionError
+
+    @dataclass
+    class Options:
+        n: int
+
+    app = App(config=Dict({"x": {"n": [1]}}), result_action="return_value")
+
+    @app.default
+    def main(x: Options):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value, expected",
+    [
+        (list[int], [1, 2], [1, 2]),
+        (tuple[int], [1], (1,)),
+        (tuple[int, int], [1, 2], (1, 2)),
+        (int | list[int], [1, 2], [1, 2]),
+        (dict[str, list[int]], {"k": [1, 2]}, {"k": [1, 2]}),
+        (dict[str, int | list[int]], {"k": [1, 2]}, {"k": [1, 2]}),
+        (Any, [1, 2], ["1", "2"]),
+        (dict[str, Any], {"k": [1, 2]}, {"k": ["1", "2"]}),
+    ],
+)
+def test_config_dict_array_for_sequence(hint, value, expected):
+    """A config array still binds for types that take a sequence (and for ``Any``)."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == expected
+
+
+@pytest.mark.parametrize("main", [_kwargs_unannotated, _kwargs_any])
+def test_config_dict_array_for_kwargs_any(main):
+    """A config array binds for ``**kwargs`` values, which take any value like ``Any``."""
+    app = App(config=Dict({"k": [1, 2]}), result_action="return_value")
+    app.default(main)
+
+    assert app([]) == {"k": ["1", "2"]}
+
+
+def test_config_dict_array_for_unannotated():
+    """A config array binds for an unannotated parameter, like ``Any``."""
+    app = App(config=Dict({"x": [1, 2]}), result_action="return_value")
+
+    @app.default
+    def main(x=None):
+        return x
+
+    assert app([]) == ["1", "2"]
+
+
+@pytest.mark.parametrize("value", [[1], [1, 2]])
+def test_config_dict_array_for_any_typed_default(value):
+    """``x: Any = 5`` is typed by its default (see rules.rst), so an array errors like for ``x: int = 5``."""
+    from cyclopts import CoercionError
+
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: Any = 5):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value, expected",
+    [
+        (dict, {"k": [1, 2]}, {"k": ["1", "2"]}),
+        (typing.Dict, {"k": [1, 2]}, {"k": ["1", "2"]}),  # noqa: UP006
+        (dict | None, {"k": [1, 2]}, {"k": ["1", "2"]}),
+        (dict[str, dict], {"a": {"b": [1, 2]}}, {"a": {"b": ["1", "2"]}}),
+    ],
+)
+def test_config_dict_array_for_bare_dict_value(hint, value, expected):
+    """A config array binds for a bare ``dict`` value, like ``dict[str, Any]``."""
+    app = App(config=Dict({"x": value}), result_action="return_value")
+
+    @app.default
+    def main(x: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app([]) == expected
+
+
+def test_config_dict_array_for_scalar_with_converter():
+    """A converter doesn't make a single-value type take a config array."""
+    from cyclopts import CoercionError
+
+    def converter(type_, tokens):
+        return ",".join(t.value for t in tokens)
+
+    app = App(config=Dict({"x": ["a", "b"]}), result_action="return_value")
+
+    @app.default
+    def main(x: Annotated[str, Parameter(converter=converter)] = ""):
+        return x
+
+    with pytest.raises(CoercionError):
+        app([], exit_on_error=False)
+
+
+def _join_tokens(type_, tokens):
+    return "+".join(t.value for t in tokens)
+
+
+def test_config_dict_array_for_n_tokens_parameter():
+    """A config array binds for a parameter whose own ``Parameter(n_tokens=...)`` takes several tokens."""
+    app = App(config=Dict({"x": ["p", "q"]}), result_action="return_value")
+
+    @app.default
+    def main(x: Annotated[str, Parameter(n_tokens=2, converter=_join_tokens)] = ""):
+        return x
+
+    assert app([], exit_on_error=False) == "p+q"
+
+
+def test_config_dict_array_for_n_tokens_kwargs():
+    """A config array binds for ``**kwargs`` values whose ``Parameter(n_tokens=...)`` takes several tokens."""
+    app = App(config=Dict({"k": ["p", "q"]}), result_action="return_value")
+
+    @app.default
+    def main(**kwargs: Annotated[str, Parameter(n_tokens=2, converter=_join_tokens)]):
+        return kwargs
+
+    assert app([], exit_on_error=False) == {"k": "p+q"}
