@@ -1934,3 +1934,29 @@ def test_config_dict_array_for_scalar_with_converter():
 
     with pytest.raises(CoercionError):
         app([], exit_on_error=False)
+
+
+def _join_tokens(type_, tokens):
+    return "+".join(t.value for t in tokens)
+
+
+def test_config_dict_array_for_n_tokens_parameter():
+    """A config array binds for a parameter whose own ``Parameter(n_tokens=...)`` takes several tokens."""
+    app = App(config=Dict({"x": ["p", "q"]}), result_action="return_value")
+
+    @app.default
+    def main(x: Annotated[str, Parameter(n_tokens=2, converter=_join_tokens)] = ""):
+        return x
+
+    assert app([], exit_on_error=False) == "p+q"
+
+
+def test_config_dict_array_for_n_tokens_kwargs():
+    """A config array binds for ``**kwargs`` values whose ``Parameter(n_tokens=...)`` takes several tokens."""
+    app = App(config=Dict({"k": ["p", "q"]}), result_action="return_value")
+
+    @app.default
+    def main(**kwargs: Annotated[str, Parameter(n_tokens=2, converter=_join_tokens)]):
+        return kwargs
+
+    assert app([], exit_on_error=False) == {"k": "p+q"}

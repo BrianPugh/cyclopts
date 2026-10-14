@@ -4,7 +4,7 @@ import inspect
 import operator
 import re
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from functools import partial, reduce
 from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
@@ -16,6 +16,7 @@ from cyclopts._convert import (
     _validate_json_extra_keys,
     create_empty_instance,
     instantiate_from_dict,
+    takes_scalar,
     token_count,
 )
 from cyclopts.annotations import (
@@ -56,7 +57,7 @@ from cyclopts.field_info import (
 )
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, grouper, is_builtin, parse_version
+from cyclopts.utils import UNSET, grouper, is_builtin, is_class_and_subclass, parse_version
 
 from .utils import (
     enum_flag_from_dict,
@@ -1167,6 +1168,15 @@ class Argument:
         tokens_per_element, consume_all = token_count(hint, upcoming_tokens=upcoming_tokens)
         return tokens_per_element, consume_all
 
+    def _scalar_hint(self, keys: tuple[str, ...] = ()) -> Any:
+        """The type under ``keys`` if it only takes a single value, so a config array can't bind to it; else ``None``."""
+        count, consume_all = self.token_count(keys)
+        if count > 1 or consume_all:
+            return None
+        # ``self.hint`` reads ``Any`` as ``str``; arrays still bind to ``Any`` as before.
+        hint = _hint_at_keys(Any if self.field_info.is_any else self.hint, keys)
+        return hint if takes_scalar(hint) else None
+
     @property
     def _negatives_hint(self):
         # Mirrors ``field_info.annotation`` but substitutes ``type(default)`` when
@@ -1603,3 +1613,17 @@ class Argument:
             raise ValidationError(exception_message=str(exc), argument=self) from exc
         else:
             raise exc
+
+
+def _hint_at_keys(hint: Any, keys: tuple[str, ...]) -> Any:
+    """The type a config value under ``keys`` binds to, e.g. ``int`` for ``dict[str, int]`` and ``("k",)``."""
+    for key in keys:
+        hint = resolve(hint)
+        if is_class_and_subclass(get_origin(hint) or hint, Mapping) and not is_typeddict(hint):
+            args = get_args(hint)
+            hint = args[1] if len(args) == 2 else Any
+        elif not is_union(hint) and (field_info := get_field_infos(hint).get(key)):
+            hint = field_info.annotation
+        else:
+            return Any
+    return hint
