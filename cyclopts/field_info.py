@@ -180,12 +180,15 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
             #   * validate_by_alias -> aliases are accepted (defaults to True).
             # populate_by_name is the pre-2.11 spelling of validate_by_name; it is not
             # recommended in pydantic 2.11+ and is slated for removal in pydantic v3, so
-            # we honor both across the supported pydantic range. pydantic forbids both
-            # validate_by_* being False, so at least one name is always registered.
-            validate_by_name = model.model_config.get("validate_by_name", False) or model.model_config.get(
-                "populate_by_name", False
-            )
+            # we honor both across the supported pydantic range.
+            # validate_by_alias=False implies validate_by_name=True. pydantic <2.14 wrote
+            # that implied value back into model_config; 2.14+ leaves it out.
             validate_by_alias = model.model_config.get("validate_by_alias", True)
+            validate_by_name = (
+                not validate_by_alias
+                or model.model_config.get("validate_by_name", False)
+                or model.model_config.get("populate_by_name", False)
+            )
 
             if validate_by_name:
                 names.append(python_name)
