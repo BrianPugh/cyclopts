@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 
@@ -207,3 +209,61 @@ def test_bind_dict_json_coercion_error_names_key(app):
 
     with pytest.raises(CoercionError, match=r"--d\.k"):
         app(["--d", '{"k": "abc"}'], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (dict[str, int], '{"k": [1]}'),
+        (dict[str, int], '{"k": [1, 2]}'),
+        (dict[str, int | None], '{"k": [1]}'),
+        (dict[str, dict[str, int]], '{"k": {"a": [1]}}'),
+    ],
+)
+@pytest.mark.parametrize("source", ["cli", "env"])
+def test_bind_dict_json_array_for_scalar_value(app, monkeypatch, hint, value, source):
+    """A JSON array for a value type that takes a single value is an error, like from a config file."""
+    from typing import Annotated
+
+    from cyclopts import CoercionError, Parameter
+
+    @app.default
+    def main(d: Annotated[hint, Parameter(env_var="D")]):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    if source == "env":
+        monkeypatch.setenv("D", value)
+    with pytest.raises(CoercionError, match=r"--d\.k" if source == "cli" else "from env"):
+        app(["--d", value] if source == "cli" else [], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value, expected",
+    [
+        (dict[str, list[int]], '{"k": [1, 2]}', {"k": [1, 2]}),
+        (dict[str, int | list[int]], '{"k": [1, 2]}', {"k": [1, 2]}),
+        (dict[str, tuple[int, int]], '{"k": [1, 2]}', {"k": (1, 2)}),
+        (dict[str, Any], '{"k": [1, 2]}', {"k": ["1", "2"]}),
+        (dict, '{"k": [1, 2]}', {"k": ["1", "2"]}),
+    ],
+)
+def test_bind_dict_json_array_for_sequence_value(app, hint, value, expected):
+    """A JSON array still binds for value types that take a sequence (and for ``Any``)."""
+
+    @app.default
+    def main(d: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return d
+
+    assert app(["--d", value], exit_on_error=False) == expected
+
+
+def test_bind_dict_json_null_for_non_nullable_value(app):
+    """A JSON ``null`` for a value type that doesn't allow ``None`` is an error, like from a config file."""
+    from cyclopts import CoercionError
+
+    @app.default
+    def main(d: dict[str, int]):
+        pass
+
+    with pytest.raises(CoercionError, match=r"--d\.k"):
+        app(["--d", '{"k": null}'], exit_on_error=False)

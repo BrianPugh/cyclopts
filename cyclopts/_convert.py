@@ -978,7 +978,7 @@ def _lone_token(tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs) -> "T
     return None
 
 
-def _json_object_tokens(token: "Token", type_: Any) -> dict[str, Any]:
+def _json_object_tokens(token: "Token", type_: Any, value_type: Any) -> dict[str, Any]:
     """Split a JSON-object token for a ``dict[...]`` type into per-key tokens, like a config file's."""
     import json
 
@@ -996,6 +996,10 @@ def _json_object_tokens(token: "Token", type_: Any) -> dict[str, Any]:
         if value is None or (isinstance(value, dict | list) and not value):
             return child.evolve(value="", implicit_value=value)
         return child.evolve(value=value if isinstance(value, str) else json.dumps(value))
+
+    for key, value in data.items():
+        if isinstance(value, list) and value and takes_scalar(value_type):
+            raise CoercionError(token=to_token(key, 0, value), target_type=value_type)
 
     return {
         key: [to_token(key, i, v) for i, v in enumerate(value)]
@@ -1044,6 +1048,7 @@ def _convert_entry(
             return convert_priv(Annotated[(Any, *annotations_)] if annotations_ else Any, lone)
         type_ = str
 
+    untyped = not get_args(type_)  # A bare ``dict`` takes any value, though it converts like ``dict[str, str]``.
     type_ = _implicit_iterable_type_mapping.get(type_, type_)
 
     # Handle bare abstract types (e.g., collections.abc.Set without [T])
@@ -1071,14 +1076,13 @@ def _convert_entry(
             dispatch_origin = get_origin(resolved) or resolved
 
     if (
-        not isinstance(tokens, dict)
-        and len(tokens) == 1
-        and isinstance(tokens[0], Token)
-        and _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin) is dict
-        and tokens[0].implicit_value is UNSET
-        and tokens[0].value.strip().startswith("{")
+        _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin) is dict
+        and lone
+        and lone.implicit_value is UNSET
+        and lone.value.strip().startswith("{")
     ):
-        tokens = _json_object_tokens(tokens[0], dispatch_type)
+        args = get_args(dispatch_type)
+        tokens = _json_object_tokens(lone, dispatch_type, Any if untyped or len(args) != 2 else args[1])
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
