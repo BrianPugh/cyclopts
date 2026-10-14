@@ -258,7 +258,7 @@ class Argument:
                 self._accepts_keywords = True
                 self._update_lookup(field_infos)
             elif is_namedtuple(hint):
-                self._missing_keys_checker = missing_keys_factory(_generic_class_field_infos)
+                self._missing_keys_checker = missing_keys_factory(get_field_infos)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple without type annotations.")
