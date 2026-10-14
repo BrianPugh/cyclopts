@@ -1775,6 +1775,75 @@ def test_config_dict_empty_container_any_converter(value):
     assert app([]) == "converted"
 
 
+def test_config_dict_value_container_validator():
+    """A ``Parameter`` validator on a dict's container value type runs for that value."""
+    validated = []
+
+    def reject_empty(type_, value):
+        validated.append(value)
+        if not value:
+            raise ValueError("must not be empty")
+
+    app = App(config=Dict({"x": {"k": [1]}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[list[int], Parameter(validator=reject_empty)]]):
+        return x
+
+    assert app([]) == {"k": [1]}
+    assert validated == [[1]]
+
+
+def test_config_dict_value_container_validator_rejects_empty():
+    """A dict value's container validator also runs for an empty container value."""
+    from cyclopts import ValidationError
+
+    def reject_empty(type_, value):
+        if not value:
+            raise ValueError("must not be empty")
+
+    app = App(config=Dict({"x": {"k": []}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[list[int], Parameter(validator=reject_empty)]]):
+        return x
+
+    with pytest.raises(ValidationError):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_value_container_converter():
+    """A ``Parameter`` converter on a dict's container value type converts that value."""
+
+    def double(type_, tokens):
+        return [2 * int(t.value) for t in tokens]
+
+    app = App(config=Dict({"x": {"k": [1, 2]}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[list[int], Parameter(converter=double)]]):
+        return x
+
+    assert app([]) == {"k": [2, 4]}
+
+
+def test_config_dict_value_dict_validator():
+    """A ``Parameter`` validator on a nested dict value type runs for that value."""
+    validated = []
+
+    def validator(type_, value):
+        validated.append(value)
+
+    app = App(config=Dict({"x": {"k": {"a": 1}}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict[str, Annotated[dict[str, int], Parameter(validator=validator)]]):
+        return x
+
+    assert app([]) == {"k": {"a": 1}}
+    assert validated == [{"a": 1}]
+
+
 def _kwargs_unannotated(**kwargs):
     return kwargs
 

@@ -958,9 +958,10 @@ def _convert_empty_container(type_: Any, token: "Token", convert: Callable, conv
         origin = _abstract_to_concrete_type_mapping.get(origin, origin)
         is_iterable = origin in ITERABLE_TYPES
         if isinstance(value, dict) and origin is dict:
-            return {}
+            return _apply_validators(type_, {})
         if isinstance(value, list) and is_iterable:
-            return convert_tuple(resolved) if origin is tuple else origin()
+            # These shortcuts bypass ``convert``; apply the type's own validators.
+            return _apply_validators(type_, convert_tuple(resolved) if origin is tuple else origin())
         element = next(iter(get_args(resolved)), str) if is_iterable else resolved
         if isinstance(value, dict) and is_structured_type(element):
             text = token.evolve(value="{}", implicit_value=UNSET)
@@ -1018,6 +1019,42 @@ def _takes_mapping(hint: Any) -> bool:
     if is_union(hint):
         return any(_takes_mapping(member) for member in get_args(hint))
     return hint is Any or is_structured_type(hint) or is_class_and_subclass(get_origin(hint) or hint, Mapping)
+
+
+def _call_value_converter(cparam: Any, type_: Any, tokens: Any) -> Any:
+    """Invoke a type's own ``Parameter`` converter over the value's tokens.
+
+    Mirrors how :class:`.Argument` invokes a parameter-level converter:
+    bound methods receive only the tokens; other callables receive ``(type, tokens)``.
+    """
+    resolved_converter = cparam.resolve_converter(type_)
+    assert resolved_converter is not None  # Caller checked that a converter is set.
+    if inspect.ismethod(resolved_converter):
+        return resolved_converter(tokens)
+    return resolved_converter(type_, tokens)
+
+
+def _apply_validators(type_: Any, value: Any) -> Any:
+    """Run the ``Parameter`` validators annotated on ``type_`` against an already-converted ``value``.
+
+    Some conversion paths in :func:`_convert_entry` (dictionary values, empty containers)
+    do not pass through :func:`_convert`, so they must apply a type's own validators
+    themselves; this mirrors the validator handling at the end of :func:`_convert`.
+    """
+    from cyclopts.parameter import Parameter
+
+    bare_type, cparam = Parameter.from_annotation(type_)
+    try:
+        for validator in cparam.validator:  # pyright: ignore
+            if isinstance(validator, str):
+                validator = getattr(bare_type, validator)
+            if inspect.ismethod(validator):
+                validator(value)
+            else:
+                validator(bare_type, value)
+    except (AssertionError, ValueError, TypeError) as e:
+        raise ValidationError(exception_message=e.args[0] if e.args else "", value=value) from e
+    return value
 
 
 def _convert_entry(
@@ -1101,13 +1138,38 @@ def _convert_entry(
         args = get_args(dispatch_type)
         tokens = _json_object_tokens(lone, dispatch_type, Any if untyped or len(args) != 2 else args[1])
 
+    # The stashed metadata, combined into a single ``Parameter`` (if any was stashed).
+    cparam = None
+    if annotations_:
+        from cyclopts.parameter import Parameter
+
+        _, cparam = Parameter.from_annotation(Annotated[(type_, *annotations_)])
+
     if origin_type is tuple:
-        return convert_tuple(type_, *tokens)  # pyright: ignore
+        if cparam is not None and cparam.converter is not None:
+            converted = _call_value_converter(cparam, type_, tokens)
+            return _apply_validators(Annotated[(type_, *annotations_)], converted)
+        out = convert_tuple(type_, *tokens)  # pyright: ignore
+        if annotations_:
+            out = _apply_validators(Annotated[(type_, *annotations_)], out)
+        return out
     elif dispatch_origin in ITERABLE_TYPES:
-        return convert_priv(type_, tokens)  # pyright: ignore
+        if cparam is not None and cparam.converter is not None:
+            # Like a parameter-level converter, a container's own converter replaces
+            # conversion of the whole value, receiving all of its tokens.
+            converted = _call_value_converter(cparam, dispatch_type, tokens)
+            return _apply_validators(Annotated[(type_, *annotations_)], converted)
+        # Re-attach the stashed metadata so that a container's own ``Parameter``
+        # validators are honored; e.g. the value type of
+        # ``dict[str, Annotated[list[int], Parameter(...)]]``.
+        annotated_type_ = Annotated[(type_, *annotations_)] if annotations_ else type_
+        return convert_priv(annotated_type_, tokens)  # pyright: ignore
     elif dispatch_origin is dict:
         if not isinstance(tokens, dict):
             raise ValueError  # Programming error
+        if cparam is not None and cparam.converter is not None:
+            converted = _call_value_converter(cparam, dispatch_type, tokens)
+            return _apply_validators(Annotated[(type_, *annotations_)], converted)
         try:
             value_type = get_args(dispatch_type)[1]
         except IndexError:
@@ -1118,7 +1180,13 @@ def _convert_entry(
             )
             for k, v in tokens.items()
         }
-        return dict(**dict_converted)
+        out = dict(**dict_converted)
+        if annotations_:
+            # ``resolve`` above stripped this dict's own ``Parameter`` metadata,
+            # and the recursion does not pass through :func:`_convert`, so this
+            # dict's validators must be applied here.
+            out = _apply_validators(Annotated[(type_, *annotations_)], out)
+        return out
     elif isinstance(tokens, dict):
         raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
     elif is_enum_flag(dispatch_origin):
