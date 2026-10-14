@@ -4,7 +4,7 @@ import operator
 import re
 import sys
 import typing
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date, datetime, timedelta
 from enum import Enum, Flag
 from functools import partial, reduce
@@ -929,9 +929,7 @@ def convert(
     return _convert_entry(type_, tokens, converter, name_transform)
 
 
-def _convert_empty_container(
-    type_: Any, token: "Token", convert: Callable, convert_tuple: Callable, name: str | None = None
-) -> Any:
+def _convert_empty_container(type_: Any, token: "Token", convert: Callable, convert_tuple: Callable) -> Any:
     """Convert an empty container from a config file, e.g. ``x = []`` or ``x = {k = {}}``.
 
     ``{}`` for a class (or an iterable of them) builds an all-defaults instance. For a union, the
@@ -947,7 +945,7 @@ def _convert_empty_container(
         for member in get_args(resolved):
             try:
                 return _convert_empty_container(
-                    Annotated[(member, *annotations)] if annotations else member, token, convert, convert_tuple, name
+                    Annotated[(member, *annotations)] if annotations else member, token, convert, convert_tuple
                 )
             except ValidationError:
                 raise
@@ -966,9 +964,7 @@ def _convert_empty_container(
         element = next(iter(get_args(resolved)), str) if is_iterable else resolved
         if isinstance(value, dict) and is_structured_type(element):
             text = token.evolve(value="{}", implicit_value=UNSET)
-            if name and token.keys:
-                name = ".".join((name, *token.keys))
-            return convert(type_, (text,) if is_iterable else text, name=name)
+            return convert(type_, (text,) if is_iterable else text)
     # Converted as text, ``[]``/``{}`` would bind into a ``str`` (or a class's first ``str`` field).
     raise CoercionError(token=token.evolve(value="{}" if isinstance(value, dict) else "[]"), target_type=resolved)
 
@@ -982,14 +978,61 @@ def _lone_token(tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs) -> "T
     return None
 
 
+def _json_object_tokens(token: "Token", type_: Any, value_type: Any) -> dict[str, Any]:
+    """Split a JSON-object token for a ``dict[...]`` type into per-key tokens, like a config file's."""
+    import json
+
+    try:
+        data = json.loads(token.value)
+    except json.JSONDecodeError as e:
+        raise CoercionError(token=token, target_type=type_, msg=str(e)) from e
+    if not isinstance(data, dict):
+        raise CoercionError(token=token, target_type=type_)
+
+    def to_token(key: str, index: int, value: Any) -> "Token":
+        child = token.evolve(keys=(*token.keys, key), index=index)
+        if token.keyword and token.keyword.startswith("-"):
+            child = child.evolve(keyword=f"{token.keyword}.{key}")
+        if value is None or (isinstance(value, dict | list) and not value):
+            return child.evolve(value="", implicit_value=value)
+        return child.evolve(value=value if isinstance(value, str) else json.dumps(value))
+
+    for key, value in data.items():
+        if value and (
+            (isinstance(value, list) and takes_scalar(value_type))
+            or (isinstance(value, dict) and takes_scalar(value_type) and not _takes_mapping(value_type))
+        ):
+            raise CoercionError(token=to_token(key, 0, value), target_type=value_type)
+
+    return {
+        key: [to_token(key, i, v) for i, v in enumerate(value)]
+        if isinstance(value, list) and value
+        else [to_token(key, 0, value)]
+        for key, value in data.items()
+    }
+
+
+def _takes_mapping(hint: Any) -> bool:
+    """Whether ``hint`` (or a union member) takes a mapping, e.g. a ``dict``, a dataclass or ``Any``."""
+    hint = resolve(hint)
+    if is_union(hint):
+        return any(_takes_mapping(member) for member in get_args(hint))
+    return hint is Any or is_structured_type(hint) or is_class_and_subclass(get_origin(hint) or hint, Mapping)
+
+
 def _convert_entry(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
     converter: Callable[[type, str], Any] | None = None,
     name_transform: Callable[[str], str] | None = None,
     name: str | None = None,
+    *,
+    json_dict: bool = True,
 ):
-    """:func:`convert`, plus ``name``: the owning parameter's name for errors inside JSON values."""
+    """:func:`convert`, plus ``name``: the owning parameter's name for errors inside JSON values.
+
+    ``json_dict=False`` (from :attr:`.Parameter.json_dict`) doesn't parse a JSON object for a ``dict``.
+    """
     from cyclopts.argument import Token
 
     if not tokens:
@@ -1006,7 +1049,7 @@ def _convert_entry(
 
     lone = _lone_token(tokens)
     if lone and isinstance(lone.implicit_value, dict | list) and not lone.implicit_value:
-        return _convert_empty_container(type_, lone, convert_priv, convert_tuple, name)
+        return _convert_empty_container(type_, lone, convert_priv, convert_tuple)
 
     # ``_convert`` applies a type's own ``Parameter`` metadata (converter/validator), but
     # ``resolve`` discards it. Stash the metadata so it can be re-attached to the
@@ -1021,6 +1064,7 @@ def _convert_entry(
             return convert_priv(Annotated[(Any, *annotations_)] if annotations_ else Any, lone)
         type_ = str
 
+    untyped = not get_args(type_)  # A bare ``dict`` takes any value, though it converts like ``dict[str, str]``.
     type_ = _implicit_iterable_type_mapping.get(type_, type_)
 
     # Handle bare abstract types (e.g., collections.abc.Set without [T])
@@ -1047,6 +1091,16 @@ def _convert_entry(
             dispatch_type = resolved
             dispatch_origin = get_origin(resolved) or resolved
 
+    if (
+        json_dict
+        and _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin) is dict
+        and lone
+        and lone.implicit_value is UNSET
+        and lone.value.strip().startswith("{")
+    ):
+        args = get_args(dispatch_type)
+        tokens = _json_object_tokens(lone, dispatch_type, Any if untyped or len(args) != 2 else args[1])
+
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
     elif dispatch_origin in ITERABLE_TYPES:
@@ -1058,7 +1112,12 @@ def _convert_entry(
             value_type = get_args(dispatch_type)[1]
         except IndexError:
             value_type = str
-        dict_converted = {k: _convert_entry(value_type, v, converter, name_transform, name) for k, v in tokens.items()}
+        dict_converted = {
+            k: _convert_entry(
+                value_type, v, converter, name_transform, f"{name}.{k}" if name else None, json_dict=json_dict
+            )
+            for k, v in tokens.items()
+        }
         return dict(**dict_converted)
     elif isinstance(tokens, dict):
         raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
