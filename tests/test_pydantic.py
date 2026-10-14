@@ -318,6 +318,44 @@ def test_pydantic_validate_by_alias_false(app, assert_parse_args):
 
 
 @pytest.mark.parametrize(
+    "config",
+    [
+        {"validate_by_alias": False},
+        {"populate_by_name": True, "validate_by_alias": False},
+        {"populate_by_name": False, "validate_by_alias": False},
+        {"populate_by_name": True, "validate_by_name": False},
+        {"populate_by_name": True, "validate_by_name": False, "validate_by_alias": True},
+    ],
+)
+def test_pydantic_alias_config_registers_accepted_names(config):
+    """CLI names match exactly what the model accepts, under pydantic's config precedence.
+
+    https://github.com/BrianPugh/cyclopts/issues/1009
+
+    pydantic 2.14+ no longer writes the normalized ``validate_by_*`` values back into
+    ``model_config``, so cyclopts has to apply the same precedence itself (an explicit
+    ``validate_by_name`` beats ``populate_by_name``, which forces ``validate_by_alias``).
+    """
+    from cyclopts.field_info import get_field_infos
+
+    class Model(BaseModel):
+        model_config = ConfigDict(**config)
+
+        full_name: str = Field(alias="userName")
+
+    accepted = set()
+    for key in ("full_name", "userName"):
+        try:
+            Model.model_validate({key: "x"})
+        except PydanticValidationError:
+            continue
+        accepted.add(key)
+
+    names = get_field_infos(Model)["full_name"].names
+    assert accepted == {name for name in names if name in ("full_name", "userName")}
+
+
+@pytest.mark.parametrize(
     "env_var",
     [
         '{"storage_class": "longhorn"}',
