@@ -768,7 +768,15 @@ class Argument:
                     # Persist the canonicalized tokens so ``_json`` (and pydantic) see the
                     # listed spelling rather than the raw input (e.g. Enum ``RED`` -> ``red``).
                     child.tokens = child._validate_choices(child._expand_json_list_tokens(child.tokens))
-            keyless = [token for token in self.tokens if not token.keys and not isinstance(token.implicit_value, dict)]
+            keyless = [
+                token
+                for token in self.tokens
+                if not token.keys
+                and not isinstance(token.implicit_value, dict)
+                and not (
+                    token.implicit_value is UNSET and token.value.lstrip().startswith("{")
+                )  # ``_json`` decodes it.
+            ]
             if keyless:
                 # e.g. ``--x`` or ``--x=false`` on ``Model | bool``; ``_json`` only handles keyed tokens.
                 self._claim_children_for_keyless_value()

@@ -689,3 +689,60 @@ def test_union_enum_flag_other_member(app, assert_parse_args, cmd, expected):
         pass
 
     assert_parse_args(default, cmd, x=expected)
+
+
+@dataclass
+class _SourceUser:
+    a: int = 1
+    b: str = "s"
+
+
+@pytest.mark.parametrize(
+    "config, cmd, expected",
+    [
+        ({"x": {"a": 2}}, ["--no-x"], False),
+        ({"x": {"a": 2}}, ["--x"], True),
+        ({"x": False}, ["--x.a", "9"], _SourceUser(a=9)),
+        ({"x": {"a": 2}}, ["--x.b", "q"], _SourceUser(a=2, b="q")),
+    ],
+)
+def test_union_bool_class_cli_replaces_config(config, cmd, expected):
+    """A keyless value and ``--x.<field>`` from different sources: the CLI replaces the config."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser | bool = False):
+        return x
+
+    assert app(cmd, exit_on_error=False) == expected
+
+
+def test_union_bool_class_cli_replaces_env(monkeypatch):
+    """A keyless env var value doesn't combine with ``--x.<field>`` from the CLI."""
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceUser | bool, Parameter(env_var="X")] = False):
+        return x
+
+    monkeypatch.setenv("X", "true")
+    assert app(["--x.a", "9"], exit_on_error=False) == _SourceUser(a=9)
+
+
+def test_union_bool_class_same_source_mix_errors():
+    """A keyless value and ``--x.<field>`` from the same source still error."""
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser | bool = False):
+        return x
+
+    with pytest.raises(CoercionError, match="Cannot combine"):
+        app(["--x", "--x.a", "9"], exit_on_error=False)

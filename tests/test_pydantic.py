@@ -1370,3 +1370,16 @@ def test_pydantic_union_bool_flag_runs_annotation_validators(app):
 
     with pytest.raises(ValidationError, match="bare flag not allowed"):
         app.parse_args("--x", print_error=False, exit_on_error=False)
+
+
+def test_pydantic_json_dict_false_accepts_json_object(app):
+    """``json_dict=False`` on a pydantic model still accepts a JSON object, like a dataclass does."""
+
+    class Model(BaseModel):
+        a: int = 1
+
+    @app.default
+    def main(x: Annotated[Model, Parameter(json_dict=False)] = Model()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"a": 2}'], exit_on_error=False) == Model(a=2)

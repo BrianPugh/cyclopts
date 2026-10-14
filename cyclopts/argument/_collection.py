@@ -783,6 +783,21 @@ def _is_valid_option_key(option_key: str, arguments: "ArgumentCollection") -> bo
     )
 
 
+def _set_by_other_source(argument: Argument, arguments: ArgumentCollection, source: str) -> bool:
+    """Whether another (earlier, so higher-precedence) source set the other side of ``argument``'s composite value.
+
+    A keyless value (e.g. ``--no-x`` on ``Foo | bool``) and ``--x.<field>`` values can't combine; the
+    earlier source replaces the later one for the whole parameter.
+    """
+    if any(token.source != source for child in argument.children_recursive for token in child.tokens):
+        return True
+    return any(
+        any(child is argument for child in parent.children_recursive)
+        and any(not token.keys and token.source != source for token in parent.tokens)
+        for parent in arguments
+    )
+
+
 def update_argument_collection(
     config: dict,
     source: str,
@@ -890,6 +905,8 @@ def update_argument_collection(
                 ) from None
 
             if do_not_update.setdefault(id(argument), bool(argument.tokens)):
+                continue
+            if _set_by_other_source(argument, arguments, source):
                 continue
 
             if isinstance(value, list) and value and (hint := argument._scalar_hint(remaining_keys)) is not None:
