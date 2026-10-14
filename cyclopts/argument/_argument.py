@@ -773,6 +773,7 @@ class Argument:
                 _convert_entry,
                 name_transform=self.parameter.name_transform,
                 name=self.names[0] if self.names else None,
+                json_dict=self.parameter.json_dict is not False,
             )
 
         assert converter is not None  # Ensure converter is set at this point

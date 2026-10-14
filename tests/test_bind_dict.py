@@ -267,3 +267,54 @@ def test_bind_dict_json_null_for_non_nullable_value(app):
 
     with pytest.raises(CoercionError, match=r"--d\.k"):
         app(["--d", '{"k": null}'], exit_on_error=False)
+
+
+def test_bind_dict_json_dict_false(app):
+    """``Parameter(json_dict=False)`` turns off parsing a JSON object for a dict parameter."""
+    from typing import Annotated
+
+    from cyclopts import CoercionError, Parameter
+
+    @app.default
+    def main(d: Annotated[dict[str, str], Parameter(json_dict=False)]):
+        pass
+
+    with pytest.raises(CoercionError):
+        app(["--d", '{"a": "b"}'], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value",
+    [
+        (dict[str, str], '{"k": {"a": 1}}'),
+        (dict[str, int], '{"k": {"a": 1}}'),
+        (dict[str, str | None], '{"k": {"a": 1}}'),
+    ],
+)
+def test_bind_dict_json_object_for_scalar_value(app, hint, value):
+    """A JSON object for a value type that takes a single value is an error, like ``{}`` is."""
+    from cyclopts import CoercionError
+
+    @app.default
+    def main(d: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    with pytest.raises(CoercionError, match=r"--d\.k"):
+        app(["--d", value], exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "hint, value, expected",
+    [
+        (dict[str, dict[str, int]], '{"k": {"a": 1}}', {"k": {"a": 1}}),
+        (dict[str, Any], '{"k": {"a": 1}}', {"k": '{"a": 1}'}),
+    ],
+)
+def test_bind_dict_json_object_for_mapping_value(app, hint, value, expected):
+    """A JSON object still binds for value types that take a mapping (and as text for ``Any``)."""
+
+    @app.default
+    def main(d: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return d
+
+    assert app(["--d", value], exit_on_error=False) == expected

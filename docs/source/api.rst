@@ -1830,7 +1830,7 @@ API
 
       1. The parameter is specified as a keyword option; e.g. ``--movie``.
 
-      2. The referenced parameter is dataclass-like.
+      2. The referenced parameter is dataclass-like, or a ``dict`` (e.g. ``dict[str, int]``).
 
       3. The first character of the token is a ``{``.
 

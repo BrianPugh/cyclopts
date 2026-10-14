@@ -4,7 +4,7 @@ import operator
 import re
 import sys
 import typing
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date, datetime, timedelta
 from enum import Enum, Flag
 from functools import partial, reduce
@@ -998,7 +998,10 @@ def _json_object_tokens(token: "Token", type_: Any, value_type: Any) -> dict[str
         return child.evolve(value=value if isinstance(value, str) else json.dumps(value))
 
     for key, value in data.items():
-        if isinstance(value, list) and value and takes_scalar(value_type):
+        if value and (
+            (isinstance(value, list) and takes_scalar(value_type))
+            or (isinstance(value, dict) and takes_scalar(value_type) and not _takes_mapping(value_type))
+        ):
             raise CoercionError(token=to_token(key, 0, value), target_type=value_type)
 
     return {
@@ -1009,14 +1012,27 @@ def _json_object_tokens(token: "Token", type_: Any, value_type: Any) -> dict[str
     }
 
 
+def _takes_mapping(hint: Any) -> bool:
+    """Whether ``hint`` (or a union member) takes a mapping, e.g. a ``dict``, a dataclass or ``Any``."""
+    hint = resolve(hint)
+    if is_union(hint):
+        return any(_takes_mapping(member) for member in get_args(hint))
+    return hint is Any or is_structured_type(hint) or is_class_and_subclass(get_origin(hint) or hint, Mapping)
+
+
 def _convert_entry(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
     converter: Callable[[type, str], Any] | None = None,
     name_transform: Callable[[str], str] | None = None,
     name: str | None = None,
+    *,
+    json_dict: bool = True,
 ):
-    """:func:`convert`, plus ``name``: the owning parameter's name for errors inside JSON values."""
+    """:func:`convert`, plus ``name``: the owning parameter's name for errors inside JSON values.
+
+    ``json_dict=False`` (from :attr:`.Parameter.json_dict`) doesn't parse a JSON object for a ``dict``.
+    """
     from cyclopts.argument import Token
 
     if not tokens:
@@ -1076,7 +1092,8 @@ def _convert_entry(
             dispatch_origin = get_origin(resolved) or resolved
 
     if (
-        _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin) is dict
+        json_dict
+        and _abstract_to_concrete_type_mapping.get(dispatch_origin, dispatch_origin) is dict
         and lone
         and lone.implicit_value is UNSET
         and lone.value.strip().startswith("{")
@@ -1096,7 +1113,9 @@ def _convert_entry(
         except IndexError:
             value_type = str
         dict_converted = {
-            k: _convert_entry(value_type, v, converter, name_transform, f"{name}.{k}" if name else None)
+            k: _convert_entry(
+                value_type, v, converter, name_transform, f"{name}.{k}" if name else None, json_dict=json_dict
+            )
             for k, v in tokens.items()
         }
         return dict(**dict_converted)
