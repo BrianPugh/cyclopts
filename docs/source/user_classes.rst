@@ -61,7 +61,7 @@ JSON Dict Parsing
 JSON dict parsing will be performed when:
 
 1. The parameter is specified as a keyword option; e.g. ``--movie``.
-2. The referenced parameter type has various sub-arguments (is dataclass-like).
+2. The referenced parameter type has various sub-arguments (is dataclass-like), or is a ``dict`` (e.g. ``dict[str, int]``).
 3. The referenced parameter is **not** union'd with a ``str``.
 4. The first character is a ``{``.
 
