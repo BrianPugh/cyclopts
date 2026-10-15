@@ -858,8 +858,9 @@ API
       :type: Union[None, str, Iterable[str]]
       :value: None
 
-      Name(s) to expose to the CLI.
+      Name(s) to expose to the CLI, **replacing** the Cyclopts-derived name.
       If not specified, cyclopts will apply :attr:`name_transform` to the python parameter name.
+      To add a short flag or an extra spelling while keeping the derived name, use :attr:`.alias` instead.
 
       .. code-block:: python
 
@@ -932,21 +933,15 @@ API
       :value: None
 
       Additional name(s) to expose to the CLI.
-      Unlike :attr:`.name`, this does not override Cyclopts-derived names.
-
-      The following two examples are functionally equivalent:
-
-      .. code-block:: python
-
-         @app.default
-         def main(foo: Annotated[int, Parameter(name=["--foo", "-f"])]):
-             pass
+      Unlike :attr:`.name`, this does not override Cyclopts-derived names, so it is the preferred way to add a short flag.
 
       .. code-block:: python
 
          @app.default
          def main(foo: Annotated[int, Parameter(alias="-f")]):
              pass
+
+      This is equivalent to, but terser than, ``Parameter(name=["--foo", "-f"])``.
 
    .. attribute:: short_alias
       :type: Union[bool, Callable[[FieldInfo, frozenset[str]], Union[str, Iterable[str], None]]]
@@ -1510,7 +1505,20 @@ API
       :value: None
 
       Help string to be displayed on the help page.
-      If not specified, defaults to the docstring.
+      If not specified, defaults to the parameter's description in the function's docstring, which is the recommended way to document parameters.
+      Reserve ``help`` for cases where a docstring is unavailable, such as a field of a third-party class.
+
+      .. code-block:: python
+
+         @app.default
+         def main(count: int = 1):
+             """Do the thing.
+
+             Parameters
+             ----------
+             count: int
+                 Number of iterations.
+             """
 
    .. attribute:: metavar
       :type: Optional[str]

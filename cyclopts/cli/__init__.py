@@ -13,6 +13,7 @@ app.register_install_completion_command(
 from cyclopts.cli import _complete as _complete
 from cyclopts.cli import docs as docs
 from cyclopts.cli import run as run
+from cyclopts.cli import skill as skill
 from cyclopts.cli import tree as tree
 
 __all__ = ["app"]
