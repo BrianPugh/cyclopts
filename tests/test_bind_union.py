@@ -1046,3 +1046,17 @@ def test_union_bool_class_nested_cli_json_field_beats_config_json():
         return x
 
     assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceOuter(inner=_SourceUser(a=9, b="q"))
+
+
+def test_union_bool_class_nested_cli_json_field_beats_config_env_json(monkeypatch):
+    from cyclopts import App
+    from cyclopts.config import Env
+
+    monkeypatch.setenv("APP_X_INNER", '{"a": 2, "b": "q"}')
+    app = App(config=Env("APP_"), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceOuter = _SourceOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceOuter(inner=_SourceUser(a=9, b="q"))

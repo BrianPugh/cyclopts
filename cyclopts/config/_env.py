@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from attrs import define, field
 
 from cyclopts.argument import Argument, ArgumentCollection, Token
-from cyclopts.argument._collection import _SourceBlocks
+from cyclopts.argument._collection import _SourceBlocks, update_argument_collection
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -53,10 +53,23 @@ class Env:
                 )
             except ValueError:
                 continue
-            if set(argument.tokens) - added_tokens or blocks.rejects(
-                argument, remaining_keys, os.environ[candidate_env_key]
-            ):
+            env_value = os.environ[candidate_env_key]
+            if set(argument.tokens) - added_tokens or blocks.rejects(argument, remaining_keys, env_value):
                 # Skip if there are any tokens from another source.
+                continue
+            if (parsed := blocks.json_to_expand(argument, remaining_keys, env_value)) is not None:
+                before = {token for child in argument.children_recursive for token in child.tokens}
+                update_argument_collection(
+                    {argument.name.lstrip("-"): parsed},
+                    self.source,
+                    arguments,
+                    root_keys=(),
+                    allow_unknown=False,
+                    blocked_by_other_sources_only=True,
+                )
+                added_tokens.update(
+                    token for child in argument.children_recursive for token in child.tokens if token not in before
+                )
                 continue
 
             # There's inherently an ambiguity because we use "_" as the key-delimiter.
@@ -67,7 +80,7 @@ class Env:
                 remaining_keys = (delimiter.join(remaining_keys),)
 
             remaining_keys = tuple(x.lower() for x in remaining_keys)
-            for i, value in enumerate(argument._split_env_value(os.environ[candidate_env_key], remaining_keys)):
+            for i, value in enumerate(argument._split_env_value(env_value, remaining_keys)):
                 token = Token(keyword=candidate_env_key, value=value, source=self.source, index=i, keys=remaining_keys)
                 argument.append(token)
                 added_tokens.add(token)

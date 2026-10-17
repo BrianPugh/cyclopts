@@ -869,6 +869,28 @@ class _SourceBlocks:
             id(argument) in self.keyless_value and not remaining_keys and _is_keyless_value(argument, value)
         )
 
+    def json_to_expand(self, argument: Argument, remaining_keys: tuple[str, ...], value: Any) -> dict | None:
+        """A JSON object to expand into ``argument``'s fields right away, so each defers to earlier sources.
+
+        Needed when earlier sources already set some of those fields; otherwise the object is kept
+        whole and expanded at conversion.
+        """
+        if (
+            remaining_keys
+            or not argument.children
+            or id(argument) not in self.keyless_value
+            or not isinstance(value, str)
+            or not argument._should_attempt_json_dict([value])
+        ):
+            return None
+        import json
+
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return None  # Reported when the token is converted.
+        return parsed if isinstance(parsed, dict) and parsed else None
+
 
 def update_argument_collection(
     config: dict,
@@ -987,23 +1009,9 @@ def update_argument_collection(
             continue
         if blocks.rejects(argument, remaining_keys, value):
             continue
-        if (
-            not remaining_keys
-            and argument.children
-            and id(argument) in blocks.keyless_value
-            and isinstance(value, str)
-            and argument._should_attempt_json_dict([value])
-        ):
-            # Earlier sources set some of this JSON object's fields; expand it so each field defers to them.
-            import json
-
-            try:
-                parsed = json.loads(value)
-            except json.JSONDecodeError:
-                parsed = None  # Reported when the token is converted.
-            if isinstance(parsed, dict) and parsed:
-                leaves.extend([(option_key, (*subkeys, *path), v) for path, v in walk_leaves(parsed)][::-1])
-                continue
+        if (parsed := blocks.json_to_expand(argument, remaining_keys, value)) is not None:
+            leaves.extend([(option_key, (*subkeys, *path), v) for path, v in walk_leaves(parsed)][::-1])
+            continue
 
         if isinstance(value, list) and value and (hint := argument._scalar_hint(remaining_keys)) is not None:
             import json
