@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, get_args
 from cyclopts._convert import _bool, _none, create_empty_instance
 from cyclopts.annotations import is_nonetype, is_union
 from cyclopts.argument import Argument, ArgumentCollection
-from cyclopts.argument._collection import _blocked_by_earlier_source
+from cyclopts.argument._collection import _SourceBlocks
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
@@ -1095,7 +1095,9 @@ def _parse_pos(
         except ValueError:
             break
         if argument.field_info.kind is POSITIONAL_OR_KEYWORD:
-            if argument.tokens and argument.tokens[0].keyword is not None:
+            if (argument.tokens and argument.tokens[0].keyword is not None) or _parent_supplied_as_keyword(
+                argument, argument_collection
+            ):
                 prior_positional_or_keyword_supplied_as_keyword_arguments.append(argument)
                 # Continue in case we hit a VAR_POSITIONAL argument.
                 continue
@@ -1165,10 +1167,20 @@ def _parse_pos(
     return [x[0] for x in tokens_and_force_positional]
 
 
+def _parent_supplied_as_keyword(argument: Argument, argument_collection: ArgumentCollection) -> bool:
+    """Whether ``--x`` already supplied the class that ``argument`` is a field of, so it isn't a positional slot."""
+    return bool(argument.keys) and any(
+        parent.tokens
+        and parent.tokens[0].keyword is not None
+        and any(child is argument for child in parent.children_recursive)
+        for parent in argument_collection
+    )
+
+
 def _parse_env(argument_collection: ArgumentCollection):
-    blocked = _blocked_by_earlier_source(argument_collection)
+    blocks = _SourceBlocks.from_arguments(argument_collection)
     for argument in argument_collection:
-        if argument.tokens or id(argument) in blocked:
+        if argument.tokens:
             # Don't check environment variables for parameters that already have values from CLI.
             continue
         assert argument.parameter.env_var is not None
@@ -1178,6 +1190,8 @@ def _parse_env(argument_collection: ArgumentCollection):
             except KeyError:
                 pass
             else:
+                if blocks.rejects(argument, (), env_var_value):
+                    break
                 for index, value in enumerate(argument._split_env_value(env_var_value)):
                     argument.tokens.append(Token(keyword=env_var_name, value=value, index=index, source="env"))
                 break
@@ -1307,8 +1321,7 @@ def create_bound_arguments(
         bound = _bind(argument_collection, func)
     except CycloptsError as e:
         e.root_input_tokens = tokens
-        if e.unused_tokens is None:
-            e.unused_tokens = unused_tokens
+        e.unused_tokens = unused_tokens
         raise
 
     return bound, unused_tokens

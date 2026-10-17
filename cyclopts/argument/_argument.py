@@ -44,7 +44,6 @@ from cyclopts.exceptions import (
     MissingArgumentError,
     MixedArgumentError,
     RepeatArgumentError,
-    UnusedCliTokensError,
     ValidationError,
 )
 from cyclopts.field_info import (
@@ -194,9 +193,6 @@ class Argument:
     See :meth:`_active_branch_required_keys` and :meth:`_resolve_union_member`.
     """
 
-    _class_or_scalar_union: bool = field(default=False, init=False, repr=False)
-    """A union like ``Foo | bool``, whose value is either keyless (``--no-x``) or built from ``--x.<field>``."""
-
     def __attrs_post_init__(self):
         from cyclopts.argument._collection import ArgumentCollection
 
@@ -310,7 +306,6 @@ class Argument:
             branches = [(member, fis) for member in hints if (fis := get_field_infos(member))]
             if branches:
                 self._union_branches = branches
-                self._class_or_scalar_union = len(branches) < len(hints)
                 # The generic checker would introspect the ``typing.Union`` alias itself
                 # (yielding phantom fields like ``origin``); branch-aware gating in
                 # :meth:`_convert` supersedes it.
@@ -752,11 +747,7 @@ class Argument:
 
     def _claim_children_for_keyless_value(self):
         """A keyless value (e.g. ``--x`` on ``Foo | bool``) is the whole value; no ``--x.<field>`` may join it."""
-        child_tokens = [token for child in self.children_recursive for token in child.tokens]
-        if child_tokens:
-            if all(token.keyword is None and token.source == "cli" for token in child_tokens):
-                # Leftover positional CLI values (``x 1 2``) bound to the fields after ``x`` took ``1``.
-                raise UnusedCliTokensError(unused_tokens=[token.value for token in child_tokens])
+        if any(child.has_tokens for child in self.children):
             raise self._keyless_and_keyed_error()
         for child in self.children_recursive:
             child._marked = True
@@ -939,6 +930,7 @@ class Argument:
                             self.children_recursive,
                             root_keys=(),
                             allow_unknown=False,
+                            blocked_by_other_sources_only=True,
                         )
                     else:
                         explicit_empty_mapping = True

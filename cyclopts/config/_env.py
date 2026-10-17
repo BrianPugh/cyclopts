@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from attrs import define, field
 
 from cyclopts.argument import Argument, ArgumentCollection, Token
-from cyclopts.argument._collection import _blocked_by_earlier_source
+from cyclopts.argument._collection import _SourceBlocks
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -37,7 +37,7 @@ class Env:
 
     def __call__(self, app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
         added_tokens = set()
-        blocked = _blocked_by_earlier_source(arguments)
+        blocks = _SourceBlocks.from_arguments(arguments)
 
         prefix = self._prefix(commands)
 
@@ -53,7 +53,9 @@ class Env:
                 )
             except ValueError:
                 continue
-            if set(argument.tokens) - added_tokens or id(argument) in blocked:
+            if set(argument.tokens) - added_tokens or blocks.rejects(
+                argument, remaining_keys, os.environ[candidate_env_key]
+            ):
                 # Skip if there are any tokens from another source.
                 continue
 

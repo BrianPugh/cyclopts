@@ -6,6 +6,8 @@ import itertools
 from collections.abc import Callable, Iterable, Sequence
 from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
 
+from attrs import define, field
+
 if TYPE_CHECKING:
     from cyclopts.core import App
 
@@ -783,23 +785,66 @@ def _is_valid_option_key(option_key: str, arguments: "ArgumentCollection") -> bo
     )
 
 
-def _blocked_by_earlier_source(arguments: ArgumentCollection) -> set[int]:
-    """Ids of arguments a later source may not set, because an earlier source set the other side of their union.
+def _is_keyless_value(value: Any) -> bool:
+    """A whole value (e.g. ``false``), as opposed to a JSON object that merges with ``--x.<field>`` values."""
+    return not isinstance(value, dict) and not (isinstance(value, str) and value.lstrip().startswith("{"))
 
-    A keyless value (e.g. ``--no-x`` on ``Foo | bool``) and ``--x.<field>`` values can't combine; the
-    earlier (higher-precedence) source replaces the later one for the whole parameter.
-    Call it before a source adds its tokens, so its own tokens don't block each other.
+
+@define
+class _SourceBlocks:
+    """What a lower-precedence source may not set, given the tokens earlier sources already supplied.
+
+    The earlier source wins for each field: a keyless value (e.g. ``--no-x`` on ``Foo | bool``) replaces
+    every ``--x.<field>``; a JSON object replaces only the fields it sets; and ``--x.<field>`` values
+    reject a later keyless value but still merge with a later JSON object. ``enum.Flag`` values combine.
     """
-    blocked = set()
-    for argument in arguments:
-        if not argument._class_or_scalar_union:
-            continue
-        descendants = argument.children_recursive
-        if any(child.tokens for child in descendants):
-            blocked.add(id(argument))
-        if any(not token.keys and not _is_json_object_token(token) for token in argument.tokens):
-            blocked.update(id(child) for child in descendants)
-    return blocked
+
+    any_value: set[int] = field(factory=set)
+    """Ids of arguments that reject any value."""
+
+    keyless_value: set[int] = field(factory=set)
+    """Ids of arguments that reject a keyless value only."""
+
+    @classmethod
+    def from_arguments(cls, arguments: Iterable[Argument], ignore_source: str | None = None) -> "_SourceBlocks":
+        """Build from ``arguments``' current tokens; call before a source adds its own.
+
+        ``ignore_source`` skips that source's tokens, so they still conflict (and error) instead of blocking.
+        """
+        blocks = cls()
+        for argument in arguments:
+            if not argument.children or argument._enum_flag_type:
+                continue
+            descendants = argument.children_recursive
+            if any(token.source != ignore_source for child in descendants for token in child.tokens):
+                blocks.keyless_value.add(id(argument))
+            for token in argument.tokens:
+                if token.keys or token.source == ignore_source:
+                    continue
+                if not _is_json_object_token(token):
+                    blocks.any_value.update(id(child) for child in descendants)
+                    continue
+                if isinstance(token.implicit_value, dict):
+                    continue
+                import json
+
+                try:
+                    paths = [path for path, _ in walk_leaves(json.loads(token.value)) if path]
+                except json.JSONDecodeError:
+                    continue  # Reported when the token is converted.
+                for child in descendants:
+                    keys = child.keys[len(argument.keys) :]
+                    for path in paths:
+                        if keys[: len(path)] == path:
+                            blocks.any_value.add(id(child))
+                        elif path[: len(keys)] == keys:
+                            blocks.keyless_value.add(id(child))
+        return blocks
+
+    def rejects(self, argument: Argument, remaining_keys: tuple[str, ...], value: Any) -> bool:
+        return id(argument) in self.any_value or (
+            id(argument) in self.keyless_value and not remaining_keys and _is_keyless_value(value)
+        )
 
 
 def update_argument_collection(
@@ -810,6 +855,7 @@ def update_argument_collection(
     *,
     root_keys: Iterable[str],
     allow_unknown: bool,
+    blocked_by_other_sources_only: bool = False,
 ):
     """Updates an argument collection with values from a configuration dictionary.
 
@@ -838,6 +884,9 @@ def update_argument_collection(
         Base path keys to prepend to all configuration keys.
     allow_unknown : bool
         If True, ignore unrecognized configuration keys instead of raising errors.
+    blocked_by_other_sources_only : bool
+        Let tokens already supplied by ``source`` itself conflict instead of taking precedence;
+        set when expanding a JSON value whose fields other sources may have filled in since.
 
     Raises
     ------
@@ -850,7 +899,7 @@ def update_argument_collection(
     precedence over configuration files.
     """
     meta_arguments = _meta_arguments(apps or ())
-    blocked = _blocked_by_earlier_source(arguments)
+    blocks = _SourceBlocks.from_arguments(arguments, ignore_source=source if blocked_by_other_sources_only else None)
 
     do_not_update = {}
 
@@ -911,7 +960,7 @@ def update_argument_collection(
 
             if do_not_update.setdefault(id(argument), bool(argument.tokens)):
                 continue
-            if id(argument) in blocked:
+            if blocks.rejects(argument, remaining_keys, value):
                 continue
 
             if isinstance(value, list) and value and (hint := argument._scalar_hint(remaining_keys)) is not None:
