@@ -365,7 +365,8 @@ def _validate_json_extra_keys(
     CoercionError
         If the data contains keys not present in the type's fields.
     """
-    field_infos = get_field_infos(type_)
+    members = get_args(type_) if is_union(type_) else (type_,)
+    field_infos = {k: v for member in members for k, v in get_field_infos(member).items()}
     # Collect all valid names including aliases (e.g., Pydantic camelCase aliases)
     valid_names: set[str] = set()
     for field_name, field_info in field_infos.items():
@@ -376,7 +377,7 @@ def _validate_json_extra_keys(
         extra_key = sorted(extra_keys)[0]  # Report first extra key alphabetically for determinism
         valid_fields = ", ".join(sorted(field_infos.keys()))
         raise CoercionError(
-            msg=f'Unknown field "{extra_key}" in JSON for {type_.__name__}. Valid fields: {valid_fields}',
+            msg=f'Unknown field "{extra_key}" in JSON for {get_hint_name(type_)}. Valid fields: {valid_fields}',
             target_type=type_,
             token=token,
         )
