@@ -44,6 +44,7 @@ from cyclopts.exceptions import (
     MissingArgumentError,
     MixedArgumentError,
     RepeatArgumentError,
+    UnusedCliTokensError,
     ValidationError,
 )
 from cyclopts.field_info import (
@@ -185,13 +186,16 @@ class Argument:
     _enum_flag_type: Any | None = field(default=None, init=False, repr=False)
 
     _union_branches: "list[tuple[Any, dict[str, FieldInfo]]]" = field(factory=list, init=False, repr=False)
-    """Per-branch ``(member_type, field_infos)`` when :attr:`hint` is a ``Union`` of 2+ keyword-accepting types.
+    """Per-branch ``(member_type, field_infos)`` when :attr:`hint` is a ``Union`` with a keyword-accepting member.
 
     Empty for non-unions and single-composite optionals (e.g. ``Foo | None``). Drives
     branch-aware required-field detection so that supplying one ``Union`` member's fields
     doesn't demand another member's required fields, and selects the member to instantiate.
     See :meth:`_active_branch_required_keys` and :meth:`_resolve_union_member`.
     """
+
+    _class_or_scalar_union: bool = field(default=False, init=False, repr=False)
+    """A union like ``Foo | bool``, whose value is either keyless (``--no-x``) or built from ``--x.<field>``."""
 
     def __attrs_post_init__(self):
         from cyclopts.argument._collection import ArgumentCollection
@@ -306,6 +310,7 @@ class Argument:
             branches = [(member, fis) for member in hints if (fis := get_field_infos(member))]
             if branches:
                 self._union_branches = branches
+                self._class_or_scalar_union = len(branches) < len(hints)
                 # The generic checker would introspect the ``typing.Union`` alias itself
                 # (yielding phantom fields like ``origin``); branch-aware gating in
                 # :meth:`_convert` supersedes it.
@@ -747,7 +752,11 @@ class Argument:
 
     def _claim_children_for_keyless_value(self):
         """A keyless value (e.g. ``--x`` on ``Foo | bool``) is the whole value; no ``--x.<field>`` may join it."""
-        if any(child.has_tokens for child in self.children):
+        child_tokens = [token for child in self.children_recursive for token in child.tokens]
+        if child_tokens:
+            if all(token.keyword is None and token.source == "cli" for token in child_tokens):
+                # Leftover positional CLI values (``x 1 2``) bound to the fields after ``x`` took ``1``.
+                raise UnusedCliTokensError(unused_tokens=[token.value for token in child_tokens])
             raise self._keyless_and_keyed_error()
         for child in self.children_recursive:
             child._marked = True
@@ -768,15 +777,8 @@ class Argument:
                     # Persist the canonicalized tokens so ``_json`` (and pydantic) see the
                     # listed spelling rather than the raw input (e.g. Enum ``RED`` -> ``red``).
                     child.tokens = child._validate_choices(child._expand_json_list_tokens(child.tokens))
-            keyless = [
-                token
-                for token in self.tokens
-                if not token.keys
-                and not isinstance(token.implicit_value, dict)
-                and not (
-                    token.implicit_value is UNSET and token.value.lstrip().startswith("{")
-                )  # ``_json`` decodes it.
-            ]
+            # ``_json`` decodes JSON objects.
+            keyless = [token for token in self.tokens if not token.keys and not _is_json_object_token(token)]
             if keyless:
                 # e.g. ``--x`` or ``--x=false`` on ``Model | bool``; ``_json`` only handles keyed tokens.
                 self._claim_children_for_keyless_value()
@@ -1659,6 +1661,12 @@ class Argument:
             raise ValidationError(exception_message=str(exc), argument=self, value=value) from exc
         else:
             raise exc
+
+
+def _is_json_object_token(token: Token) -> bool:
+    return isinstance(token.implicit_value, dict) or (
+        token.implicit_value is UNSET and token.value.lstrip().startswith("{")
+    )
 
 
 def _hint_at_keys(hint: Any, keys: tuple[str, ...]) -> Any:

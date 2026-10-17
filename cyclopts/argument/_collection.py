@@ -22,7 +22,7 @@ from cyclopts.parameter import Parameter
 from cyclopts.token import Token
 from cyclopts.utils import UNSET, is_iterable
 
-from ._argument import Argument
+from ._argument import Argument, _is_json_object_token
 from .utils import (
     KIND_PARENT_CHILD_REASSIGNMENT,
     PARAMETER_SUBKEY_BLOCKER,
@@ -783,19 +783,23 @@ def _is_valid_option_key(option_key: str, arguments: "ArgumentCollection") -> bo
     )
 
 
-def _set_by_other_source(argument: Argument, arguments: ArgumentCollection, source: str) -> bool:
-    """Whether another (earlier, so higher-precedence) source set the other side of ``argument``'s composite value.
+def _blocked_by_earlier_source(arguments: ArgumentCollection) -> set[int]:
+    """Ids of arguments a later source may not set, because an earlier source set the other side of their union.
 
     A keyless value (e.g. ``--no-x`` on ``Foo | bool``) and ``--x.<field>`` values can't combine; the
-    earlier source replaces the later one for the whole parameter.
+    earlier (higher-precedence) source replaces the later one for the whole parameter.
+    Call it before a source adds its tokens, so its own tokens don't block each other.
     """
-    if any(token.source != source for child in argument.children_recursive for token in child.tokens):
-        return True
-    return any(
-        any(child is argument for child in parent.children_recursive)
-        and any(not token.keys and token.source != source for token in parent.tokens)
-        for parent in arguments
-    )
+    blocked = set()
+    for argument in arguments:
+        if not argument._class_or_scalar_union:
+            continue
+        descendants = argument.children_recursive
+        if any(child.tokens for child in descendants):
+            blocked.add(id(argument))
+        if any(not token.keys and not _is_json_object_token(token) for token in argument.tokens):
+            blocked.update(id(child) for child in descendants)
+    return blocked
 
 
 def update_argument_collection(
@@ -846,6 +850,7 @@ def update_argument_collection(
     precedence over configuration files.
     """
     meta_arguments = _meta_arguments(apps or ())
+    blocked = _blocked_by_earlier_source(arguments)
 
     do_not_update = {}
 
@@ -906,7 +911,7 @@ def update_argument_collection(
 
             if do_not_update.setdefault(id(argument), bool(argument.tokens)):
                 continue
-            if _set_by_other_source(argument, arguments, source):
+            if id(argument) in blocked:
                 continue
 
             if isinstance(value, list) and value and (hint := argument._scalar_hint(remaining_keys)) is not None:

@@ -866,7 +866,7 @@ def test_enum_flag_combines_across_sources(monkeypatch, cmd, config, env):
     app = App(config=Dict(config), result_action="return_value")
 
     @app.default
-    def main(*, x: Annotated[_SourcePermission, Parameter(env_var="X")] = _SourcePermission(0)):
+    def main(*, x: Annotated[_SourcePermission, Parameter(env_var="X")] = _SourcePermission(0)):  # noqa: B008
         return x
 
     assert app(cmd, exit_on_error=False) == _SourcePermission.READ | _SourcePermission.WRITE

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, get_args
 from cyclopts._convert import _bool, _none, create_empty_instance
 from cyclopts.annotations import is_nonetype, is_union
 from cyclopts.argument import Argument, ArgumentCollection
-from cyclopts.argument._collection import _set_by_other_source
+from cyclopts.argument._collection import _blocked_by_earlier_source
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
@@ -1166,8 +1166,9 @@ def _parse_pos(
 
 
 def _parse_env(argument_collection: ArgumentCollection):
+    blocked = _blocked_by_earlier_source(argument_collection)
     for argument in argument_collection:
-        if argument.tokens or _set_by_other_source(argument, argument_collection, "env"):
+        if argument.tokens or id(argument) in blocked:
             # Don't check environment variables for parameters that already have values from CLI.
             continue
         assert argument.parameter.env_var is not None
@@ -1306,7 +1307,8 @@ def create_bound_arguments(
         bound = _bind(argument_collection, func)
     except CycloptsError as e:
         e.root_input_tokens = tokens
-        e.unused_tokens = unused_tokens
+        if e.unused_tokens is None:
+            e.unused_tokens = unused_tokens
         raise
 
     return bound, unused_tokens

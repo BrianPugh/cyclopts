@@ -1383,3 +1383,35 @@ def test_pydantic_json_dict_false_accepts_json_object(app):
         return x
 
     assert app(["--x", '{"a": 2}'], exit_on_error=False) == Model(a=2)
+
+
+class _SourceModel(BaseModel):
+    a: int = 0
+    b: int = 0
+
+
+def test_pydantic_json_merges_fields_from_other_source():
+    """A JSON object for a plain model still merges with field values from another source."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"b": 2}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceModel = _SourceModel()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"a": 1}'], exit_on_error=False) == _SourceModel(a=1, b=2)
+
+
+def test_pydantic_env_var_json_merges_cli_field(monkeypatch):
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceModel, Parameter(env_var="X")] = _SourceModel()):  # noqa: B008
+        return x
+
+    monkeypatch.setenv("X", '{"b": 2}')
+    assert app(["--x.a", "1"], exit_on_error=False) == _SourceModel(a=1, b=2)
