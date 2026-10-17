@@ -996,3 +996,53 @@ def test_union_bool_class_nested_same_source_json_and_field_errors():
 
     with pytest.raises(CoercionError, match="Cannot combine"):
         app(["--x", '{"inner": false}', "--x.inner.a", "2"], exit_on_error=False)
+
+
+@pytest.mark.parametrize("value", ['{"literal": 9}', "{text"])
+def test_union_str_class_cli_string_replaces_config_fields(value):
+    """A ``{``-leading value that a ``str`` member takes whole isn't JSON; it replaces the config's fields."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"a": 2}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: str | _SourceUser = ""):
+        return x
+
+    assert app(["--x", value], exit_on_error=False) == value
+
+
+@dataclass
+class _SourceOptions:
+    options: dict[str, int]
+
+
+@pytest.mark.parametrize("hint", [_SourceOptions, _SourceOptions | bool])
+@pytest.mark.parametrize("config_options", [{"b": 2}, {"a": 5, "b": 2}])
+def test_class_cli_json_dict_field_replaces_config_dict(hint, config_options):
+    """Like ``--x.options.a 1``, CLI JSON entries replace the config's whole ``dict`` field."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"options": config_options}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: hint = None):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app(["--x", '{"options": {"a": 1}}'], exit_on_error=False) == _SourceOptions({"a": 1})
+
+
+def test_union_bool_class_nested_cli_json_field_beats_config_json():
+    """A later source's JSON string for a nested field merges per field under the CLI's JSON."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"inner": '{"a": 2, "b": "q"}'}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceOuter = _SourceOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceOuter(inner=_SourceUser(a=9, b="q"))

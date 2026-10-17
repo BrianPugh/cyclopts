@@ -1415,3 +1415,23 @@ def test_pydantic_env_var_json_merges_cli_field(monkeypatch):
 
     monkeypatch.setenv("X", '{"b": 2}')
     assert app(["--x.a", "1"], exit_on_error=False) == _SourceModel(a=1, b=2)
+
+
+class _SourceAliasModel(BaseModel):
+    model_config = pydantic.ConfigDict(populate_by_name=True)
+
+    full_name: str = Field("default", alias="userName")
+
+
+def test_pydantic_cli_json_alias_beats_config_field_name():
+    """CLI JSON keyed by an alias still takes precedence over config keyed by the field name."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"full_name": "CONFIG"}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceAliasModel = _SourceAliasModel(userName="default")):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"userName": "CLI"}'], exit_on_error=False).full_name == "CLI"
