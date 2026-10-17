@@ -886,3 +886,113 @@ def test_class_extra_positional_token_is_unused(hint):
 
     with pytest.raises(UnusedCliTokensError, match=r"\['2'\]"):
         app(["--x", "1", "2"], exit_on_error=False)
+
+
+def test_class_extra_positional_token_parse_known_args():
+    """``parse_known_args`` hands back a stray value after ``--x 1`` instead of raising."""
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(x: _SourceUser | None = None):
+        return x
+
+    _, bound, unused, _ = app.parse_known_args(["--x", "1", "2"])
+    assert bound.arguments == {"x": _SourceUser(a=1)}
+    assert unused == ["2"]
+
+
+@dataclass
+class _SourceRequired:
+    a: int
+
+
+def test_class_cli_value_replaces_config_fields():
+    """A keyless CLI value for a plain class replaces the config's ``--x.<field>`` values."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"a": 2}}), result_action="return_value")
+
+    @app.default
+    def main(x: _SourceRequired = _SourceRequired(0)):  # noqa: B008
+        return x
+
+    assert app(["--x", "1"], exit_on_error=False) == _SourceRequired(1)
+
+
+@pytest.mark.parametrize("via", ["config", "env"])
+def test_union_bool_class_json_merges_cli_field(monkeypatch, via):
+    """A later source's JSON object merges into ``--x.<field>`` values, like a nested config table does."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    if via == "env":
+        monkeypatch.setenv("X", '{"b": "q"}')
+    app = App(config=Dict({"x": '{"b": "q"}'} if via == "config" else {}), result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceUser | bool, Parameter(env_var="X")] = False):
+        return x
+
+    assert app(["--x.a", "9"], exit_on_error=False) == _SourceUser(a=9, b="q")
+
+
+def test_union_enum_flag_combines_across_sources():
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"write": True}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _Perm | str = "default"):
+        return x
+
+    assert app(["--x", "read"], exit_on_error=False) == _Perm.READ | _Perm.WRITE
+
+
+@dataclass
+class _SourceOuter:
+    inner: _SourceUser | bool = False
+
+
+def test_union_bool_class_nested_cli_json_replaces_config():
+    """CLI JSON for an outer class keeps precedence over config values for the fields it sets."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"inner": {"a": 2}}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceOuter = _SourceOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": false}'], exit_on_error=False) == _SourceOuter(inner=False)
+
+
+def test_class_cli_json_field_beats_config_field():
+    """CLI JSON wins over config for the same field; the config's other fields still merge."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"a": 2, "b": "c"}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser = _SourceUser()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"a": 1}'], exit_on_error=False) == _SourceUser(a=1, b="c")
+
+
+def test_union_bool_class_nested_same_source_json_and_field_errors():
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceOuter = _SourceOuter()):  # noqa: B008
+        return x
+
+    with pytest.raises(CoercionError, match="Cannot combine"):
+        app(["--x", '{"inner": false}', "--x.inner.a", "2"], exit_on_error=False)
