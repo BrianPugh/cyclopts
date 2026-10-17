@@ -258,7 +258,7 @@ class Argument:
                 self._accepts_keywords = True
                 self._update_lookup(field_infos)
             elif is_namedtuple(hint):
-                self._missing_keys_checker = missing_keys_factory(_generic_class_field_infos)
+                self._missing_keys_checker = missing_keys_factory(get_field_infos)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple without type annotations.")
@@ -979,7 +979,7 @@ class Argument:
                     for descendant in child.children_recursive:
                         descendant._marked = True
 
-            self._run_missing_keys_checker(data)
+            self._run_missing_keys_checker(data, explicit_empty_mapping=explicit_empty_mapping)
 
             member = None
             if self._union_branches and (data or explicit_empty_mapping):
@@ -1609,8 +1609,8 @@ class Argument:
         data = dict.fromkeys(supplied_keys)
         return [argument for _, argument in self._resolve_missing_keys(data) if argument is not None]
 
-    def _run_missing_keys_checker(self, data):
-        if not self._missing_keys_checker or (not self.required and not data):
+    def _run_missing_keys_checker(self, data, explicit_empty_mapping: bool = False):
+        if not self._missing_keys_checker or (not self.required and not data and not explicit_empty_mapping):
             return
         for keys, argument in self._resolve_missing_keys(data):
             if argument is not None:
