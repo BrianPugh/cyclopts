@@ -746,3 +746,143 @@ def test_union_bool_class_same_source_mix_errors():
 
     with pytest.raises(CoercionError, match="Cannot combine"):
         app(["--x", "--x.a", "9"], exit_on_error=False)
+
+
+def _source_app(*configs):
+    from cyclopts import App
+
+    app = App(config=list(configs), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser | bool = False):
+        return x
+
+    return app
+
+
+@pytest.mark.parametrize(
+    "first, second, expected",
+    [
+        ({"x": False}, {"x": {"a": 2}}, False),
+        ({"x": {"a": 2}}, {"x": False}, _SourceUser(a=2)),
+    ],
+)
+def test_union_bool_class_earlier_config_wins_same_source_label(first, second, expected):
+    """2 ``Dict`` configs share the ``"dict"`` source label but are still separate sources."""
+    from cyclopts.config import Dict
+
+    assert _source_app(Dict(first), Dict(second))([], exit_on_error=False) == expected
+
+
+@pytest.mark.parametrize(
+    "configs, env, cmd, expected",
+    [
+        ((), {"APP_X": "false"}, ["--x.a", "9"], _SourceUser(a=9)),
+        ((), {"APP_X_A": "2"}, ["--no-x"], False),
+        (({"x": {"a": 2}},), {"APP_X": "false"}, [], _SourceUser(a=2)),
+        (({"x": False},), {"APP_X_A": "2"}, [], False),
+    ],
+)
+def test_union_bool_class_config_env_precedence(monkeypatch, configs, env, cmd, expected):
+    """``config.Env`` follows the same whole-parameter precedence as the other sources."""
+    from cyclopts.config import Dict, Env
+
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    app = _source_app(*(Dict(c) for c in configs), Env("APP_"))
+    assert app(cmd, exit_on_error=False) == expected
+
+
+def test_union_bool_class_config_env_same_source_mix_errors(monkeypatch):
+    from cyclopts.config import Env
+
+    monkeypatch.setenv("APP_X", "false")
+    monkeypatch.setenv("APP_X_A", "2")
+    with pytest.raises(CoercionError, match="Cannot combine"):
+        _source_app(Env("APP_"))([], exit_on_error=False)
+
+
+@pytest.mark.parametrize("hint", [_SourceUser, _SourceUser | None])
+def test_class_json_merges_fields_from_other_source(hint):
+    """A JSON object for a plain class still merges with field values from another source."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"b": "q"}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: hint = None):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app(["--x", '{"a": 9}'], exit_on_error=False) == _SourceUser(a=9, b="q")
+
+
+def test_class_env_var_json_merges_cli_field(monkeypatch):
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceUser, Parameter(env_var="X")]):
+        return x
+
+    monkeypatch.setenv("X", '{"b": "q"}')
+    assert app(["--x.a", "9"], exit_on_error=False) == _SourceUser(a=9, b="q")
+
+
+def test_class_config_json_string_merges_cli_field():
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": '{"b": "q"}'}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser):
+        return x
+
+    assert app(["--x.a", "9"], exit_on_error=False) == _SourceUser(a=9, b="q")
+
+
+class _SourcePermission(Flag):
+    READ = auto()
+    WRITE = auto()
+
+
+@pytest.mark.parametrize(
+    "cmd, config, env",
+    [
+        (["--x", "read"], {"x": {"write": True}}, {}),
+        (["--x.write"], {"x": "read"}, {}),
+        (["--x.write"], {}, {"X": "read"}),
+    ],
+)
+def test_enum_flag_combines_across_sources(monkeypatch, cmd, config, env):
+    """A plain ``enum.Flag`` keeps OR-ing values from different sources."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourcePermission, Parameter(env_var="X")] = _SourcePermission(0)):
+        return x
+
+    assert app(cmd, exit_on_error=False) == _SourcePermission.READ | _SourcePermission.WRITE
+
+
+@pytest.mark.parametrize("hint", [_SourceUser, _SourceUser | bool, _SourceUser | None])
+def test_class_extra_positional_token_is_unused(hint):
+    """An extra value after ``--x 1`` is reported as unused, not as a ``--x.<field>`` conflict."""
+    from cyclopts import App
+    from cyclopts.exceptions import UnusedCliTokensError
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(x: hint = None):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(UnusedCliTokensError, match=r"\['2'\]"):
+        app(["--x", "1", "2"], exit_on_error=False)
