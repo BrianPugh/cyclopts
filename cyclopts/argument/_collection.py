@@ -852,6 +852,7 @@ def update_argument_collection(
     *,
     root_keys: Iterable[str],
     allow_unknown: bool,
+    native_values: bool = False,
 ):
     """Updates an argument collection with values from a configuration dictionary.
 
@@ -880,6 +881,9 @@ def update_argument_collection(
         Base path keys to prepend to all configuration keys.
     allow_unknown : bool
         If True, ignore unrecognized configuration keys instead of raising errors.
+    native_values : bool
+        Keep non-string values (numbers, booleans, lists) as each token's ``implicit_value``.
+        For JSON destined for a pydantic ``TypeAdapter``, so strict fields see the decoded types.
 
     Raises
     ------
@@ -965,6 +969,20 @@ def update_argument_collection(
                     argument=argument,
                     target_type=hint,
                 )
+
+            if native_values and value is not None and not isinstance(value, str):
+                import json
+
+                argument.append(
+                    Token(
+                        keyword=complete_keyword,
+                        value=json.dumps(value),
+                        implicit_value=value,
+                        source=source,
+                        keys=remaining_keys,
+                    )
+                )
+                continue
 
             if not is_iterable(value):
                 value = (value,)

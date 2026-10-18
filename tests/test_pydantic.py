@@ -1450,3 +1450,49 @@ def test_pydantic_cli_json_alias_beats_config_field_name():
         return x
 
     assert app(["--x", '{"userName": "CLI"}'], exit_on_error=False).full_name == "CLI"
+
+
+class _StrictInner(BaseModel):
+    a: pydantic.StrictInt
+
+
+class _StrictOuter(BaseModel):
+    inner: _StrictInner
+
+
+def test_pydantic_nested_cli_json_keeps_native_leaf_types():
+    """CLI JSON on a nested model reaches pydantic with its native types, so strict fields accept it."""
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(outer: _StrictOuter):
+        return outer
+
+    assert app(["--outer.inner", '{"a": 2}'], exit_on_error=False) == _StrictOuter(inner=_StrictInner(a=2))
+
+
+def test_pydantic_json_dict_false_keeps_native_leaf_types():
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(x: Annotated[_StrictInner, Parameter(json_dict=False)]):
+        return x
+
+    assert app(["--x", '{"a": 2}'], exit_on_error=False) == _StrictInner(a=2)
+
+
+def test_pydantic_config_json_string_keeps_native_leaf_types():
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"outer": {"inner": '{"a": 2}'}}), result_action="return_value")
+
+    @app.default
+    def main(outer: _StrictOuter):
+        return outer
+
+    assert app([], exit_on_error=False) == _StrictOuter(inner=_StrictInner(a=2))

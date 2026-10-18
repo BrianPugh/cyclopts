@@ -789,6 +789,7 @@ class Argument:
                     self.children_recursive,
                     root_keys=(),
                     allow_unknown=False,
+                    native_values=self._use_pydantic_type_adapter,
                 )
             else:
                 explicit_empty_mapping = True

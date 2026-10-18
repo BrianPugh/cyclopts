@@ -624,6 +624,29 @@ def test_env_var_does_not_populate_active_argument(monkeypatch):
     assert seen == {"index": 0, "provided": False}
 
 
+def test_env_var_json_does_not_populate_active_composite_argument(monkeypatch):
+    """An env JSON object for a composite argument being completed must not land on its fields."""
+
+    @dataclass
+    class Point:
+        a: int = 0
+
+    app = App(name="myapp")
+    seen = {}
+
+    def complete_point(ctx):
+        seen["provided"] = ctx["point"].provided
+        return ["c"]
+
+    @app.command
+    def d(*, point: Annotated[Point, Parameter(env_var="MYAPP_POINT", completer=complete_point)] = Point()):  # noqa: B008
+        pass
+
+    monkeypatch.setenv("MYAPP_POINT", '{"a": 1}')
+    compute_completions(app, ["d", "--point", ""])
+    assert seen == {"provided": False}
+
+
 def test_sibling_value_falls_back_to_default():
     """An untyped sibling's ``.value`` is its parameter default (the docs' Dependent Completions example)."""
     app = App(name="myapp")
