@@ -1372,6 +1372,63 @@ def test_pydantic_union_bool_flag_runs_annotation_validators(app):
         app.parse_args("--x", print_error=False, exit_on_error=False)
 
 
+class _FlagOuter(BaseModel):
+    inner: _FlagModel | bool = False
+
+
+@pytest.mark.parametrize(
+    "cmd,expected",
+    [
+        ("--x.inner", True),
+        ("--x.no-inner", False),
+        ("--x.inner=false", False),
+        ("--x.inner false", False),
+        ("""--x '{"inner": false}'""", False),
+        ("""--x '{"inner": true}'""", True),
+        ("--x.inner.a 1", _FlagModel(a=1)),
+    ],
+)
+def test_pydantic_nested_union_bool_flag(app, assert_parse_args, cmd, expected):
+    """A nested ``Model | bool`` field acts as a flag when given no keys, like a top-level one."""
+
+    @app.default
+    def default(*, x: _FlagOuter = _FlagOuter()):  # noqa: B008
+        pass
+
+    assert_parse_args(default, cmd, x=_FlagOuter(inner=expected))
+
+
+@pytest.mark.parametrize("cmd", ["--x.inner --x.inner.a 1", "--x.no-inner --x.inner.a 1"])
+def test_pydantic_nested_union_bool_flag_mixed_with_keys(app, cmd):
+    @app.default
+    def default(*, x: _FlagOuter = _FlagOuter()):  # noqa: B008
+        pass
+
+    with pytest.raises(CoercionError, match="Cannot combine"):
+        app.parse_args(cmd, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "config,cmd,expected",
+    [
+        ({"x": {"inner": False}}, [], False),
+        ({"x": {"inner": {"a": 3}}}, ["--x.no-inner"], False),
+        ({"x": {"inner": False}}, ["--x.inner.a", "3"], _FlagModel(a=3)),
+    ],
+)
+def test_pydantic_nested_union_bool_flag_across_sources(config, cmd, expected):
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: _FlagOuter = _FlagOuter()):  # noqa: B008
+        return x
+
+    assert app(cmd, exit_on_error=False) == _FlagOuter(inner=expected)
+
+
 def test_pydantic_json_dict_false_accepts_json_object(app):
     """``json_dict=False`` on a pydantic model still accepts a JSON object, like a dataclass does."""
 

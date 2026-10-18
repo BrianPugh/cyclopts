@@ -806,21 +806,13 @@ class Argument:
                     # Persist the canonicalized tokens so ``_json`` (and pydantic) see the
                     # listed spelling rather than the raw input (e.g. Enum ``RED`` -> ``red``).
                     child.tokens = child._validate_choices(child._expand_json_list_tokens(child.tokens))
-            # ``_json`` decodes JSON objects.
-            keyless = [token for token in self.tokens if not token.keys and not _is_json_object_token(token)]
-            if keyless:
-                # e.g. ``--x`` or ``--x=false`` on ``Model | bool``; ``_json`` only handles keyed tokens.
-                self._claim_children_for_keyless_value()
-                if len(keyless) != len(self.tokens):
-                    raise self._keyless_and_keyed_error()
-                values = [token.value if token.implicit_value is UNSET else token.implicit_value for token in keyless]
-                unstructured_data = values[0] if len(values) == 1 else values
-            else:
+            unstructured_data = keyless_value = self._keyless_json_value()
+            if keyless_value is UNSET:
                 unstructured_data = self._json()
             try:
                 return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
             except pydantic.ValidationError as e:
-                self._handle_pydantic_validation_error(e, value=unstructured_data if keyless else UNSET)
+                self._handle_pydantic_validation_error(e, value=keyless_value)
         else:
             return UNSET
 
@@ -1459,6 +1451,20 @@ class Argument:
             return None
         return normalize_completions(completer(context))
 
+    def _keyless_json_value(self) -> Any:
+        """The whole value given without keys (e.g. ``--x`` or ``--x=false`` on ``Model | bool``); ``UNSET`` if none.
+
+        ``_json`` decodes JSON objects, so those don't count.
+        """
+        keyless = [token for token in self.tokens if not token.keys and not _is_json_object_token(token)]
+        if not keyless:
+            return UNSET
+        self._claim_children_for_keyless_value()
+        if len(keyless) != len(self.tokens):
+            raise self._keyless_and_keyed_error()
+        values = [token.value if token.implicit_value is UNSET else token.implicit_value for token in keyless]
+        return values[0] if len(values) == 1 else values
+
     def _json(self) -> dict:
         """Convert argument to be json-like for pydantic.
 
@@ -1486,6 +1492,9 @@ class Argument:
             if child._explicit_none:
                 out[keys[0]] = None
             elif child._accepts_keywords:
+                if (value := child._keyless_json_value()) is not UNSET:
+                    out[keys[0]] = value
+                    continue
                 result = child._json()
                 if result or any(not token.keys for token in child.tokens):
                     out.setdefault(keys[0], {}).update(result)
