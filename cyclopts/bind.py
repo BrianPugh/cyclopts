@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, get_args
 from cyclopts._convert import _bool, _none, create_empty_instance
 from cyclopts.annotations import is_nonetype, is_union
 from cyclopts.argument import Argument, ArgumentCollection
-from cyclopts.argument._collection import _SourceBlocks, update_argument_collection
+from cyclopts.argument._collection import earlier_source_filter, expand_json_objects
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
@@ -1178,11 +1178,8 @@ def _parent_supplied_as_keyword(argument: Argument, argument_collection: Argumen
 
 
 def _parse_env(argument_collection: ArgumentCollection):
-    blocks = _SourceBlocks.from_arguments(argument_collection)
+    rejects = earlier_source_filter(argument_collection)
     for argument in argument_collection:
-        if argument.tokens:
-            # Don't check environment variables for parameters that already have values from CLI.
-            continue
         assert argument.parameter.env_var is not None
         for env_var_name in argument.parameter.env_var:
             try:
@@ -1190,21 +1187,22 @@ def _parse_env(argument_collection: ArgumentCollection):
             except KeyError:
                 pass
             else:
-                if blocks.rejects(argument, (), env_var_value):
-                    break
-                if (parsed := blocks.json_to_expand(argument, (), env_var_value)) is not None:
-                    update_argument_collection(
-                        {argument.name.lstrip("-"): parsed},
-                        "env",
-                        argument_collection,
-                        root_keys=(),
-                        allow_unknown=False,
-                        blocks=blocks,
-                    )
+                if rejects(argument, (), env_var_value):
                     break
                 for index, value in enumerate(argument._split_env_value(env_var_value)):
                     argument.tokens.append(Token(keyword=env_var_name, value=value, index=index, source="env"))
                 break
+
+
+def _apply_sources(argument_collection: ArgumentCollection, configs):
+    """Add env-var, then config values; each source fills only what earlier sources left unset."""
+    expand_json_objects(argument_collection)
+    _parse_env(argument_collection)
+    expand_json_objects(argument_collection)
+    for config in configs:
+        # Each ``config`` is a partial that already has apps and commands provided.
+        config(argument_collection)
+        expand_json_objects(argument_collection)
 
 
 def _bind(
@@ -1217,12 +1215,6 @@ def _bind(
         if argument.value is not UNSET:
             bound.arguments[argument.field_info.name] = argument.value
     return bound
-
-
-def _parse_configs(argument_collection: ArgumentCollection, configs):
-    for config in configs:
-        # Each ``config`` is a partial that already has apps and commands provided.
-        config(argument_collection)
 
 
 def _sort_group(argument_collection) -> list[tuple["Group", ArgumentCollection]]:
@@ -1310,8 +1302,7 @@ def create_bound_arguments(
         if leftover_kw_tokens:
             unused_tokens = leftover_kw_tokens + unused_tokens
 
-        _parse_env(argument_collection)
-        _parse_configs(argument_collection, configs)
+        _apply_sources(argument_collection, configs)
 
         argument_collection._convert()
         groups_with_arguments = _sort_group(argument_collection)

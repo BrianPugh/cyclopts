@@ -6,8 +6,6 @@ import itertools
 from collections.abc import Callable, Iterable, Sequence
 from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
 
-from attrs import define, field
-
 if TYPE_CHECKING:
     from cyclopts.core import App
 
@@ -785,9 +783,18 @@ def _is_valid_option_key(option_key: str, arguments: "ArgumentCollection") -> bo
     )
 
 
+def _decodes_json_object(argument: Argument, value: str) -> bool:
+    if argument._use_pydantic_type_adapter:
+        # ``Argument._convert_pydantic`` decodes a JSON object regardless of ``json_dict``.
+        return value.lstrip().startswith("{")
+    return argument._should_attempt_json_dict([value])
+
+
 def _is_keyless_value(argument: Argument, value: Any) -> bool:
-    """A whole value (e.g. ``false``), as opposed to a JSON object that merges with ``--x.<field>`` values."""
+    """A whole value (e.g. ``false``) for a composite ``argument``, as opposed to a JSON object or a field value."""
     if isinstance(value, Token):
+        if value.keys:
+            return False
         if value.implicit_value is not UNSET:
             return not isinstance(value.implicit_value, dict)
         value = value.value
@@ -796,114 +803,45 @@ def _is_keyless_value(argument: Argument, value: Any) -> bool:
     return not (isinstance(value, str) and _decodes_json_object(argument, value))
 
 
-def _decodes_json_object(argument: Argument, value: str) -> bool:
-    if argument._use_pydantic_type_adapter:
-        # ``Argument._convert_pydantic`` decodes a JSON object regardless of ``json_dict``.
-        return value.lstrip().startswith("{")
-    return argument._should_attempt_json_dict([value])
+def expand_json_objects(arguments: "ArgumentCollection"):
+    """Expand keyless JSON-object tokens into the fields they set, so a later source can see which are taken."""
+    for argument in sorted(arguments, key=lambda a: len(a.keys)):
+        argument._expand_json_object_tokens()
 
 
-def _field_names(argument: Argument, descendants: ArgumentCollection) -> dict[int, list[set[str]]]:
-    """Per descendant, the names (field name and aliases) that select it at each level below ``argument``."""
-    by_keys = {child.keys: child for child in descendants}
-    return {
-        id(child): [
-            {child.keys[i], *by_keys[child.keys[: i + 1]].field_info.names}
-            for i in range(len(argument.keys), len(child.keys))
-        ]
-        for child in descendants
-    }
+def earlier_source_filter(arguments: Iterable[Argument]) -> Callable[[Argument, tuple[str, ...], Any], bool]:
+    """Build a predicate: whether earlier sources' tokens (already expanded per field) win over a new value.
 
-
-@define
-class _SourceBlocks:
-    """What a lower-precedence source may not set, given the tokens earlier sources already supplied.
-
-    The earlier source wins for each field: a keyless value (e.g. ``--no-x`` on ``Foo | bool``) replaces
-    every ``--x.<field>``; a JSON object replaces only the fields it sets (a ``dict`` field as a whole);
-    and ``--x.<field>`` values reject a later keyless value but still merge with a later JSON object.
-    ``enum.Flag`` values combine.
+    Each source fills only what earlier sources left unset. An argument with tokens keeps them; a keyless value (e.g. ``--no-x``) also keeps every ``--x.<field>``;
+    and ``--x.<field>`` values reject a later keyless value. ``enum.Flag`` values combine.
     """
+    arguments = list(arguments)
+    taken: set[int] = set()
+    rejects_keyless: set[int] = set()
+    for argument in arguments:
+        if not argument.tokens:
+            continue
+        taken.add(id(argument))
+        if (
+            argument.children
+            and not argument._enum_flag_type
+            and any(_is_keyless_value(argument, token) for token in argument.tokens)
+        ):
+            taken.update(id(child) for child in argument.children_recursive)
+    for argument in arguments:
+        if (
+            argument.children
+            and not argument._enum_flag_type
+            and any(child.tokens for child in argument.children_recursive)
+        ):
+            rejects_keyless.add(id(argument))
 
-    any_value: set[int] = field(factory=set)
-    """Ids of arguments that reject any value."""
-
-    keyless_value: set[int] = field(factory=set)
-    """Ids of arguments that reject a keyless value only."""
-
-    @classmethod
-    def from_arguments(cls, arguments: Iterable[Argument], ignore_source: str | None = None) -> "_SourceBlocks":
-        """Build from ``arguments``' current tokens; call before a source adds its own.
-
-        ``ignore_source`` skips that source's tokens, so they still conflict (and error) instead of blocking.
-        """
-        blocks = cls()
-        for argument in arguments:
-            if not argument.children or argument._enum_flag_type:
-                continue
-            descendants = argument.children_recursive
-            if any(token.source != ignore_source for child in descendants for token in child.tokens):
-                blocks.keyless_value.add(id(argument))
-            for token in argument.tokens:
-                if token.keys or token.source == ignore_source:
-                    continue
-                if _is_keyless_value(argument, token):
-                    blocks.any_value.update(id(child) for child in descendants)
-                    continue
-                if token.implicit_value is not UNSET:
-                    continue  # ``{}``
-                import json
-
-                try:
-                    paths = [path for path, _ in walk_leaves(json.loads(token.value)) if path]
-                except json.JSONDecodeError:
-                    continue  # Reported when the token is converted.
-                names = _field_names(argument, descendants)
-                by_keys = {child.keys: child for child in descendants}
-                for child in descendants:
-                    child_names = names[id(child)]
-                    for path in paths:
-                        if not all(key in options for key, options in zip(path, child_names, strict=False)):
-                            continue
-                        target = by_keys.get(child.keys[: len(argument.keys) + len(path)])
-                        if target is not None and target._enum_flag_type:
-                            # A whole ``enum.Flag`` value combines with a later source's member fields.
-                            if target is child:
-                                blocks.keyless_value.add(id(child))
-                            continue
-                        if len(path) <= len(child_names) or not child.children:
-                            # The JSON sets this field, or an entry of this ``dict`` field.
-                            blocks.any_value.add(id(child))
-                        else:
-                            blocks.keyless_value.add(id(child))
-        return blocks
-
-    def rejects(self, argument: Argument, remaining_keys: tuple[str, ...], value: Any) -> bool:
-        return id(argument) in self.any_value or (
-            id(argument) in self.keyless_value and not remaining_keys and _is_keyless_value(argument, value)
+    def rejects(argument: Argument, remaining_keys: tuple[str, ...], value: Any) -> bool:
+        return id(argument) in taken or (
+            id(argument) in rejects_keyless and not remaining_keys and _is_keyless_value(argument, value)
         )
 
-    def json_to_expand(self, argument: Argument, remaining_keys: tuple[str, ...], value: Any) -> dict | None:
-        """A JSON object to expand into ``argument``'s fields right away, so each defers to earlier sources.
-
-        Needed when earlier sources already set some of those fields; otherwise the object is kept
-        whole and expanded at conversion.
-        """
-        if (
-            remaining_keys
-            or not argument.children
-            or id(argument) not in self.keyless_value
-            or not isinstance(value, str)
-            or not _decodes_json_object(argument, value)
-        ):
-            return None
-        import json
-
-        try:
-            parsed = json.loads(value)
-        except json.JSONDecodeError:
-            return None  # Reported when the token is converted.
-        return parsed if isinstance(parsed, dict) and parsed else None
+    return rejects
 
 
 def update_argument_collection(
@@ -914,8 +852,6 @@ def update_argument_collection(
     *,
     root_keys: Iterable[str],
     allow_unknown: bool,
-    blocked_by_other_sources_only: bool = False,
-    blocks: _SourceBlocks | None = None,
 ):
     """Updates an argument collection with values from a configuration dictionary.
 
@@ -944,12 +880,6 @@ def update_argument_collection(
         Base path keys to prepend to all configuration keys.
     allow_unknown : bool
         If True, ignore unrecognized configuration keys instead of raising errors.
-    blocked_by_other_sources_only : bool
-        Let tokens already supplied by ``source`` itself conflict instead of taking precedence;
-        set when expanding a JSON value whose fields other sources may have filled in since.
-    blocks : _SourceBlocks | None
-        What earlier sources block, snapshotted before ``source`` added any tokens. Defaults to
-        a snapshot of ``arguments``' current tokens.
 
     Raises
     ------
@@ -962,117 +892,107 @@ def update_argument_collection(
     precedence over configuration files.
     """
     meta_arguments = _meta_arguments(apps or ())
-    if blocks is None:
-        blocks = _SourceBlocks.from_arguments(
-            arguments, ignore_source=source if blocked_by_other_sources_only else None
-        )
+    rejects = earlier_source_filter(arguments)
 
-    do_not_update = {}
+    for option_key, option_value in config.items():
+        for subkeys, value in walk_leaves(option_value):
+            cli_option_name = to_cli_option_name(option_key, *subkeys)
+            complete_keyword = "".join(f"[{k}]" for k in itertools.chain(root_keys, (option_key,), subkeys))
 
-    # Popped from the end; a JSON value expanded below pushes its own leaves.
-    leaves = [(key, subkeys, value) for key, tree in config.items() for subkeys, value in walk_leaves(tree)][::-1]
-    while leaves:
-        option_key, subkeys, value = leaves.pop()
-        cli_option_name = to_cli_option_name(option_key, *subkeys)
-        complete_keyword = "".join(f"[{k}]" for k in itertools.chain(root_keys, (option_key,), subkeys))
+            try:
+                meta_arguments.match(cli_option_name)
+                continue
+            except ValueError:
+                pass
 
-        try:
-            meta_arguments.match(cli_option_name)
-            continue
-        except ValueError:
-            pass
-
-        argument = None
-        remaining_keys = ()
-        try:
-            argument, remaining_keys, _ = arguments.match(cli_option_name)
-        except ValueError:
-            if subkeys and _is_valid_option_key(option_key, arguments):
-                for arg in arguments:
-                    if len(subkeys) != len(arg.keys):
-                        continue
-
-                    all_match = True
-                    for i, (subkey, arg_key) in enumerate(zip(subkeys, arg.keys, strict=False)):
-                        if subkey == arg_key:
+            argument = None
+            remaining_keys = ()
+            try:
+                argument, remaining_keys, _ = arguments.match(cli_option_name)
+            except ValueError:
+                if subkeys and _is_valid_option_key(option_key, arguments):
+                    for arg in arguments:
+                        if len(subkeys) != len(arg.keys):
                             continue
 
-                        if i == len(arg.keys) - 1:
-                            if subkey not in arg.field_info.names:
-                                all_match = False
-                                break
-                        else:
-                            parent_keys = arg.keys[: i + 1]
-                            alias_found = False
-                            for parent_arg in arguments:
-                                if parent_arg.keys == parent_keys and subkey in parent_arg.field_info.names:
-                                    alias_found = True
+                        all_match = True
+                        for i, (subkey, arg_key) in enumerate(zip(subkeys, arg.keys, strict=False)):
+                            if subkey == arg_key:
+                                continue
+
+                            if i == len(arg.keys) - 1:
+                                if subkey not in arg.field_info.names:
+                                    all_match = False
                                     break
-                            if not alias_found:
-                                all_match = False
-                                break
+                            else:
+                                parent_keys = arg.keys[: i + 1]
+                                alias_found = False
+                                for parent_arg in arguments:
+                                    if parent_arg.keys == parent_keys and subkey in parent_arg.field_info.names:
+                                        alias_found = True
+                                        break
+                                if not alias_found:
+                                    all_match = False
+                                    break
 
-                    if all_match:
-                        argument = arg
-                        remaining_keys = ()
-                        break
+                        if all_match:
+                            argument = arg
+                            remaining_keys = ()
+                            break
 
-        if not argument:
-            if allow_unknown:
+            if not argument:
+                if allow_unknown:
+                    continue
+                if apps and apps[-1]._meta_parent:
+                    continue
+                raise UnknownOptionError(
+                    token=Token(keyword=complete_keyword, source=source), argument_collection=arguments
+                ) from None
+
+            if rejects(argument, remaining_keys, value):
                 continue
-            if apps and apps[-1]._meta_parent:
-                continue
-            raise UnknownOptionError(
-                token=Token(keyword=complete_keyword, source=source), argument_collection=arguments
-            ) from None
 
-        if do_not_update.setdefault(id(argument), bool(argument.tokens)):
-            continue
-        if blocks.rejects(argument, remaining_keys, value):
-            continue
-        if (parsed := blocks.json_to_expand(argument, remaining_keys, value)) is not None:
-            leaves.extend([(option_key, (*subkeys, *path), v) for path, v in walk_leaves(parsed)][::-1])
-            continue
+            if isinstance(value, list) and value and (hint := argument._scalar_hint(remaining_keys)) is not None:
+                import json
 
-        if isinstance(value, list) and value and (hint := argument._scalar_hint(remaining_keys)) is not None:
-            import json
-
-            raise CoercionError(
-                token=Token(
-                    keyword=complete_keyword,
-                    value=json.dumps(value, default=str),
-                    source=source,
-                    keys=remaining_keys,
-                ),
-                argument=argument,
-                target_type=hint,
-            )
-
-        if not is_iterable(value):
-            value = (value,)
-
-        if value:
-            for i, v in enumerate(value):
-                if v is None:
-                    token = Token(
+                raise CoercionError(
+                    token=Token(
                         keyword=complete_keyword,
-                        implicit_value=None,
+                        value=json.dumps(value, default=str),
                         source=source,
-                        index=i,
                         keys=remaining_keys,
-                    )
-                else:
-                    if isinstance(v, dict | list):
-                        # Serialize to JSON string; will be deserialized in Argument._json()
-                        import json
+                    ),
+                    argument=argument,
+                    target_type=hint,
+                )
 
-                        value_str = json.dumps(v)
+            if not is_iterable(value):
+                value = (value,)
+
+            if value:
+                for i, v in enumerate(value):
+                    if v is None:
+                        token = Token(
+                            keyword=complete_keyword,
+                            implicit_value=None,
+                            source=source,
+                            index=i,
+                            keys=remaining_keys,
+                        )
                     else:
-                        value_str = str(v)
-                    token = Token(
-                        keyword=complete_keyword, value=value_str, source=source, index=i, keys=remaining_keys
-                    )
+                        if isinstance(v, dict | list):
+                            # Serialize to JSON string; will be deserialized in Argument._json()
+                            import json
+
+                            value_str = json.dumps(v)
+                        else:
+                            value_str = str(v)
+                        token = Token(
+                            keyword=complete_keyword, value=value_str, source=source, index=i, keys=remaining_keys
+                        )
+                    argument.append(token)
+            else:
+                token = Token(
+                    keyword=complete_keyword, implicit_value=value, source=source, index=0, keys=remaining_keys
+                )
                 argument.append(token)
-        else:
-            token = Token(keyword=complete_keyword, implicit_value=value, source=source, index=0, keys=remaining_keys)
-            argument.append(token)

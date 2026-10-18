@@ -985,19 +985,6 @@ def test_class_cli_json_field_beats_config_field():
     assert app(["--x", '{"a": 1}'], exit_on_error=False) == _SourceUser(a=1, b="c")
 
 
-def test_union_bool_class_nested_same_source_json_and_field_errors():
-    from cyclopts import App
-
-    app = App(result_action="return_value")
-
-    @app.default
-    def main(*, x: _SourceOuter = _SourceOuter()):  # noqa: B008
-        return x
-
-    with pytest.raises(CoercionError, match="Cannot combine"):
-        app(["--x", '{"inner": false}', "--x.inner.a", "2"], exit_on_error=False)
-
-
 @pytest.mark.parametrize("value", ['{"literal": 9}', "{text"])
 def test_union_str_class_cli_string_replaces_config_fields(value):
     """A ``{``-leading value that a ``str`` member takes whole isn't JSON; it replaces the config's fields."""

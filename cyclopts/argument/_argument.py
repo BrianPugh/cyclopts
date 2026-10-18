@@ -759,6 +759,43 @@ class Argument:
             target_type=self.hint,
         )
 
+    def _expand_json_object_tokens(self) -> bool:
+        """Expand keyless JSON-object tokens into the fields they set; return whether one was an empty ``{}``."""
+        from cyclopts.argument._collection import _decodes_json_object, update_argument_collection
+
+        if not self.children:
+            return False
+        json_tokens = [
+            token
+            for token in self.tokens
+            if not token.keys and token.implicit_value is UNSET and _decodes_json_object(self, token.value)
+        ]
+        if not json_tokens:
+            return False
+        import json
+
+        explicit_empty_mapping = False
+        self.tokens = [token for token in self.tokens if token not in json_tokens]
+        for token in json_tokens:
+            try:
+                parsed_json = json.loads(token.value)
+            except json.JSONDecodeError as e:
+                raise CoercionError(token=token, target_type=self.hint) from e
+            _validate_json_extra_keys(parsed_json, self.resolved_hint, token)
+            if parsed_json:
+                update_argument_collection(
+                    {self.name.lstrip("-"): parsed_json},
+                    token.source,
+                    self.children_recursive,
+                    root_keys=(),
+                    allow_unknown=False,
+                )
+            else:
+                explicit_empty_mapping = True
+                # Placeholder so ``has_tokens`` still reports this argument as supplied.
+                self.tokens.append(token.evolve(value="", implicit_value={}))
+        return explicit_empty_mapping
+
     def _convert_pydantic(self):
         if self.has_tokens:
             import pydantic
@@ -787,8 +824,6 @@ class Argument:
             return UNSET
 
     def _convert(self, converter: Callable | None = None):
-        from cyclopts.argument._collection import update_argument_collection
-
         if self.parameter.converter:
             converter = self.parameter.resolve_converter(self.hint)
         # Children build their own default converter so it carries their own name.
@@ -913,29 +948,8 @@ class Argument:
                 converted_flags = safe_converter(self._enum_flag_type, self.tokens)
                 out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags
 
-            if self._should_attempt_json_dict():
-                import json
-
-                json_tokens, self.tokens = self.tokens, []
-                for token in json_tokens:
-                    try:
-                        parsed_json = json.loads(token.value)
-                    except json.JSONDecodeError as e:
-                        raise CoercionError(token=token, target_type=self.hint) from e
-                    _validate_json_extra_keys(parsed_json, self.resolved_hint, token)
-                    if parsed_json:
-                        update_argument_collection(
-                            {self.name.lstrip("-"): parsed_json},
-                            token.source,
-                            self.children_recursive,
-                            root_keys=(),
-                            allow_unknown=False,
-                            blocked_by_other_sources_only=True,
-                        )
-                    else:
-                        explicit_empty_mapping = True
-                        # Placeholder so ``has_tokens`` still reports this argument as supplied.
-                        self.tokens.append(token.evolve(value="", implicit_value={}))
+            if self._expand_json_object_tokens():
+                explicit_empty_mapping = True
 
             if self._use_pydantic_type_adapter:
                 return self._convert_pydantic()
