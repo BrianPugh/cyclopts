@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Flag, auto
 from pathlib import Path
 from textwrap import dedent
@@ -1060,3 +1060,84 @@ def test_union_bool_class_nested_cli_json_field_beats_config_env_json(monkeypatc
         return x
 
     assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceOuter(inner=_SourceUser(a=9, b="q"))
+
+
+def test_class_env_var_json_beats_later_config_env_json(monkeypatch):
+    """An ``env_var`` JSON keeps precedence over a later ``config.Env`` JSON for the fields it sets."""
+    from cyclopts import App
+    from cyclopts.config import Env
+
+    monkeypatch.setenv("OUTER_JSON", '{"inner": {"a": 9}}')
+    monkeypatch.setenv("APP_X_INNER", '{"a": 2, "b": "q"}')
+    app = App(config=Env("APP_"), result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceOuter, Parameter(env_var="OUTER_JSON")] = _SourceOuter()):  # noqa: B008
+        return x
+
+    assert app([], exit_on_error=False) == _SourceOuter(inner=_SourceUser(a=9, b="q"))
+
+
+@dataclass
+class _SourceEnvVarOuter:
+    inner: Annotated[_SourceUser | bool, Parameter(env_var="INNER")] = False
+
+
+@dataclass
+class _SourceEnvVarPlainOuter:
+    inner: Annotated[_SourceUser, Parameter(env_var="INNER")] = field(default_factory=_SourceUser)
+
+
+def test_nested_env_var_json_merges_with_cli_json(monkeypatch):
+    """CLI JSON for an outer class beats a nested field's ``env_var`` JSON for the fields it sets."""
+    from cyclopts import App
+
+    monkeypatch.setenv("INNER", '{"a": 2, "b": "q"}')
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceEnvVarOuter = _SourceEnvVarOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceEnvVarOuter(inner=_SourceUser(a=9, b="q"))
+
+
+def test_nested_env_var_json_merges_with_cli_json_plain_class(monkeypatch):
+    from cyclopts import App
+
+    monkeypatch.setenv("INNER", '{"a": 2, "b": "q"}')
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceEnvVarPlainOuter = _SourceEnvVarPlainOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceEnvVarPlainOuter(
+        inner=_SourceUser(a=9, b="q")
+    )
+
+
+@dataclass
+class _SourceFlagOuter:
+    perms: _SourcePermission = _SourcePermission(0)
+
+
+@pytest.mark.parametrize(
+    "config, expected",
+    [
+        ({"x": {"perms": {"write": True}}}, _SourcePermission.READ | _SourcePermission.WRITE),
+        ({"x": {"perms": "write"}}, _SourcePermission.READ),
+    ],
+)
+def test_enum_flag_in_outer_json_combines_across_sources(config, expected):
+    """A whole ``enum.Flag`` in CLI JSON combines with config members, and beats a whole config value."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceFlagOuter = _SourceFlagOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"perms": "read"}'], exit_on_error=False) == _SourceFlagOuter(perms=expected)

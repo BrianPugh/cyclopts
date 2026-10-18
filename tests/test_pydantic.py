@@ -1404,6 +1404,21 @@ def test_pydantic_json_merges_fields_from_other_source():
     assert app(["--x", '{"a": 1}'], exit_on_error=False) == _SourceModel(a=1, b=2)
 
 
+@pytest.mark.parametrize("config", [{"x": {"b": 2}}, {"x": {"a": 5, "b": 2}}])
+def test_pydantic_json_dict_false_json_merges_fields_from_other_source(config):
+    """``json_dict=False`` still decodes a JSON object for a model, so it merges like one."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceModel, Parameter(json_dict=False)] = _SourceModel()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"a": 1}'], exit_on_error=False) == _SourceModel(a=1, b=2)
+
+
 def test_pydantic_env_var_json_merges_cli_field(monkeypatch):
     from cyclopts import App
 

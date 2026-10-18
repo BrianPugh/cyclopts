@@ -793,7 +793,14 @@ def _is_keyless_value(argument: Argument, value: Any) -> bool:
         value = value.value
     if isinstance(value, dict):
         return False
-    return not (isinstance(value, str) and argument._should_attempt_json_dict([value]))
+    return not (isinstance(value, str) and _decodes_json_object(argument, value))
+
+
+def _decodes_json_object(argument: Argument, value: str) -> bool:
+    if argument._use_pydantic_type_adapter:
+        # ``Argument._convert_pydantic`` decodes a JSON object regardless of ``json_dict``.
+        return value.lstrip().startswith("{")
+    return argument._should_attempt_json_dict([value])
 
 
 def _field_names(argument: Argument, descendants: ArgumentCollection) -> dict[int, list[set[str]]]:
@@ -852,10 +859,17 @@ class _SourceBlocks:
                 except json.JSONDecodeError:
                     continue  # Reported when the token is converted.
                 names = _field_names(argument, descendants)
+                by_keys = {child.keys: child for child in descendants}
                 for child in descendants:
                     child_names = names[id(child)]
                     for path in paths:
                         if not all(key in options for key, options in zip(path, child_names, strict=False)):
+                            continue
+                        target = by_keys.get(child.keys[: len(argument.keys) + len(path)])
+                        if target is not None and target._enum_flag_type:
+                            # A whole ``enum.Flag`` value combines with a later source's member fields.
+                            if target is child:
+                                blocks.keyless_value.add(id(child))
                             continue
                         if len(path) <= len(child_names) or not child.children:
                             # The JSON sets this field, or an entry of this ``dict`` field.
@@ -880,7 +894,7 @@ class _SourceBlocks:
             or not argument.children
             or id(argument) not in self.keyless_value
             or not isinstance(value, str)
-            or not argument._should_attempt_json_dict([value])
+            or not _decodes_json_object(argument, value)
         ):
             return None
         import json
@@ -901,6 +915,7 @@ def update_argument_collection(
     root_keys: Iterable[str],
     allow_unknown: bool,
     blocked_by_other_sources_only: bool = False,
+    blocks: _SourceBlocks | None = None,
 ):
     """Updates an argument collection with values from a configuration dictionary.
 
@@ -932,6 +947,9 @@ def update_argument_collection(
     blocked_by_other_sources_only : bool
         Let tokens already supplied by ``source`` itself conflict instead of taking precedence;
         set when expanding a JSON value whose fields other sources may have filled in since.
+    blocks : _SourceBlocks | None
+        What earlier sources block, snapshotted before ``source`` added any tokens. Defaults to
+        a snapshot of ``arguments``' current tokens.
 
     Raises
     ------
@@ -944,7 +962,10 @@ def update_argument_collection(
     precedence over configuration files.
     """
     meta_arguments = _meta_arguments(apps or ())
-    blocks = _SourceBlocks.from_arguments(arguments, ignore_source=source if blocked_by_other_sources_only else None)
+    if blocks is None:
+        blocks = _SourceBlocks.from_arguments(
+            arguments, ignore_source=source if blocked_by_other_sources_only else None
+        )
 
     do_not_update = {}
 

@@ -65,7 +65,7 @@ class Env:
                     arguments,
                     root_keys=(),
                     allow_unknown=False,
-                    blocked_by_other_sources_only=True,
+                    blocks=blocks,
                 )
                 added_tokens.update(
                     token for child in argument.children_recursive for token in child.tokens if token not in before

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, get_args
 from cyclopts._convert import _bool, _none, create_empty_instance
 from cyclopts.annotations import is_nonetype, is_union
 from cyclopts.argument import Argument, ArgumentCollection
-from cyclopts.argument._collection import _SourceBlocks
+from cyclopts.argument._collection import _SourceBlocks, update_argument_collection
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
@@ -1191,6 +1191,16 @@ def _parse_env(argument_collection: ArgumentCollection):
                 pass
             else:
                 if blocks.rejects(argument, (), env_var_value):
+                    break
+                if (parsed := blocks.json_to_expand(argument, (), env_var_value)) is not None:
+                    update_argument_collection(
+                        {argument.name.lstrip("-"): parsed},
+                        "env",
+                        argument_collection,
+                        root_keys=(),
+                        allow_unknown=False,
+                        blocks=blocks,
+                    )
                     break
                 for index, value in enumerate(argument._split_env_value(env_var_value)):
                     argument.tokens.append(Token(keyword=env_var_name, value=value, index=index, source="env"))
