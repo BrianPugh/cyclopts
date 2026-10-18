@@ -1509,47 +1509,55 @@ def test_pydantic_cli_json_alias_beats_config_field_name():
     assert app(["--x", '{"userName": "CLI"}'], exit_on_error=False).full_name == "CLI"
 
 
-class _StrictInner(BaseModel):
-    a: pydantic.StrictInt
+class _ChoiceModel(BaseModel):
+    values: Annotated[list[int], Parameter(choices=["1", "2"])] = []
+    count: Annotated[int, Parameter(choices=["1", "2"])] = 1
 
 
-class _StrictOuter(BaseModel):
-    inner: _StrictInner
-
-
-def test_pydantic_nested_cli_json_keeps_native_leaf_types():
-    """CLI JSON on a nested model reaches pydantic with its native types, so strict fields accept it."""
+@pytest.mark.parametrize(
+    "payload,expected",
+    [
+        ('{"values": [1, 2]}', _ChoiceModel(values=[1, 2])),
+        ('{"count": 2}', _ChoiceModel(count=2)),
+    ],
+)
+def test_pydantic_json_list_and_choice_fields(payload, expected):
     from cyclopts import App
 
     app = App(result_action="return_value")
 
     @app.default
-    def main(outer: _StrictOuter):
-        return outer
-
-    assert app(["--outer.inner", '{"a": 2}'], exit_on_error=False) == _StrictOuter(inner=_StrictInner(a=2))
-
-
-def test_pydantic_json_dict_false_keeps_native_leaf_types():
-    from cyclopts import App
-
-    app = App(result_action="return_value")
-
-    @app.default
-    def main(x: Annotated[_StrictInner, Parameter(json_dict=False)]):
+    def main(*, x: _ChoiceModel = _ChoiceModel()):  # noqa: B008
         return x
 
-    assert app(["--x", '{"a": 2}'], exit_on_error=False) == _StrictInner(a=2)
+    assert app(["--x", payload], exit_on_error=False) == expected
 
 
-def test_pydantic_config_json_string_keeps_native_leaf_types():
+@pytest.mark.parametrize("payload", ['{"values": [1, 3]}', '{"count": 3}'])
+def test_pydantic_json_values_checked_against_choices(payload):
     from cyclopts import App
-    from cyclopts.config import Dict
 
-    app = App(config=Dict({"outer": {"inner": '{"a": 2}'}}), result_action="return_value")
+    app = App(result_action="return_value")
 
     @app.default
-    def main(outer: _StrictOuter):
-        return outer
+    def main(*, x: _ChoiceModel = _ChoiceModel()):  # noqa: B008
+        return x
 
-    assert app([], exit_on_error=False) == _StrictOuter(inner=_StrictInner(a=2))
+    with pytest.raises(CoercionError, match="Choose from"):
+        app(["--x", payload], exit_on_error=False)
+
+
+class _AliasOuter(BaseModel):
+    inner: _SourceAliasModel = _SourceAliasModel(userName="default")  # noqa: B008
+
+
+def test_pydantic_nested_cli_json_alias():
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _AliasOuter = _AliasOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x.inner", '{"userName": "Alice"}'], exit_on_error=False).inner.full_name == "Alice"
