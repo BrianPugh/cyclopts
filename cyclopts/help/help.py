@@ -607,7 +607,11 @@ def _resolve_metavar(argument: "Argument") -> str | None:
         and argument._accepts_keywords
         and (argument._accepts_arbitrary_keywords or argument.children)
     ):
-        return None
+        # ``--x 3`` on ``Foo | int`` still takes a value; ``--x`` on ``Foo | bool`` doesn't.
+        members = tuple(m for m in argument._whole_value_members if m is not bool)
+        if not members:
+            return None
+        hint = Union[members]  # noqa: UP007
     # An explicit ``Parameter.choices`` describes the leaf value exactly like a
     # ``Literal``/``Enum`` hint does, so the leaf renders as ``CHOICE`` (``CHOICE...`` for a
     # single-token collection, ``LIST[CHOICE]`` for a multi-token one), never the type name.

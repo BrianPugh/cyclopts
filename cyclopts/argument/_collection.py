@@ -4,12 +4,12 @@ import copy as copy_module
 import inspect
 import itertools
 from collections.abc import Callable, Iterable, Sequence
-from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
+from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, get_args, overload
 
 if TYPE_CHECKING:
     from cyclopts.core import App
 
-from cyclopts.annotations import get_hint_name, is_typeddict, is_unpack, resolve, resolve_unpack
+from cyclopts.annotations import get_hint_name, is_typeddict, is_union, is_unpack, resolve, resolve_unpack
 from cyclopts.exceptions import (
     CoercionError,
     UnknownOptionError,
@@ -20,7 +20,7 @@ from cyclopts.field_info import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, is_iterable
+from cyclopts.utils import UNSET, is_builtin, is_iterable
 
 from ._argument import Argument
 from .utils import (
@@ -432,7 +432,13 @@ class ArgumentCollection(list[Argument]):
         out.append(argument)
         if argument._accepts_keywords:
             # Use resolved_hint for extracting docstrings (needs a class, not Optional[class])
-            hint_docstring_lookup = extract_docstring_help(argument.resolved_hint) if parse_docstring else {}
+            hint_docstring_lookup = {}
+            if parse_docstring:
+                hint = argument.resolved_hint
+                # Earlier union members win, e.g. ``Foo``'s field docs on ``Foo | Bar``.
+                for member in reversed(get_args(hint) if is_union(hint) else (hint,)):
+                    if not is_builtin(member):
+                        hint_docstring_lookup.update(extract_docstring_help(member))
             hint_docstring_lookup.update(docstring_lookup)
 
             for sub_field_name, sub_field_info in argument._lookup.items():

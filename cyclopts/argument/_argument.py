@@ -1254,7 +1254,7 @@ class Argument:
         If an argument has child arguments, don't show it on the help-page.
         Returns False for arguments that won't be parsed (including underscore-prefixed params).
         """
-        if self.children:
+        if self.children and not self._whole_value_members:
             return False
         if self.parameter.show is not None:
             # User explicitly set show
@@ -1264,6 +1264,20 @@ class Argument:
             return False
         # Default to whether this argument is parsed
         return self.parse
+
+    @property
+    def _whole_value_members(self) -> tuple:
+        """Union members of a composite that take the whole value, e.g. ``bool`` in ``Foo | bool`` or ``int`` in ``Foo | int``."""
+        hint = self.resolved_hint
+        if not is_union(hint):
+            return ()
+        return tuple(
+            member
+            for member in get_args(hint)
+            if not is_nonetype(member)
+            and not get_field_infos(member)
+            and not is_class_and_subclass(get_origin(member) or member, Mapping)
+        )
 
     @property
     def parse(self) -> bool:
