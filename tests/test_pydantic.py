@@ -6,7 +6,17 @@ from typing import Annotated, Literal
 
 import pydantic
 import pytest
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, SecretBytes, SecretStr, model_validator, validate_call
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    SecretBytes,
+    SecretStr,
+    model_validator,
+    validate_call,
+)
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
@@ -1299,3 +1309,255 @@ def test_pydantic_config_null_non_nullable_model():
 
     with pytest.raises(CoercionError, match='unable to convert "null"'):
         app([], exit_on_error=False)
+
+
+class _FlagModel(BaseModel):
+    a: int
+    b: int = 2
+
+
+@pytest.mark.parametrize("hint", [_FlagModel | bool, bool | _FlagModel])
+@pytest.mark.parametrize(
+    "cmd,expected",
+    [
+        ("--x", True),
+        ("--no-x", False),
+        ("--x=true", True),
+        ("--x false", False),
+        ("--x.a 1", _FlagModel(a=1)),
+    ],
+)
+def test_pydantic_union_bool_flag(app, assert_parse_args, hint, cmd, expected):
+    """A union of ``bool`` and a pydantic model acts as a flag when given no keys (#990)."""
+
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
+
+
+@pytest.mark.parametrize("cmd", ["--x --x.a 1", "--x.a 1 --x", "--no-x --x.a 1", "--x=false --x.a 1"])
+def test_pydantic_union_bool_flag_mixed_with_keys(app, cmd):
+    """A bool value alongside ``--x.<field>`` is rejected, not silently dropped."""
+
+    @app.default
+    def default(*, x: _FlagModel | bool = False):
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(cmd, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize("cmd,expected", [("--x", True), ("--no-x", False)])
+def test_pydantic_union_bool_required_flag(app, assert_parse_args, cmd, expected):
+    @app.default
+    def default(*, x: _FlagModel | bool):
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
+
+
+def test_pydantic_union_bool_flag_runs_annotation_validators(app):
+    def reject_true(value):
+        if value is True:
+            raise ValueError("bare flag not allowed")
+        return value
+
+    @app.default
+    def default(*, x: Annotated[_FlagModel | bool, AfterValidator(reject_true)] = False):
+        pass
+
+    with pytest.raises(ValidationError, match="bare flag not allowed"):
+        app.parse_args("--x", print_error=False, exit_on_error=False)
+
+
+class _FlagOuter(BaseModel):
+    inner: _FlagModel | bool = False
+
+
+@pytest.mark.parametrize(
+    "cmd,expected",
+    [
+        ("--x.inner", True),
+        ("--x.no-inner", False),
+        ("--x.inner=false", False),
+        ("--x.inner false", False),
+        ("""--x '{"inner": false}'""", False),
+        ("""--x '{"inner": true}'""", True),
+        ("--x.inner.a 1", _FlagModel(a=1)),
+    ],
+)
+def test_pydantic_nested_union_bool_flag(app, assert_parse_args, cmd, expected):
+    """A nested ``Model | bool`` field acts as a flag when given no keys, like a top-level one."""
+
+    @app.default
+    def default(*, x: _FlagOuter = _FlagOuter()):  # noqa: B008
+        pass
+
+    assert_parse_args(default, cmd, x=_FlagOuter(inner=expected))
+
+
+@pytest.mark.parametrize("cmd", ["--x.inner --x.inner.a 1", "--x.no-inner --x.inner.a 1"])
+def test_pydantic_nested_union_bool_flag_mixed_with_keys(app, cmd):
+    @app.default
+    def default(*, x: _FlagOuter = _FlagOuter()):  # noqa: B008
+        pass
+
+    with pytest.raises(CoercionError, match="Cannot combine"):
+        app.parse_args(cmd, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "config,cmd,expected",
+    [
+        ({"x": {"inner": False}}, [], False),
+        ({"x": {"inner": {"a": 3}}}, ["--x.no-inner"], False),
+        ({"x": {"inner": False}}, ["--x.inner.a", "3"], _FlagModel(a=3)),
+    ],
+)
+def test_pydantic_nested_union_bool_flag_across_sources(config, cmd, expected):
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: _FlagOuter = _FlagOuter()):  # noqa: B008
+        return x
+
+    assert app(cmd, exit_on_error=False) == _FlagOuter(inner=expected)
+
+
+def test_pydantic_json_dict_false_accepts_json_object(app):
+    """``json_dict=False`` on a pydantic model still accepts a JSON object, like a dataclass does."""
+
+    class Model(BaseModel):
+        a: int = 1
+
+    @app.default
+    def main(x: Annotated[Model, Parameter(json_dict=False)] = Model()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"a": 2}'], exit_on_error=False) == Model(a=2)
+
+
+class _SourceModel(BaseModel):
+    a: int = 0
+    b: int = 0
+
+
+def test_pydantic_json_merges_fields_from_other_source():
+    """A JSON object for a plain model still merges with field values from another source."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"b": 2}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceModel = _SourceModel()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"a": 1}'], exit_on_error=False) == _SourceModel(a=1, b=2)
+
+
+@pytest.mark.parametrize("config", [{"x": {"b": 2}}, {"x": {"a": 5, "b": 2}}])
+def test_pydantic_json_dict_false_json_merges_fields_from_other_source(config):
+    """``json_dict=False`` still decodes a JSON object for a model, so it merges like one."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceModel, Parameter(json_dict=False)] = _SourceModel()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"a": 1}'], exit_on_error=False) == _SourceModel(a=1, b=2)
+
+
+def test_pydantic_env_var_json_merges_cli_field(monkeypatch):
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceModel, Parameter(env_var="X")] = _SourceModel()):  # noqa: B008
+        return x
+
+    monkeypatch.setenv("X", '{"b": 2}')
+    assert app(["--x.a", "1"], exit_on_error=False) == _SourceModel(a=1, b=2)
+
+
+class _SourceAliasModel(BaseModel):
+    model_config = pydantic.ConfigDict(populate_by_name=True)
+
+    full_name: str = Field("default", alias="userName")
+
+
+def test_pydantic_cli_json_alias_beats_config_field_name():
+    """CLI JSON keyed by an alias still takes precedence over config keyed by the field name."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"full_name": "CONFIG"}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceAliasModel = _SourceAliasModel(userName="default")):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"userName": "CLI"}'], exit_on_error=False).full_name == "CLI"
+
+
+class _ChoiceModel(BaseModel):
+    values: Annotated[list[int], Parameter(choices=["1", "2"])] = []
+    count: Annotated[int, Parameter(choices=["1", "2"])] = 1
+
+
+@pytest.mark.parametrize(
+    "payload,expected",
+    [
+        ('{"values": [1, 2]}', _ChoiceModel(values=[1, 2])),
+        ('{"count": 2}', _ChoiceModel(count=2)),
+    ],
+)
+def test_pydantic_json_list_and_choice_fields(payload, expected):
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _ChoiceModel = _ChoiceModel()):  # noqa: B008
+        return x
+
+    assert app(["--x", payload], exit_on_error=False) == expected
+
+
+@pytest.mark.parametrize("payload", ['{"values": [1, 3]}', '{"count": 3}'])
+def test_pydantic_json_values_checked_against_choices(payload):
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _ChoiceModel = _ChoiceModel()):  # noqa: B008
+        return x
+
+    with pytest.raises(CoercionError, match="Choose from"):
+        app(["--x", payload], exit_on_error=False)
+
+
+class _AliasOuter(BaseModel):
+    inner: _SourceAliasModel = _SourceAliasModel(userName="default")  # noqa: B008
+
+
+def test_pydantic_nested_cli_json_alias():
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _AliasOuter = _AliasOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x.inner", '{"userName": "Alice"}'], exit_on_error=False).inner.full_name == "Alice"

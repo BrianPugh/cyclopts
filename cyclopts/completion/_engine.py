@@ -19,7 +19,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from cyclopts.argument import ArgumentCollection
-from cyclopts.bind import _parse_configs, _parse_env, _parse_kw_and_flags, _parse_pos
+from cyclopts.bind import _apply_sources, _parse_kw_and_flags, _parse_pos
 from cyclopts.completion._base import (
     CompletionAction,
     app_description,
@@ -484,16 +484,17 @@ def dynamic_candidates(slot: Slot) -> list[tuple[str, str]]:
         # same sibling values the command itself would receive. Best effort — a
         # broken config source must not kill completion.
         # The active argument itself must keep only its typed tokens: an env/config
-        # value for it would otherwise inflate ``ctx.index`` and mark it provided.
-        typed = list(active.tokens)
+        # value for it (or a JSON object expanded onto its fields) would otherwise
+        # inflate ``ctx.index`` and mark it provided.
+        typed = [(argument, list(argument.tokens)) for argument in (active, *active.children_recursive)]
         try:
-            _parse_env(slot.arguments)
             configs = slot.command_app.app_stack.resolve("_config") or ()
-            _parse_configs(slot.arguments, tuple(partial(x, slot.command_app, slot.command_chain) for x in configs))
+            _apply_sources(slot.arguments, tuple(partial(x, slot.command_app, slot.command_chain) for x in configs))
         except Exception as e:
             debug(f"applying env/config sources failed (sibling values may be partial): {_exc(e)}")
         finally:
-            active.tokens[:] = typed
+            for argument, tokens in typed:
+                argument.tokens[:] = tokens
 
         context = CompletionContext(incomplete=slot.incomplete, argument=active, arguments=slot.arguments)
         completions = active.get_completions(context)

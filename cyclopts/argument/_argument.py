@@ -185,7 +185,7 @@ class Argument:
     _enum_flag_type: Any | None = field(default=None, init=False, repr=False)
 
     _union_branches: "list[tuple[Any, dict[str, FieldInfo]]]" = field(factory=list, init=False, repr=False)
-    """Per-branch ``(member_type, field_infos)`` when :attr:`hint` is a ``Union`` of 2+ keyword-accepting types.
+    """Per-branch ``(member_type, field_infos)`` when :attr:`hint` is a ``Union`` with a keyword-accepting member.
 
     Empty for non-unions and single-composite optionals (e.g. ``Foo | None``). Drives
     branch-aware required-field detection so that supplying one ``Union`` member's fields
@@ -299,11 +299,9 @@ class Argument:
                     self._update_lookup({field_info.name: field_info})
 
         if self._accepts_keywords and len(hints) > 1:
-            # Genuine multi-branch ``Union`` of keyword-accepting types (not ``Foo | None``,
-            # whose only composite branch collapses to a single dict). Record each branch's
-            # type and fields so requiredness can be evaluated per-branch at conversion time.
+            # e.g. ``Foo | Bar`` or ``Foo | bool``; see ``_union_branches``.
             branches = [(member, fis) for member in hints if (fis := get_field_infos(member))]
-            if len(branches) > 1:
+            if branches:
                 self._union_branches = branches
                 # The generic checker would introspect the ``typing.Union`` alias itself
                 # (yielding phantom fields like ``origin``); branch-aware gating in
@@ -419,10 +417,8 @@ class Argument:
                 raise
             return self._default
 
-    def _should_attempt_json_dict(self, tokens: Sequence[Token | str] | None = None) -> bool:
+    def _should_attempt_json_dict(self, tokens: Sequence[Token | str]) -> bool:
         """When parsing, should attempt to parse the token(s) as json dict data."""
-        if tokens is None:
-            tokens = self.tokens
         if not tokens:
             return False
         value = tokens[0].value if isinstance(tokens[0], Token) else tokens[0]
@@ -744,6 +740,52 @@ class Argument:
             out.extend(child.children_recursive)
         return out
 
+    def _claim_children_for_keyless_value(self):
+        """A keyless value (e.g. ``--x`` on ``Foo | bool``) is the whole value; no ``--x.<field>`` may join it."""
+        if any(child.has_tokens for child in self.children):
+            raise self._keyless_and_keyed_error()
+        for child in self.children_recursive:
+            child._marked = True
+
+    def _keyless_and_keyed_error(self) -> CoercionError:
+        return CoercionError(
+            msg=f"Cannot combine a value for {self.name} with its {self.name}.<field> options.",
+            argument=self,
+            target_type=self.hint,
+        )
+
+    def _expand_json_object_tokens(self) -> bool:
+        """Expand keyless JSON-object tokens into the fields they set; return whether one was an empty ``{}``."""
+        from cyclopts.argument._collection import _decodes_json_object, update_argument_collection
+
+        if not self.children:
+            return False
+        json_tokens, other_tokens = [], []
+        for token in self.tokens:
+            is_json = not token.keys and token.implicit_value is UNSET and _decodes_json_object(self, token.value)
+            (json_tokens if is_json else other_tokens).append(token)
+        if not json_tokens:
+            return False
+
+        explicit_empty_mapping = False
+        self.tokens = other_tokens
+        for token in json_tokens:
+            parsed_json = self._decode_json_object(token)
+            if parsed_json:
+                update_argument_collection(
+                    {self.name.lstrip("-"): parsed_json},
+                    token.source,
+                    self.children_recursive,
+                    root_keys=(),
+                    allow_unknown=False,
+                    key_prefix=self.keys,
+                )
+            else:
+                explicit_empty_mapping = True
+                # Placeholder so ``has_tokens`` still reports this argument as supplied.
+                self.tokens.append(token.evolve(value="", implicit_value={}))
+        return explicit_empty_mapping
+
     def _convert_pydantic(self):
         if self.has_tokens:
             import pydantic
@@ -753,17 +795,16 @@ class Argument:
                     # Persist the canonicalized tokens so ``_json`` (and pydantic) see the
                     # listed spelling rather than the raw input (e.g. Enum ``RED`` -> ``red``).
                     child.tokens = child._validate_choices(child._expand_json_list_tokens(child.tokens))
-            unstructured_data = self._json()
+            keyless_value = self._keyless_json_value()
+            unstructured_data = self._json() if keyless_value is UNSET else keyless_value
             try:
                 return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
             except pydantic.ValidationError as e:
-                self._handle_pydantic_validation_error(e)
+                self._handle_pydantic_validation_error(e, value=keyless_value)
         else:
             return UNSET
 
     def _convert(self, converter: Callable | None = None):
-        from cyclopts.argument._collection import update_argument_collection
-
         if self.parameter.converter:
             converter = self.parameter.resolve_converter(self.hint)
         # Children build their own default converter so it carries their own name.
@@ -863,10 +904,6 @@ class Argument:
         else:
             data = {}
             out = UNSET
-            # An explicitly-supplied empty mapping (e.g. ``x = {}`` in a config file, or
-            # ``--x={}`` on the cli) means "instantiate from defaults", not "missing".
-            explicit_empty_mapping = False
-
             if (
                 self._enum_flag_type
                 and is_union(self.resolved_hint)
@@ -888,28 +925,9 @@ class Argument:
                 converted_flags = safe_converter(self._enum_flag_type, self.tokens)
                 out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags
 
-            if self._should_attempt_json_dict():
-                import json
-
-                json_tokens, self.tokens = self.tokens, []
-                for token in json_tokens:
-                    try:
-                        parsed_json = json.loads(token.value)
-                    except json.JSONDecodeError as e:
-                        raise CoercionError(token=token, target_type=self.hint) from e
-                    _validate_json_extra_keys(parsed_json, self.resolved_hint, token)
-                    if parsed_json:
-                        update_argument_collection(
-                            {self.name.lstrip("-"): parsed_json},
-                            token.source,
-                            self.children_recursive,
-                            root_keys=(),
-                            allow_unknown=False,
-                        )
-                    else:
-                        explicit_empty_mapping = True
-                        # Placeholder so ``has_tokens`` still reports this argument as supplied.
-                        self.tokens.append(token.evolve(value="", implicit_value={}))
+            # An explicitly-supplied empty mapping (e.g. ``x = {}`` in a config file, or
+            # ``--x={}`` on the cli) means "instantiate from defaults", not "missing".
+            explicit_empty_mapping = self._expand_json_object_tokens()
 
             if self._use_pydantic_type_adapter:
                 return self._convert_pydantic()
@@ -921,6 +939,8 @@ class Argument:
                     positional_tokens = [
                         token for token in positional_tokens if not isinstance(token.implicit_value, dict)
                     ]
+                if positional_tokens:
+                    self._claim_children_for_keyless_value()
                 if len(positional_tokens) == 1 and self._is_whole_implicit_value(positional_tokens[0]):
                     return positional_tokens[0].implicit_value
                 if positional_tokens:
@@ -954,10 +974,14 @@ class Argument:
             self._run_missing_keys_checker(data)
 
             member = None
-            if self._union_branches and data:
+            if self._union_branches and (data or explicit_empty_mapping):
                 # ``instantiate_from_dict`` cannot build a bare ``Union``; pick the branch
                 # whose fields accept the supplied data.
                 member = self._resolve_union_member(set(data))
+                if member is None and not data:
+                    # ``{}`` with no default-constructible branch: report the first branch's
+                    # missing field, matching the declaration-order preference above.
+                    raise MissingArgumentError(argument=self._first_branch_missing_children()[0])
                 if member is None or (member is not self._enum_flag_type and out):
                     # Supplied fields span multiple branches / match no single one, or
                     # sibling-member fields were mixed with enum.Flag values.
@@ -1405,6 +1429,20 @@ class Argument:
             return None
         return normalize_completions(completer(context))
 
+    def _keyless_json_value(self) -> Any:
+        """The whole value given without keys (e.g. ``--x`` or ``--x=false`` on ``Model | bool``); ``UNSET`` if none.
+
+        ``_json`` decodes JSON objects, so those don't count.
+        """
+        keyless = [token for token in self.tokens if not token.keys and not _is_json_object_token(token)]
+        if not keyless:
+            return UNSET
+        self._claim_children_for_keyless_value()
+        if len(keyless) != len(self.tokens):
+            raise self._keyless_and_keyed_error()
+        values = [token.value if token.implicit_value is UNSET else token.implicit_value for token in keyless]
+        return values[0] if len(values) == 1 else values
+
     def _json(self) -> dict:
         """Convert argument to be json-like for pydantic.
 
@@ -1432,6 +1470,9 @@ class Argument:
             if child._explicit_none:
                 out[keys[0]] = None
             elif child._accepts_keywords:
+                if (value := child._keyless_json_value()) is not UNSET:
+                    out[keys[0]] = value
+                    continue
                 result = child._json()
                 if result or any(not token.keys for token in child.tokens):
                     out.setdefault(keys[0], {}).update(result)
@@ -1560,15 +1601,16 @@ class Argument:
         """
         supplied_keys = {child.keys[-1] for child in self.children if child.has_tokens}
         if self._union_branches and self.required and not supplied_keys:
-            first_branch_required = {k for k, v in self._union_branches[0][1].items() if v.required}
-            return [
-                child for child in self.children if not child.has_tokens and child.keys[-1] in first_branch_required
-            ]
+            return self._first_branch_missing_children()
         active_required = self._active_branch_required_keys(supplied_keys)
         if active_required is not None:
             return [child for child in self.children if not child.has_tokens and child.keys[-1] in active_required]
         data = dict.fromkeys(supplied_keys)
         return [argument for _, argument in self._resolve_missing_keys(data) if argument is not None]
+
+    def _first_branch_missing_children(self) -> "list[Argument]":
+        first_branch_required = {k for k, v in self._union_branches[0][1].items() if v.required}
+        return [child for child in self.children if not child.has_tokens and child.keys[-1] in first_branch_required]
 
     def _run_missing_keys_checker(self, data):
         if not self._missing_keys_checker or (not self.required and not data):
@@ -1581,7 +1623,7 @@ class Argument:
                 f'Required field "{missing_description}" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements.'
             )
 
-    def _handle_pydantic_validation_error(self, exc):
+    def _handle_pydantic_validation_error(self, exc, value: Any = UNSET):
         import pydantic
 
         error = exc.errors()[0]
@@ -1611,9 +1653,15 @@ class Argument:
             # Fall through to ValidationError.
 
         if isinstance(exc, pydantic.ValidationError):
-            raise ValidationError(exception_message=str(exc), argument=self) from exc
+            raise ValidationError(exception_message=str(exc), argument=self, value=value) from exc
         else:
             raise exc
+
+
+def _is_json_object_token(token: Token) -> bool:
+    return isinstance(token.implicit_value, dict) or (
+        token.implicit_value is UNSET and token.value.lstrip().startswith("{")
+    )
 
 
 def _hint_at_keys(hint: Any, keys: tuple[str, ...]) -> Any:

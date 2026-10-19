@@ -1,10 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Flag, auto
 from pathlib import Path
 from textwrap import dedent
 from typing import Annotated, Literal, NamedTuple, NewType, TypedDict, Union
 
 import pytest
+from attrs import define
 
 from cyclopts import Parameter
 from cyclopts.exceptions import CoercionError, MissingArgumentError, RepeatArgumentError
@@ -340,6 +341,120 @@ def test_union_bool_class_member_first(app, assert_parse_args, hint, cmd, expect
     assert_parse_args(default, cmd, x=expected)
 
 
+@define
+class _FlagAttrs:
+    a: int
+    b: int = 2
+
+
+@pytest.mark.parametrize(
+    "hint,cls",
+    [
+        (_FlagDataclass | bool, _FlagDataclass),
+        (bool | _FlagDataclass, _FlagDataclass),
+        (_FlagAttrs | bool, _FlagAttrs),
+        (bool | _FlagAttrs, _FlagAttrs),
+    ],
+)
+def test_union_bool_class_member_keys(app, assert_parse_args, hint, cls):
+    """``--x.<field>`` options build the class member of a union with ``bool`` (#990)."""
+
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, "--x.a 1", x=cls(a=1))
+    assert_parse_args(default, "--x", x=True)
+
+
+@pytest.mark.parametrize("hint", [_FlagAttrs | bool, bool | _FlagAttrs])
+def test_union_bool_class_member_keys_missing_field(app, hint):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("--x.b 3", print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize("hint", [_FlagDataclass | bool, _FlagAttrs | bool])
+@pytest.mark.parametrize("cmd", ["--x --x.a 1", "--x.a 1 --x", "--no-x --x.a 1", "--x=false --x.a 1"])
+def test_union_bool_class_member_flag_mixed_with_keys(app, hint, cmd):
+    """A bool value alongside ``--x.<field>`` is rejected, not silently dropped."""
+
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(cmd, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize("hint", [_FlagDataclass | bool, _FlagAttrs | bool])
+@pytest.mark.parametrize("cmd,expected", [("--x", True), ("--no-x", False)])
+def test_union_bool_class_member_required_flag(app, assert_parse_args, hint, cmd, expected):
+    @app.default
+    def default(*, x: hint):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
+
+
+@dataclass
+class _DefaultsA:
+    a: int = 1
+
+
+@dataclass
+class _DefaultsB:
+    b: int = 2
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        (_DefaultsA | bool, _DefaultsA()),
+        (bool | _DefaultsA, _DefaultsA()),
+        (_DefaultsA | _DefaultsB, _DefaultsA()),
+    ],
+)
+@pytest.mark.parametrize("cmd", ["--x={}", "--x {}"])
+def test_union_class_member_explicit_empty_mapping(app, assert_parse_args, hint, expected, cmd):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, cmd, x=expected)
+
+
+@pytest.mark.parametrize("hint", [_FlagAttrs | bool, bool | _FlagAttrs])
+def test_union_class_member_explicit_empty_mapping_missing_field(app, hint):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    with pytest.raises(MissingArgumentError) as e:
+        app.parse_args("--x={}", print_error=False, exit_on_error=False)
+    assert e.value.argument is not None
+    assert e.value.argument.name == "--x.a"
+
+
+class _FlagTypedDictPair(TypedDict):
+    a: int
+    b: int
+
+
+@pytest.mark.parametrize("hint", [_FlagTypedDictPair | bool, bool | _FlagTypedDictPair])
+def test_union_bool_typeddict_keys(app, assert_parse_args, hint):
+    @app.default
+    def default(*, x: hint = False):  # pyright: ignore
+        pass
+
+    assert_parse_args(default, "--x.a 1 --x.b 2", x={"a": 1, "b": 2})
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("--x.a 1", print_error=False, exit_on_error=False)
+
+
 @pytest.mark.parametrize(
     "hint,cmd",
     [
@@ -574,3 +689,442 @@ def test_union_enum_flag_other_member(app, assert_parse_args, cmd, expected):
         pass
 
     assert_parse_args(default, cmd, x=expected)
+
+
+@dataclass
+class _SourceUser:
+    a: int = 1
+    b: str = "s"
+
+
+@pytest.mark.parametrize(
+    "config, cmd, expected",
+    [
+        ({"x": {"a": 2}}, ["--no-x"], False),
+        ({"x": {"a": 2}}, ["--x"], True),
+        ({"x": False}, ["--x.a", "9"], _SourceUser(a=9)),
+        ({"x": {"a": 2}}, ["--x.b", "q"], _SourceUser(a=2, b="q")),
+    ],
+)
+def test_union_bool_class_cli_replaces_config(config, cmd, expected):
+    """A keyless value and ``--x.<field>`` from different sources: the CLI replaces the config."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser | bool = False):
+        return x
+
+    assert app(cmd, exit_on_error=False) == expected
+
+
+def test_union_bool_class_cli_replaces_env(monkeypatch):
+    """A keyless env var value doesn't combine with ``--x.<field>`` from the CLI."""
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceUser | bool, Parameter(env_var="X")] = False):
+        return x
+
+    monkeypatch.setenv("X", "true")
+    assert app(["--x.a", "9"], exit_on_error=False) == _SourceUser(a=9)
+
+
+def test_union_bool_class_same_source_mix_errors():
+    """A keyless value and ``--x.<field>`` from the same source still error."""
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser | bool = False):
+        return x
+
+    with pytest.raises(CoercionError, match="Cannot combine"):
+        app(["--x", "--x.a", "9"], exit_on_error=False)
+
+
+def _source_app(*configs):
+    from cyclopts import App
+
+    app = App(config=list(configs), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser | bool = False):
+        return x
+
+    return app
+
+
+@pytest.mark.parametrize(
+    "first, second, expected",
+    [
+        ({"x": False}, {"x": {"a": 2}}, False),
+        ({"x": {"a": 2}}, {"x": False}, _SourceUser(a=2)),
+    ],
+)
+def test_union_bool_class_earlier_config_wins_same_source_label(first, second, expected):
+    """2 ``Dict`` configs share the ``"dict"`` source label but are still separate sources."""
+    from cyclopts.config import Dict
+
+    assert _source_app(Dict(first), Dict(second))([], exit_on_error=False) == expected
+
+
+@pytest.mark.parametrize(
+    "configs, env, cmd, expected",
+    [
+        ((), {"APP_X": "false"}, ["--x.a", "9"], _SourceUser(a=9)),
+        ((), {"APP_X_A": "2"}, ["--no-x"], False),
+        (({"x": {"a": 2}},), {"APP_X": "false"}, [], _SourceUser(a=2)),
+        (({"x": False},), {"APP_X_A": "2"}, [], False),
+    ],
+)
+def test_union_bool_class_config_env_precedence(monkeypatch, configs, env, cmd, expected):
+    """``config.Env`` follows the same whole-parameter precedence as the other sources."""
+    from cyclopts.config import Dict, Env
+
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    app = _source_app(*(Dict(c) for c in configs), Env("APP_"))
+    assert app(cmd, exit_on_error=False) == expected
+
+
+def test_union_bool_class_config_env_same_source_mix_errors(monkeypatch):
+    from cyclopts.config import Env
+
+    monkeypatch.setenv("APP_X", "false")
+    monkeypatch.setenv("APP_X_A", "2")
+    with pytest.raises(CoercionError, match="Cannot combine"):
+        _source_app(Env("APP_"))([], exit_on_error=False)
+
+
+@pytest.mark.parametrize("hint", [_SourceUser, _SourceUser | None])
+def test_class_json_merges_fields_from_other_source(hint):
+    """A JSON object for a plain class still merges with field values from another source."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"b": "q"}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: hint = None):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app(["--x", '{"a": 9}'], exit_on_error=False) == _SourceUser(a=9, b="q")
+
+
+def test_class_env_var_json_merges_cli_field(monkeypatch):
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceUser, Parameter(env_var="X")]):
+        return x
+
+    monkeypatch.setenv("X", '{"b": "q"}')
+    assert app(["--x.a", "9"], exit_on_error=False) == _SourceUser(a=9, b="q")
+
+
+def test_class_config_json_string_merges_cli_field():
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": '{"b": "q"}'}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser):
+        return x
+
+    assert app(["--x.a", "9"], exit_on_error=False) == _SourceUser(a=9, b="q")
+
+
+class _SourcePermission(Flag):
+    READ = auto()
+    WRITE = auto()
+
+
+@pytest.mark.parametrize(
+    "cmd, config, env",
+    [
+        (["--x", "read"], {"x": {"write": True}}, {}),
+        (["--x.write"], {"x": "read"}, {}),
+        (["--x.write"], {}, {"X": "read"}),
+    ],
+)
+def test_enum_flag_combines_across_sources(monkeypatch, cmd, config, env):
+    """A plain ``enum.Flag`` keeps OR-ing values from different sources."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourcePermission, Parameter(env_var="X")] = _SourcePermission(0)):  # noqa: B008
+        return x
+
+    assert app(cmd, exit_on_error=False) == _SourcePermission.READ | _SourcePermission.WRITE
+
+
+@pytest.mark.parametrize("hint", [_SourceUser, _SourceUser | bool, _SourceUser | None])
+def test_class_extra_positional_token_is_unused(hint):
+    """An extra value after ``--x 1`` is reported as unused, not as a ``--x.<field>`` conflict."""
+    from cyclopts import App
+    from cyclopts.exceptions import UnusedCliTokensError
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(x: hint = None):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    with pytest.raises(UnusedCliTokensError, match=r"\['2'\]"):
+        app(["--x", "1", "2"], exit_on_error=False)
+
+
+def test_class_extra_positional_token_parse_known_args():
+    """``parse_known_args`` hands back a stray value after ``--x 1`` instead of raising."""
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(x: _SourceUser | None = None):
+        return x
+
+    _, bound, unused, _ = app.parse_known_args(["--x", "1", "2"])
+    assert bound.arguments == {"x": _SourceUser(a=1)}
+    assert unused == ["2"]
+
+
+@dataclass
+class _SourceRequired:
+    a: int
+
+
+def test_class_cli_value_replaces_config_fields():
+    """A keyless CLI value for a plain class replaces the config's ``--x.<field>`` values."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"a": 2}}), result_action="return_value")
+
+    @app.default
+    def main(x: _SourceRequired = _SourceRequired(0)):  # noqa: B008
+        return x
+
+    assert app(["--x", "1"], exit_on_error=False) == _SourceRequired(1)
+
+
+@pytest.mark.parametrize("via", ["config", "env"])
+def test_union_bool_class_json_merges_cli_field(monkeypatch, via):
+    """A later source's JSON object merges into ``--x.<field>`` values, like a nested config table does."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    if via == "env":
+        monkeypatch.setenv("X", '{"b": "q"}')
+    app = App(config=Dict({"x": '{"b": "q"}'} if via == "config" else {}), result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceUser | bool, Parameter(env_var="X")] = False):
+        return x
+
+    assert app(["--x.a", "9"], exit_on_error=False) == _SourceUser(a=9, b="q")
+
+
+def test_union_enum_flag_combines_across_sources():
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"write": True}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _Perm | str = "default"):
+        return x
+
+    assert app(["--x", "read"], exit_on_error=False) == _Perm.READ | _Perm.WRITE
+
+
+@dataclass
+class _SourceOuter:
+    inner: _SourceUser | bool = False
+
+
+def test_union_bool_class_nested_cli_json_replaces_config():
+    """CLI JSON for an outer class keeps precedence over config values for the fields it sets."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"inner": {"a": 2}}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceOuter = _SourceOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": false}'], exit_on_error=False) == _SourceOuter(inner=False)
+
+
+def test_class_cli_json_field_beats_config_field():
+    """CLI JSON wins over config for the same field; the config's other fields still merge."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"a": 2, "b": "c"}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceUser = _SourceUser()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"a": 1}'], exit_on_error=False) == _SourceUser(a=1, b="c")
+
+
+@pytest.mark.parametrize("value", ['{"literal": 9}', "{text"])
+def test_union_str_class_cli_string_replaces_config_fields(value):
+    """A ``{``-leading value that a ``str`` member takes whole isn't JSON; it replaces the config's fields."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"a": 2}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: str | _SourceUser = ""):
+        return x
+
+    assert app(["--x", value], exit_on_error=False) == value
+
+
+@dataclass
+class _SourceOptions:
+    options: dict[str, int]
+
+
+@pytest.mark.parametrize("hint", [_SourceOptions, _SourceOptions | bool])
+@pytest.mark.parametrize("config_options", [{"b": 2}, {"a": 5, "b": 2}])
+def test_class_cli_json_dict_field_replaces_config_dict(hint, config_options):
+    """Like ``--x.options.a 1``, CLI JSON entries replace the config's whole ``dict`` field."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"options": config_options}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: hint = None):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app(["--x", '{"options": {"a": 1}}'], exit_on_error=False) == _SourceOptions({"a": 1})
+
+
+def test_union_bool_class_nested_cli_json_field_beats_config_json():
+    """A later source's JSON string for a nested field merges per field under the CLI's JSON."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"inner": '{"a": 2, "b": "q"}'}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceOuter = _SourceOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceOuter(inner=_SourceUser(a=9, b="q"))
+
+
+def test_union_bool_class_nested_cli_json_field_beats_config_env_json(monkeypatch):
+    from cyclopts import App
+    from cyclopts.config import Env
+
+    monkeypatch.setenv("APP_X_INNER", '{"a": 2, "b": "q"}')
+    app = App(config=Env("APP_"), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceOuter = _SourceOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceOuter(inner=_SourceUser(a=9, b="q"))
+
+
+def test_class_env_var_json_beats_later_config_env_json(monkeypatch):
+    """An ``env_var`` JSON keeps precedence over a later ``config.Env`` JSON for the fields it sets."""
+    from cyclopts import App
+    from cyclopts.config import Env
+
+    monkeypatch.setenv("OUTER_JSON", '{"inner": {"a": 9}}')
+    monkeypatch.setenv("APP_X_INNER", '{"a": 2, "b": "q"}')
+    app = App(config=Env("APP_"), result_action="return_value")
+
+    @app.default
+    def main(*, x: Annotated[_SourceOuter, Parameter(env_var="OUTER_JSON")] = _SourceOuter()):  # noqa: B008
+        return x
+
+    assert app([], exit_on_error=False) == _SourceOuter(inner=_SourceUser(a=9, b="q"))
+
+
+@dataclass
+class _SourceEnvVarOuter:
+    inner: Annotated[_SourceUser | bool, Parameter(env_var="INNER")] = False
+
+
+@dataclass
+class _SourceEnvVarPlainOuter:
+    inner: Annotated[_SourceUser, Parameter(env_var="INNER")] = field(default_factory=_SourceUser)
+
+
+def test_nested_env_var_json_merges_with_cli_json(monkeypatch):
+    """CLI JSON for an outer class beats a nested field's ``env_var`` JSON for the fields it sets."""
+    from cyclopts import App
+
+    monkeypatch.setenv("INNER", '{"a": 2, "b": "q"}')
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceEnvVarOuter = _SourceEnvVarOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceEnvVarOuter(inner=_SourceUser(a=9, b="q"))
+
+
+def test_nested_env_var_json_merges_with_cli_json_plain_class(monkeypatch):
+    from cyclopts import App
+
+    monkeypatch.setenv("INNER", '{"a": 2, "b": "q"}')
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceEnvVarPlainOuter = _SourceEnvVarPlainOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"inner": {"a": 9}}'], exit_on_error=False) == _SourceEnvVarPlainOuter(
+        inner=_SourceUser(a=9, b="q")
+    )
+
+
+@dataclass
+class _SourceFlagOuter:
+    perms: _SourcePermission = _SourcePermission(0)
+
+
+@pytest.mark.parametrize(
+    "config, expected",
+    [
+        ({"x": {"perms": {"write": True}}}, _SourcePermission.READ | _SourcePermission.WRITE),
+        ({"x": {"perms": "write"}}, _SourcePermission.READ),
+    ],
+)
+def test_enum_flag_in_outer_json_combines_across_sources(config, expected):
+    """A whole ``enum.Flag`` in CLI JSON combines with config members, and beats a whole config value."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: _SourceFlagOuter = _SourceFlagOuter()):  # noqa: B008
+        return x
+
+    assert app(["--x", '{"perms": "read"}'], exit_on_error=False) == _SourceFlagOuter(perms=expected)

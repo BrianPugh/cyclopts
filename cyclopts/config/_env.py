@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from attrs import define, field
 
 from cyclopts.argument import Argument, ArgumentCollection, Token
+from cyclopts.argument._collection import earlier_source_filter
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -35,7 +36,7 @@ class Env:
         return self._prefix(commands) + _transform(argument.name)
 
     def __call__(self, app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
-        added_tokens = set()
+        rejects = earlier_source_filter(arguments)
 
         prefix = self._prefix(commands)
 
@@ -51,8 +52,8 @@ class Env:
                 )
             except ValueError:
                 continue
-            if set(argument.tokens) - added_tokens:
-                # Skip if there are any tokens from another source.
+            env_value = os.environ[candidate_env_key]
+            if rejects(argument, remaining_keys, env_value):
                 continue
 
             # There's inherently an ambiguity because we use "_" as the key-delimiter.
@@ -63,7 +64,6 @@ class Env:
                 remaining_keys = (delimiter.join(remaining_keys),)
 
             remaining_keys = tuple(x.lower() for x in remaining_keys)
-            for i, value in enumerate(argument._split_env_value(os.environ[candidate_env_key], remaining_keys)):
+            for i, value in enumerate(argument._split_env_value(env_value, remaining_keys)):
                 token = Token(keyword=candidate_env_key, value=value, source=self.source, index=i, keys=remaining_keys)
                 argument.append(token)
-                added_tokens.add(token)
