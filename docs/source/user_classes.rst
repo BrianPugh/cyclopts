@@ -159,6 +159,64 @@ JSON list parsing is automatically enabled for ``list`` types containing datacla
 
 This behavior can be configured via :attr:`.Parameter.json_list`.
 
+Unions with Other Types
+^^^^^^^^^^^^^^^^^^^^^^^
+A class can share a union with a type that takes the whole value, like ``bool``.
+This suits a feature that can be switched on or off, with optional settings:
+
+.. code-block:: python
+
+   from cyclopts import App
+   from dataclasses import dataclass
+
+   app = App(name="server")
+
+   @dataclass
+   class Cache:
+      size: int = 128
+      """Maximum number of entries."""
+
+      ttl: int = 60
+      """Entry lifetime in seconds."""
+
+   @app.default
+   def main(*, cache: Cache | bool = False):
+      """Start the server.
+
+      Parameters
+      ----------
+      cache: Cache | bool
+         Enable the response cache.
+      """
+      print(f"{cache=}")
+
+   app()
+
+.. code-block:: console
+
+   $ server --help
+   Usage: server [OPTIONS]
+
+   Start the server.
+
+   ╭─ Parameters ───────────────────────────────────────────────────────╮
+   │ --cache --no-cache  Enable the response cache. [default: False]    │
+   │ --cache.size INT    Maximum number of entries. [default: 128]      │
+   │ --cache.ttl INT     Entry lifetime in seconds. [default: 60]       │
+   ╰────────────────────────────────────────────────────────────────────╯
+
+   $ server --cache
+   cache=True
+
+   $ server --no-cache
+   cache=False
+
+   $ server --cache.size 512
+   cache=Cache(size=512, ttl=60)
+
+* A bare value (``--cache``, ``--no-cache``) can't be combined with ``--cache.<field>`` options on the command line.
+* Across sources, the earlier source wins: ``--no-cache`` on the command line overrides ``cache.size`` from a config file, and ``--cache.size`` overrides ``cache = false``.
+
 .. _Namespace Flattening:
 
 Namespace Flattening
