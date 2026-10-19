@@ -50,6 +50,7 @@ from cyclopts.field_info import (
     FieldInfo,
     _attrs_field_infos,
     _generic_class_field_infos,
+    _namedtuple_field_infos,
     _pydantic_field_infos,
     _typed_dict_field_infos,
     get_field_infos,
@@ -258,7 +259,7 @@ class Argument:
                 self._accepts_keywords = True
                 self._update_lookup(field_infos)
             elif is_namedtuple(hint):
-                self._missing_keys_checker = missing_keys_factory(_generic_class_field_infos)
+                self._missing_keys_checker = missing_keys_factory(_namedtuple_field_infos)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple without type annotations.")
@@ -971,10 +972,11 @@ class Argument:
                     for descendant in child.children_recursive:
                         descendant._marked = True
 
-            self._run_missing_keys_checker(data)
+            instantiate = bool(data) or explicit_empty_mapping
+            self._run_missing_keys_checker(data, instantiate)
 
             member = None
-            if self._union_branches and (data or explicit_empty_mapping):
+            if self._union_branches and instantiate:
                 # ``instantiate_from_dict`` cannot build a bare ``Union``; pick the branch
                 # whose fields accept the supplied data.
                 member = self._resolve_union_member(set(data))
@@ -995,7 +997,7 @@ class Argument:
                 out |= enum_flag_from_dict(self._enum_flag_type, data, self.parameter.name_transform)
                 if not out:
                     out = UNSET
-            elif data or explicit_empty_mapping:
+            elif instantiate:
                 # Use resolved_hint to get the actual class type (Optional stripped)
                 out = instantiate_from_dict(member or self.resolved_hint, data)
             elif self.required:
@@ -1612,8 +1614,8 @@ class Argument:
         first_branch_required = {k for k, v in self._union_branches[0][1].items() if v.required}
         return [child for child in self.children if not child.has_tokens and child.keys[-1] in first_branch_required]
 
-    def _run_missing_keys_checker(self, data):
-        if not self._missing_keys_checker or (not self.required and not data):
+    def _run_missing_keys_checker(self, data, instantiate: bool):
+        if not self._missing_keys_checker or not (self.required or instantiate):
             return
         for keys, argument in self._resolve_missing_keys(data):
             if argument is not None:
