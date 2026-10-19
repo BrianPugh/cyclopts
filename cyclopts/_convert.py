@@ -27,6 +27,7 @@ from cyclopts.annotations import (
     is_annotated,
     is_enum_flag,
     is_nonetype,
+    is_typeddict,
     is_union,
     resolve,
     resolve_optional,
@@ -365,6 +366,8 @@ def _validate_json_extra_keys(
     CoercionError
         If the data contains keys not present in the type's fields.
     """
+    if union_mapping_member(type_) is not None:
+        return
     members = get_args(type_) if is_union(type_) else (type_,)
     field_infos = {k: v for member in members for k, v in get_field_infos(member).items()}
     # Collect all valid names including aliases (e.g., Pydantic camelCase aliases)
@@ -1012,6 +1015,20 @@ def _json_object_tokens(token: "Token", type_: Any, value_type: Any) -> dict[str
         else [to_token(key, 0, value)]
         for key, value in data.items()
     }
+
+
+def union_mapping_member(hint: Any) -> Any:
+    """The ``dict``-like member of a union (e.g. ``dict[str, int]`` in ``Foo | dict[str, int]``), else ``None``."""
+    if not is_union(hint):
+        return None
+    return next(
+        (
+            member
+            for member in get_args(hint)
+            if is_class_and_subclass(get_origin(member) or member, Mapping) and not is_typeddict(member)
+        ),
+        None,
+    )
 
 
 def _takes_mapping(hint: Any) -> bool:

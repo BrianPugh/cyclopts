@@ -18,6 +18,7 @@ from cyclopts._convert import (
     instantiate_from_dict,
     takes_scalar,
     token_count,
+    union_mapping_member,
 )
 from cyclopts.annotations import (
     ITERABLE_TYPES,
@@ -764,7 +765,7 @@ class Argument:
 
     def _expand_json_object_tokens(self) -> bool:
         """Expand keyless JSON-object tokens into the fields they set; return whether one was an empty ``{}``."""
-        from cyclopts.argument._collection import _decodes_json_object, update_argument_collection
+        from cyclopts.argument._collection import ArgumentCollection, _decodes_json_object, update_argument_collection
 
         if not self.children:
             return False
@@ -783,7 +784,10 @@ class Argument:
                 update_argument_collection(
                     {self.name.lstrip("-"): parsed_json},
                     token.source,
-                    self.children_recursive,
+                    # A ``dict`` member takes the keys no class field matches.
+                    ArgumentCollection([self, *self.children_recursive])
+                    if union_mapping_member(self.resolved_hint) is not None
+                    else self.children_recursive,
                     root_keys=(),
                     allow_unknown=False,
                     key_prefix=self.keys,
@@ -955,6 +959,13 @@ class Argument:
                     return safe_converter(self.hint, tuple(positional_tokens))
 
             supplied_keys = {child.keys[-1] for child in self.children if child.has_tokens}
+            mapping = union_mapping_member(self.resolved_hint)
+            if mapping is not None and (
+                any(token.keys for token in self.tokens)
+                or (supplied_keys and self._resolve_union_member(supplied_keys) is None)
+            ):
+                # Keys no single class branch takes (e.g. ``--x.z`` on ``Foo | dict[str, int]``).
+                return safe_converter(mapping, self._keyed_tokens())
             active_required = self._active_branch_required_keys(supplied_keys)
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
@@ -1451,6 +1462,21 @@ class Argument:
         if completer is None:
             return None
         return normalize_completions(completer(context))
+
+    def _keyed_tokens(self) -> dict:
+        """Every token under this argument, nested by key like ``--x.a.b``; claims all children."""
+        out = {}
+        for argument in (self, *self.children_recursive):
+            argument._marked = True
+            for token in argument.tokens:
+                keys = argument.keys[len(self.keys) :] + token.keys
+                if not keys:
+                    continue  # e.g. the placeholder of an explicit ``{}``
+                node = out
+                for key in keys[:-1]:
+                    node = node.setdefault(key, {})
+                node.setdefault(keys[-1], []).append(token)
+        return out
 
     def _keyless_json_value(self) -> Any:
         """The whole value given without keys (e.g. ``--x`` or ``--x=false`` on ``Model | bool``); ``UNSET`` if none.
