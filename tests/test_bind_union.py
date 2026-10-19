@@ -1128,3 +1128,57 @@ def test_enum_flag_in_outer_json_combines_across_sources(config, expected):
         return x
 
     assert app(["--x", '{"perms": "read"}'], exit_on_error=False) == _SourceFlagOuter(perms=expected)
+
+
+@dataclass
+class _DictUser:
+    a: int
+    b: str = "x"
+
+
+@pytest.mark.parametrize("hint", [_DictUser | dict[str, int] | None, _DictUser | dict[str, int]])
+@pytest.mark.parametrize(
+    "cmd, expected",
+    [
+        (["--x.a", "1"], _DictUser(a=1)),
+        (["--x.a", "1", "--x.b", "q"], _DictUser(a=1, b="q")),
+        (["--x.z", "1"], {"z": 1}),
+        (["--x.a", "1", "--x.z", "2"], {"a": 1, "z": 2}),
+        (["--x.b", "2"], {"b": 2}),
+        (["--x", '{"z": 1}'], {"z": 1}),
+        (["--x", '{"a": 1, "z": 2}'], {"a": 1, "z": 2}),
+        (["--x", '{"a": 1}'], _DictUser(a=1)),
+    ],
+)
+def test_union_class_or_dict_cli(hint, cmd, expected):
+    """Keys the class doesn't take (or a partial class) bind to the ``dict`` member instead of being dropped."""
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: hint = None):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app(cmd, exit_on_error=False) == expected
+
+
+@pytest.mark.parametrize(
+    "config, expected",
+    [
+        ({"x": {"a": 1}}, _DictUser(a=1)),
+        ({"x": {"z": 1}}, {"z": 1}),
+        ({"x": {"a": 1, "z": 2}}, {"a": 1, "z": 2}),
+    ],
+)
+def test_union_class_or_dict_config(config, expected):
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: _DictUser | dict[str, int] | None = None):
+        return x
+
+    assert app([], exit_on_error=False) == expected
