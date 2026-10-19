@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass, field
-from typing import Annotated
+from typing import Annotated, NamedTuple
 
 import pytest
 
@@ -13,6 +13,11 @@ class User:
     id: int
     name: str = "John Doe"
     tastes: dict[str, int] = field(default_factory=dict)
+
+
+class Point(NamedTuple):
+    a: int
+    b: int = 2
 
 
 def test_bind_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
@@ -75,8 +80,11 @@ def test_bind_dataclass_from_cli_json_empty(app, assert_parse_args):
     assert_parse_args(main, "--origin={}", Coordinate())
 
 
-@pytest.mark.parametrize("hint", [User, User | None])
-def test_bind_dataclass_from_cli_json_empty_missing_field(app, hint):
+@pytest.mark.parametrize(
+    "hint, missing",
+    [(User, "--user.id"), (User | None, "--user.id"), (Point | None, "--user.a")],
+)
+def test_bind_from_cli_json_empty_missing_field(app, hint, missing):
     @app.default
     def main(user: hint = None):  # pyright: ignore
         pass
@@ -84,7 +92,7 @@ def test_bind_dataclass_from_cli_json_empty_missing_field(app, hint):
     with pytest.raises(MissingArgumentError) as exc_info:
         app.parse_args("--user={}", print_error=False, exit_on_error=False)
     assert exc_info.value.argument is not None
-    assert exc_info.value.argument.name == "--user.id"
+    assert exc_info.value.argument.name == missing
 
 
 def test_nested_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
@@ -171,19 +179,3 @@ def test_complex_nested_type_validation_env_var(app, monkeypatch):
 
     with pytest.raises(CycloptsError):
         app([], exit_on_error=False)
-
-
-def test_json_empty_object_optional_namedtuple_missing_field(app):
-    """An explicit ``{}`` for an optional NamedTuple reports its missing required field."""
-    from typing import NamedTuple
-
-    class Point(NamedTuple):
-        a: int
-        b: int = 2
-
-    @app.default
-    def main(x: Point | None = None):
-        return x
-
-    with pytest.raises(MissingArgumentError, match=r"--x\.a"):
-        app(["--x", "{}"], exit_on_error=False)
