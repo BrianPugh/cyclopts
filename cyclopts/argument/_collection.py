@@ -815,25 +815,15 @@ def earlier_source_filter(arguments: Iterable[Argument]) -> Callable[[Argument, 
     Each source fills only what earlier sources left unset. An argument with tokens keeps them; a keyless value (e.g. ``--no-x``) also keeps every ``--x.<field>``;
     and ``--x.<field>`` values reject a later keyless value. ``enum.Flag`` values combine.
     """
-    arguments = list(arguments)
     taken: set[int] = set()
     rejects_keyless: set[int] = set()
     for argument in arguments:
-        if not argument.tokens:
-            continue
-        taken.add(id(argument))
-        if (
-            argument.children
-            and not argument._enum_flag_type
-            and any(_is_keyless_value(argument, token) for token in argument.tokens)
-        ):
-            taken.update(id(child) for child in argument.children_recursive)
-    for argument in arguments:
-        if (
-            argument.children
-            and not argument._enum_flag_type
-            and any(child.tokens for child in argument.children_recursive)
-        ):
+        composite = argument.children and not argument._enum_flag_type
+        if argument.tokens:
+            taken.add(id(argument))
+            if composite and any(_is_keyless_value(argument, token) for token in argument.tokens):
+                taken.update(id(child) for child in argument.children_recursive)
+        if composite and any(child.has_tokens for child in argument.children):
             rejects_keyless.add(id(argument))
 
     def rejects(argument: Argument, remaining_keys: tuple[str, ...], value: Any) -> bool:

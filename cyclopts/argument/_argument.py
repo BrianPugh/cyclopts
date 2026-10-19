@@ -299,10 +299,7 @@ class Argument:
                     self._update_lookup({field_info.name: field_info})
 
         if self._accepts_keywords and len(hints) > 1:
-            # Genuine ``Union`` with a keyword-accepting member (not ``Foo | None``, whose only
-            # composite branch collapses to a single dict); e.g. ``Foo | Bar`` or ``Foo | bool``.
-            # Record each branch's type and fields so requiredness can be evaluated per-branch
-            # at conversion time.
+            # e.g. ``Foo | Bar`` or ``Foo | bool``; see ``_union_branches``.
             branches = [(member, fis) for member in hints if (fis := get_field_infos(member))]
             if branches:
                 self._union_branches = branches
@@ -420,10 +417,8 @@ class Argument:
                 raise
             return self._default
 
-    def _should_attempt_json_dict(self, tokens: Sequence[Token | str] | None = None) -> bool:
+    def _should_attempt_json_dict(self, tokens: Sequence[Token | str]) -> bool:
         """When parsing, should attempt to parse the token(s) as json dict data."""
-        if tokens is None:
-            tokens = self.tokens
         if not tokens:
             return False
         value = tokens[0].value if isinstance(tokens[0], Token) else tokens[0]
@@ -765,23 +760,17 @@ class Argument:
 
         if not self.children:
             return False
-        json_tokens = [
-            token
-            for token in self.tokens
-            if not token.keys and token.implicit_value is UNSET and _decodes_json_object(self, token.value)
-        ]
+        json_tokens, other_tokens = [], []
+        for token in self.tokens:
+            is_json = not token.keys and token.implicit_value is UNSET and _decodes_json_object(self, token.value)
+            (json_tokens if is_json else other_tokens).append(token)
         if not json_tokens:
             return False
-        import json
 
         explicit_empty_mapping = False
-        self.tokens = [token for token in self.tokens if token not in json_tokens]
+        self.tokens = other_tokens
         for token in json_tokens:
-            try:
-                parsed_json = json.loads(token.value)
-            except json.JSONDecodeError as e:
-                raise CoercionError(token=token, target_type=self.hint) from e
-            _validate_json_extra_keys(parsed_json, self.resolved_hint, token)
+            parsed_json = self._decode_json_object(token)
             if parsed_json:
                 update_argument_collection(
                     {self.name.lstrip("-"): parsed_json},
@@ -806,9 +795,8 @@ class Argument:
                     # Persist the canonicalized tokens so ``_json`` (and pydantic) see the
                     # listed spelling rather than the raw input (e.g. Enum ``RED`` -> ``red``).
                     child.tokens = child._validate_choices(child._expand_json_list_tokens(child.tokens))
-            unstructured_data = keyless_value = self._keyless_json_value()
-            if keyless_value is UNSET:
-                unstructured_data = self._json()
+            keyless_value = self._keyless_json_value()
+            unstructured_data = self._json() if keyless_value is UNSET else keyless_value
             try:
                 return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
             except pydantic.ValidationError as e:
@@ -916,10 +904,6 @@ class Argument:
         else:
             data = {}
             out = UNSET
-            # An explicitly-supplied empty mapping (e.g. ``x = {}`` in a config file, or
-            # ``--x={}`` on the cli) means "instantiate from defaults", not "missing".
-            explicit_empty_mapping = False
-
             if (
                 self._enum_flag_type
                 and is_union(self.resolved_hint)
@@ -941,8 +925,9 @@ class Argument:
                 converted_flags = safe_converter(self._enum_flag_type, self.tokens)
                 out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags
 
-            if self._expand_json_object_tokens():
-                explicit_empty_mapping = True
+            # An explicitly-supplied empty mapping (e.g. ``x = {}`` in a config file, or
+            # ``--x={}`` on the cli) means "instantiate from defaults", not "missing".
+            explicit_empty_mapping = self._expand_json_object_tokens()
 
             if self._use_pydantic_type_adapter:
                 return self._convert_pydantic()
@@ -996,14 +981,7 @@ class Argument:
                 if member is None and not data:
                     # ``{}`` with no default-constructible branch: report the first branch's
                     # missing field, matching the declaration-order preference above.
-                    first_branch_fields = self._union_branches[0][1]
-                    raise MissingArgumentError(
-                        argument=next(
-                            child
-                            for child in self.children
-                            if (fi := first_branch_fields.get(child.keys[-1])) and fi.required
-                        )
-                    )
+                    raise MissingArgumentError(argument=self._first_branch_missing_children()[0])
                 if member is None or (member is not self._enum_flag_type and out):
                     # Supplied fields span multiple branches / match no single one, or
                     # sibling-member fields were mixed with enum.Flag values.
@@ -1623,15 +1601,16 @@ class Argument:
         """
         supplied_keys = {child.keys[-1] for child in self.children if child.has_tokens}
         if self._union_branches and self.required and not supplied_keys:
-            first_branch_required = {k for k, v in self._union_branches[0][1].items() if v.required}
-            return [
-                child for child in self.children if not child.has_tokens and child.keys[-1] in first_branch_required
-            ]
+            return self._first_branch_missing_children()
         active_required = self._active_branch_required_keys(supplied_keys)
         if active_required is not None:
             return [child for child in self.children if not child.has_tokens and child.keys[-1] in active_required]
         data = dict.fromkeys(supplied_keys)
         return [argument for _, argument in self._resolve_missing_keys(data) if argument is not None]
+
+    def _first_branch_missing_children(self) -> "list[Argument]":
+        first_branch_required = {k for k, v in self._union_branches[0][1].items() if v.required}
+        return [child for child in self.children if not child.has_tokens and child.keys[-1] in first_branch_required]
 
     def _run_missing_keys_checker(self, data):
         if not self._missing_keys_checker or (not self.required and not data):

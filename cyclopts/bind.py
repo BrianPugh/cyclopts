@@ -1187,10 +1187,9 @@ def _parse_env(argument_collection: ArgumentCollection):
             except KeyError:
                 pass
             else:
-                if rejects(argument, (), env_var_value):
-                    break
-                for index, value in enumerate(argument._split_env_value(env_var_value)):
-                    argument.tokens.append(Token(keyword=env_var_name, value=value, index=index, source="env"))
+                if not rejects(argument, (), env_var_value):
+                    for index, value in enumerate(argument._split_env_value(env_var_value)):
+                        argument.tokens.append(Token(keyword=env_var_name, value=value, index=index, source="env"))
                 break
 
 
