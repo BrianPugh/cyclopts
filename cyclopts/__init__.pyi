@@ -9,6 +9,7 @@ from cyclopts._edit import EditorNotFoundError as EditorNotFoundError
 from cyclopts._edit import edit as edit
 from cyclopts._env_var import env_var_split as env_var_split
 from cyclopts._result_action import ResultAction as ResultAction
+from cyclopts._result_action import resolve_returncode as resolve_returncode
 from cyclopts._run import run as run
 from cyclopts.argument import Argument as Argument
 from cyclopts.argument import ArgumentCollection as ArgumentCollection
@@ -17,6 +18,7 @@ from cyclopts.exceptions import ArgumentOrderError as ArgumentOrderError
 from cyclopts.exceptions import CoercionError as CoercionError
 from cyclopts.exceptions import CombinedShortOptionError as CombinedShortOptionError
 from cyclopts.exceptions import CommandCollisionError as CommandCollisionError
+from cyclopts.exceptions import ConsumeMultipleError as ConsumeMultipleError
 from cyclopts.exceptions import CycloptsError as CycloptsError
 from cyclopts.exceptions import DocstringError as DocstringError
 from cyclopts.exceptions import MissingArgumentError as MissingArgumentError
