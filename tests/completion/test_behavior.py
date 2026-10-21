@@ -243,6 +243,16 @@ SCENARIOS = [
         {"--opts", "--no-opts", "--opts.a", "--level", "--level.a", "--plain.a"},
         {"--plain"},
     ),
+    # 20. ``--opts`` on ``Opts | bool`` is a flag: it must not swallow the next word
+    # (zsh registered it as value-taking, so nothing completed after it).
+    (
+        "union-whole-value-flag-then-option",
+        app_union_whole_value,
+        "unionval",
+        "unionval --opts --",
+        {"--level", "--level.a", "--plain.a"},
+        set(),
+    ),
 ]
 
 

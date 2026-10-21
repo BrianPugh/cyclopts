@@ -594,6 +594,9 @@ def _resolve_metavar(argument: "Argument") -> str | None:
     is_var_keyword = argument.field_info.kind is argument.field_info.VAR_KEYWORD
     if is_var_keyword:
         hint = get_args(hint)[1]
+    elif argument._keyless_members:
+        # ``--x`` on ``Foo | bool`` is a flag; ``Foo | int`` renders ``--x INT``.
+        hint = Union[argument._keyless_members]  # noqa: UP007
     # Mirror ``Argument.match``'s flag rule rather than ``token_count`` so that
     # ``Optional[bool]`` agrees with what the parser accepts.
     resolved = resolve_optional(hint)
@@ -604,14 +607,11 @@ def _resolve_metavar(argument: "Argument") -> str | None:
         return override or None
     if (
         not is_var_keyword
+        and not argument._keyless_members
         and argument._accepts_keywords
         and (argument._accepts_arbitrary_keywords or argument.children)
     ):
-        # ``--x 3`` on ``Foo | int`` still takes a value; ``--x`` on ``Foo | bool`` doesn't.
-        members = tuple(m for m in argument._whole_value_members if m is not bool)
-        if not members:
-            return None
-        hint = Union[members]  # noqa: UP007
+        return None
     # An explicit ``Parameter.choices`` describes the leaf value exactly like a
     # ``Literal``/``Enum`` hint does, so the leaf renders as ``CHOICE`` (``CHOICE...`` for a
     # single-token collection, ``LIST[CHOICE]`` for a multi-token one), never the type name.

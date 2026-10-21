@@ -311,7 +311,6 @@ class UnionOpts:
     a: int = 1
 
 
-# Class unions whose other member takes the whole value (``--opts``/``--no-opts``, ``--level 3``).
 app_union_whole_value = App(name="unionval")
 
 

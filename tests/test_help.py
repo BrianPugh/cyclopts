@@ -3871,7 +3871,7 @@ def test_help_union_takes_whole_value(app, console):
         """Field a."""
 
     @app.default
-    def main(*, x: Opts | bool = False, n: Opts | int = 0, y: Opts | None = None):
+    def main(*, x: Opts | bool = False, n: Opts | int = 0, m: Opts | bool | int = False, y: Opts | None = None):
         """Main.
 
         Parameters
@@ -3880,6 +3880,8 @@ def test_help_union_takes_whole_value(app, console):
             X option.
         n
             N option.
+        m
+            M option.
         y
             Y option.
         """
@@ -3899,15 +3901,57 @@ def test_help_union_takes_whole_value(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --x --no-x  X option. [default: False]                             │
-        │ --x.a INT   Field a. [default: 1]                                  │
-        │ --n INT     N option. [default: 0]                                 │
-        │ --n.a INT   Field a. [default: 1]                                  │
-        │ --y.a INT   Field a. [default: 1]                                  │
+        │ --x --no-x           X option. [default: False]                    │
+        │ --x.a INT            Field a. [default: 1]                         │
+        │ --n INT              N option. [default: 0]                        │
+        │ --n.a INT            Field a. [default: 1]                         │
+        │ --m BOOL|INT --no-m  M option. [default: False]                    │
+        │ --m.a INT            Field a. [default: 1]                         │
+        │ --y.a INT            Field a. [default: 1]                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected
+
+
+def test_help_union_bool_member_shapes(app, console):
+    """Nested, ``TypedDict``, and pydantic class unions with ``bool`` all list their bare flag."""
+
+    @dataclass
+    class Opts:
+        a: int = 1
+        """Field a."""
+
+    @dataclass
+    class Outer:
+        inner: Opts | bool = False
+        """Inner option."""
+
+    class TD(TypedDict, total=False):
+        a: int
+
+    class PM(BaseModel):
+        a: int = 1
+
+    @app.default
+    def main(*, o: Outer = Outer(), t: TD | bool = False, p: PM | bool = False):  # noqa: B008
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    assert "--o.inner --o.no-inner  Inner option." in actual
+    assert "--o.inner.a INT         Field a." in actual
+    assert "--t --no-t" in actual
+    assert "--t.a INT" in actual
+    assert "--p --no-p" in actual
+    assert "--p.a INT" in actual
+
+    docs = app.generate_docs(output_format="markdown")
+    assert "* `--o.inner, --o.no-inner`: Inner option." in docs
+    assert "* `--o.inner.a INT`: Field a." in docs
+    assert "* `--p, --no-p`:" in docs
 
 
 def test_help_union_bool_flag_enum(app, console):

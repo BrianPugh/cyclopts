@@ -813,7 +813,7 @@ def _generate_eq_form_prepass(keyword_args: list, indent_str: str, prog_name: st
     """
     cases: list[tuple[str, str]] = []  # (option_name, completion_action_lines)
     for argument in keyword_args:
-        if argument.is_flag() or argument.parameter.requires_equals:
+        if argument.is_flag() or argument._is_flag_composite or argument.parameter.requires_equals:
             continue
         long_names = [name for name in (argument.parameter.name or []) if name.startswith("--")]
         if not long_names:
@@ -874,7 +874,7 @@ def _generate_keyword_specs(argument: "Argument", help_format: str, prog_name: s
         List of zsh argument specs.
     """
     specs = []
-    flag = argument.is_flag()
+    flag = argument.is_flag() or argument._is_flag_composite
 
     # Determine completion action. When choices are present we emit the spec
     # in a *double-quoted* outer string so a literal ``'`` inside a choice
