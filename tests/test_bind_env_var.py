@@ -2,7 +2,7 @@ from typing import Annotated
 
 import pytest
 
-from cyclopts import MissingArgumentError, Parameter
+from cyclopts import MissingArgumentError, Parameter, env_var_split
 
 
 def test_env_var_unset_use_signature_default(app, assert_parse_args, monkeypatch):
@@ -98,6 +98,20 @@ def test_env_var_path_list_value_pathsep_split(app, assert_parse_args, monkeypat
 
     monkeypatch.setenv("BAR", "/a/b:/c/d")
     assert_parse_args(foo, [], [Path("/a/b"), Path("/c/d")])
+
+
+def test_env_var_path_list_explicit_delimiter(app, assert_parse_args, monkeypatch):
+    from pathlib import Path
+
+    def split_on_comma(type_, value, **kwargs):
+        return env_var_split(type_, value, delimiter=",")
+
+    @app.default
+    def foo(bar: Annotated[list[Path], Parameter(env_var="BAR", env_var_split=split_on_comma)]):
+        pass
+
+    monkeypatch.setenv("BAR", "one,two")
+    assert_parse_args(foo, [], [Path("one"), Path("two")])
 
 
 def test_env_var_str_value_with_spaces_not_split(app, assert_parse_args, monkeypatch):
