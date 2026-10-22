@@ -41,6 +41,25 @@ def test_env_var_split_path_posix_single(mocker):
     assert ["foo:bar"] == env_var_split(Path, "foo:bar")
 
 
+@pytest.mark.parametrize("pathsep", [":", ";"])
+@pytest.mark.parametrize(
+    "type_, expected",
+    [
+        (list[Path], ["one", "two"]),
+        (list[Path | None], ["one", "two"]),
+        (tuple[Path, ...], ["one", "two"]),
+        (tuple[Path | None, ...], ["one", "two"]),
+        (Annotated[list[Path], "test annotation"], ["one", "two"]),
+        (list[str], ["one", "two"]),
+        (Path, ["one,two"]),
+    ],
+)
+def test_env_var_split_explicit_delimiter(mocker, pathsep, type_, expected):
+    mocker.patch("cyclopts._env_var.os.pathsep", pathsep)
+
+    assert env_var_split(type_, "one,two", delimiter=",") == expected
+
+
 def test_env_var_split_path_general():
     assert ["foo"] == env_var_split(str, "foo")
     assert ["foo"] == env_var_split(Optional[str], "foo")

@@ -28,9 +28,9 @@ def env_var_split(
     Converts a single string into a list of strings. Splits when:
 
     * The ``type_`` is some variant of ``Iterable[pathlib.Path]`` objects.
-      If Windows, split on ``;``, otherwise split on ``:``.
+      By default, split on ``;`` on Windows and ``:`` otherwise.
 
-    * Otherwise, if the ``type_`` is an ``Iterable``, split on whitespace.
+    * Otherwise, if the ``type_`` is an ``Iterable``, split on whitespace by default.
       Leading/trailing whitespace of each output element will be stripped.
 
     This function is the default value for :attr:`cyclopts.App.env_var_split`.
@@ -43,7 +43,7 @@ def env_var_split(
         String to split.
     delimiter: str | None
         Delimiter to split ``val`` on.
-        If None, defaults to whitespace.
+        If None, defaults to ``os.pathsep`` for paths and whitespace otherwise.
 
     Returns
     -------
@@ -54,6 +54,8 @@ def env_var_split(
     count, consume_all = token_count(type_)
 
     if count > 1 or consume_all:
-        return val.split(os.pathsep) if _is_path(type_) else val.split(delimiter)
+        if delimiter is None and _is_path(type_):
+            delimiter = os.pathsep
+        return val.split(delimiter)
     else:
         return [val]
