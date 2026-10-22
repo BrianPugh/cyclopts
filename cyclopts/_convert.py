@@ -366,6 +366,8 @@ def _validate_json_extra_keys(
         If the data contains keys not present in the type's fields.
     """
     members = get_args(type_) if is_union(type_) else (type_,)
+    if any(dict in (member, get_origin(member)) for member in members):
+        return
     field_infos = {k: v for member in members for k, v in get_field_infos(member).items()}
     # Collect all valid names including aliases (e.g., Pydantic camelCase aliases)
     valid_names: set[str] = set()
