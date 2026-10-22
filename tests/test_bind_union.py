@@ -1265,6 +1265,62 @@ def test_union_class_or_dict_cli_and_config():
     assert app(["--x.a", "1"], exit_on_error=False) == {"a": 1, "z": 2}
 
 
+@dataclass
+class _DictNamed:
+    my_field: int
+    alpha: Annotated[int, Parameter(name="al")] = 0
+    flag: bool = False
+
+
+@pytest.mark.parametrize(
+    "cmd, config, expected",
+    [
+        (["--x.my-field", "1", "--x.z", "2"], {}, [("my-field", 1), ("z", 2)]),
+        (["--x.z", "2", "--x.my-field", "1"], {}, [("z", 2), ("my-field", 1)]),
+        (["--x.al", "1", "--x.z", "2"], {}, [("al", 1), ("z", 2)]),
+        (["--x.no-flag", "--x.z", "2"], {}, [("flag", False), ("z", 2)]),
+        (["--x.flag", "--x.z", "2"], {}, [("flag", True), ("z", 2)]),
+        (["--x", '{"my-field": 1, "z": 2}'], {}, [("my-field", 1), ("z", 2)]),
+        (["--x", '{"z": 2, "my_field": 1}'], {}, [("z", 2), ("my_field", 1)]),
+        ([], {"x": {"my-field": 1, "z": 2}}, [("my-field", 1), ("z", 2)]),
+        ([], {"x": {"z": 2, "my_field": 1}}, [("z", 2), ("my_field", 1)]),
+    ],
+)
+def test_union_class_or_dict_typed_keys(cmd, config, expected):
+    """The ``dict`` member keeps each key as typed, in input order, like a plain ``dict``.
+
+    A negative flag keeps the field name, so a ``no-`` key doesn't invert the value.
+    """
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict(config), result_action="return_value")
+
+    @app.default
+    def main(*, x: _DictNamed | dict[str, int] | None = None):
+        return x
+
+    assert list(app(cmd, exit_on_error=False).items()) == expected
+
+
+def test_union_class_or_dict_typed_keys_nested():
+    from cyclopts import App
+
+    @dataclass
+    class Outer:
+        inner: _DictNamed | dict[str, int] | None = None
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: Outer = Outer()):  # noqa: B008
+        return x
+
+    result = app(["--x.inner.z", "2", "--x.inner.my-field", "1"], exit_on_error=False)
+    assert isinstance(result.inner, dict)
+    assert list(result.inner.items()) == [("z", 2), ("my-field", 1)]
+
+
 def test_union_class_or_mapping_json_unknown_field():
     """A ``Mapping`` member doesn't take arbitrary keys, so JSON keeps the unknown-field error."""
     from collections.abc import Mapping

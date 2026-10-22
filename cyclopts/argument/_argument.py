@@ -1472,18 +1472,30 @@ class Argument:
         return normalize_completions(completer(context))
 
     def _claim_keyed_tokens(self) -> dict[str, Any]:
-        """Every token under this argument, nested by key like ``--x.a.b``; claims all children."""
-        out: dict[str, Any] = {}
+        """Every token under this argument, nested by key like ``--x.a.b``; claims all children.
+
+        Keys are as typed (``--x.my-field`` gives ``my-field``) and in input order, like a plain ``dict``.
+        """
+        keyed_tokens = []
         for argument in (self, *self.children_recursive):
             argument._marked = True
             for token in argument.tokens:
                 keys = argument.keys[len(self.keys) :] + token.keys
                 if not keys:
                     continue  # e.g. the placeholder of an explicit ``{}``
-                node = out
-                for key in keys[:-1]:
-                    node = node.setdefault(key, {})
-                node.setdefault(keys[-1], []).append(token)
+                name = token._option_name or token.keyword or ""
+                with suppress(ValueError):
+                    # A negative (``--x.no-flag``) keeps the field key; ``{"no-flag": False}`` would invert it.
+                    if argument is not self and argument.match(name)[1] in (UNSET, True):
+                        keys = self.match(name)[0]
+                keyed_tokens.append((keys, token))
+
+        out: dict[str, Any] = {}
+        for keys, token in sorted(keyed_tokens, key=lambda item: item[1]._order):
+            node = out
+            for key in keys[:-1]:
+                node = node.setdefault(key, {})
+            node.setdefault(keys[-1], []).append(token)
         return out
 
     def _keyless_json_value(self) -> Any:

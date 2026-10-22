@@ -4,6 +4,7 @@ import copy as copy_module
 import inspect
 import itertools
 from collections.abc import Callable, Iterable, Sequence
+from functools import partial
 from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, get_args, overload
 
 if TYPE_CHECKING:
@@ -970,16 +971,13 @@ def update_argument_collection(
             if not is_iterable(value):
                 value = (value,)
 
+            make_token = partial(
+                Token, keyword=complete_keyword, source=source, keys=remaining_keys, _option_name=cli_option_name
+            )
             if value:
                 for i, v in enumerate(value):
                     if v is None:
-                        token = Token(
-                            keyword=complete_keyword,
-                            implicit_value=None,
-                            source=source,
-                            index=i,
-                            keys=remaining_keys,
-                        )
+                        token = make_token(implicit_value=None, index=i)
                     else:
                         if isinstance(v, dict | list):
                             # Serialize to JSON string; will be deserialized in Argument._json()
@@ -988,12 +986,7 @@ def update_argument_collection(
                             value_str = json.dumps(v)
                         else:
                             value_str = str(v)
-                        token = Token(
-                            keyword=complete_keyword, value=value_str, source=source, index=i, keys=remaining_keys
-                        )
+                        token = make_token(value=value_str, index=i)
                     argument.append(token)
             else:
-                token = Token(
-                    keyword=complete_keyword, implicit_value=value, source=source, index=0, keys=remaining_keys
-                )
-                argument.append(token)
+                argument.append(make_token(implicit_value=value))
