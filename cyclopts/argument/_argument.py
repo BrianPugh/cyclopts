@@ -18,7 +18,6 @@ from cyclopts._convert import (
     instantiate_from_dict,
     takes_scalar,
     token_count,
-    union_mapping_member,
 )
 from cyclopts.annotations import (
     ITERABLE_TYPES,
@@ -189,6 +188,9 @@ class Argument:
     _keyless_members: tuple[Any, ...] = field(factory=tuple, init=False, repr=False)
     """Members of a keyword-accepting ``Union`` that take a keyless value, e.g. ``bool`` in ``Foo | bool``."""
 
+    _mapping_member: Any = field(default=None, init=False, repr=False)
+    """The ``dict`` member of a class-or-dict ``Union``, e.g. ``dict[str, int]`` in ``Foo | dict[str, int]``."""
+
     _union_branches: "list[tuple[Any, dict[str, FieldInfo]]]" = field(factory=list, init=False, repr=False)
     """Per-branch ``(member_type, field_infos)`` when :attr:`hint` is a ``Union`` with a keyword-accepting member.
 
@@ -240,12 +242,14 @@ class Argument:
             return
 
         keyless_members = []
+        mapping_members = []
         for hint in hints:
             origin = get_origin(hint)
             hint_origin = {hint, origin}
 
             field_infos = get_field_infos(hint)
             if dict in hint_origin:
+                mapping_members.append(hint)
                 self._accepts_keywords = True
                 key_type, val_type = str, str
                 args = get_args(hint)
@@ -312,6 +316,7 @@ class Argument:
             branches = [(member, fis) for member in hints if (fis := get_field_infos(member))]
             if branches:
                 self._union_branches = branches
+                self._mapping_member = next(iter(mapping_members), None)
                 # The generic checker would introspect the ``typing.Union`` alias itself
                 # (yielding phantom fields like ``origin``); branch-aware gating in
                 # :meth:`_convert` supersedes it.
@@ -778,16 +783,19 @@ class Argument:
 
         explicit_empty_mapping = False
         self.tokens = other_tokens
+        # A ``dict`` member takes the keys no class field matches (``match`` accepts them on ``self``).
+        targets = (
+            ArgumentCollection([self, *self.children_recursive])
+            if self._mapping_member is not None
+            else self.children_recursive
+        )
         for token in json_tokens:
             parsed_json = self._decode_json_object(token)
             if parsed_json:
                 update_argument_collection(
                     {self.name.lstrip("-"): parsed_json},
                     token.source,
-                    # A ``dict`` member takes the keys no class field matches.
-                    ArgumentCollection([self, *self.children_recursive])
-                    if union_mapping_member(self.resolved_hint) is not None
-                    else self.children_recursive,
+                    targets,
                     root_keys=(),
                     allow_unknown=False,
                     key_prefix=self.keys,
@@ -959,13 +967,13 @@ class Argument:
                     return safe_converter(self.hint, tuple(positional_tokens))
 
             supplied_keys = {child.keys[-1] for child in self.children if child.has_tokens}
-            mapping = union_mapping_member(self.resolved_hint)
+            mapping = self._mapping_member
             if mapping is not None and (
                 any(token.keys for token in self.tokens)
                 or (supplied_keys and self._resolve_union_member(supplied_keys) is None)
             ):
                 # Keys no single class branch takes (e.g. ``--x.z`` on ``Foo | dict[str, int]``).
-                return safe_converter(mapping, self._keyed_tokens())
+                return safe_converter(mapping, self._claim_keyed_tokens())
             active_required = self._active_branch_required_keys(supplied_keys)
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
@@ -1463,9 +1471,9 @@ class Argument:
             return None
         return normalize_completions(completer(context))
 
-    def _keyed_tokens(self) -> dict:
+    def _claim_keyed_tokens(self) -> dict[str, Any]:
         """Every token under this argument, nested by key like ``--x.a.b``; claims all children."""
-        out = {}
+        out: dict[str, Any] = {}
         for argument in (self, *self.children_recursive):
             argument._marked = True
             for token in argument.tokens:

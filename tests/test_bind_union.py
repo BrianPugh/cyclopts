@@ -1182,3 +1182,100 @@ def test_union_class_or_dict_config(config, expected):
         return x
 
     assert app([], exit_on_error=False) == expected
+
+
+@define
+class _DictAttrs:
+    a: int
+
+
+class _DictTuple(NamedTuple):
+    a: int
+
+
+@dataclass
+class _DictOther:
+    c: int
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        dict[str, int] | _DictUser | None,
+        _DictAttrs | dict[str, int] | None,
+        _DictTuple | dict[str, int] | None,
+        _DictUser | dict[str, int] | bool,
+    ],
+)
+def test_union_class_or_dict_members(hint):
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: hint = None):  # pyright: ignore[reportInvalidTypeForm]
+        return x
+
+    assert app(["--x.z", "1"], exit_on_error=False) == {"z": 1}
+    assert app(["--x.a", "1", "--x.z", "2"], exit_on_error=False) == {"a": 1, "z": 2}
+
+
+def test_union_class_or_dict_cross_branch():
+    """Keys from 2 class branches fit neither, so they go to the ``dict`` member."""
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _DictUser | _DictOther | dict[str, int] | None = None):
+        return x
+
+    assert app(["--x.c", "2"], exit_on_error=False) == _DictOther(c=2)
+    assert app(["--x.a", "1", "--x.c", "2"], exit_on_error=False) == {"a": 1, "c": 2}
+
+
+def test_union_class_or_dict_nested():
+    from cyclopts import App
+
+    @dataclass
+    class Outer:
+        inner: _DictUser | dict[str, int] | None = None
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: Outer = Outer()):  # noqa: B008
+        return x
+
+    assert app(["--x.inner.z", "1"], exit_on_error=False) == Outer(inner={"z": 1})
+    assert app(["--x.inner.a", "1"], exit_on_error=False) == Outer(inner=_DictUser(a=1))
+
+
+def test_union_class_or_dict_cli_and_config():
+    """Each source fills only what earlier sources left unset, so CLI and config keys merge into the dict."""
+    from cyclopts import App
+    from cyclopts.config import Dict
+
+    app = App(config=Dict({"x": {"z": 2}}), result_action="return_value")
+
+    @app.default
+    def main(*, x: _DictUser | dict[str, int] | None = None):
+        return x
+
+    assert app(["--x.a", "1"], exit_on_error=False) == {"a": 1, "z": 2}
+
+
+def test_union_class_or_mapping_json_unknown_field():
+    """A ``Mapping`` member doesn't take arbitrary keys, so JSON keeps the unknown-field error."""
+    from collections.abc import Mapping
+
+    from cyclopts import App
+
+    app = App(result_action="return_value")
+
+    @app.default
+    def main(*, x: _DictOther | Mapping[str, int] | None = None):
+        return x
+
+    with pytest.raises(CoercionError, match='Unknown field "z"'):
+        app(["--x", '{"z": 1}'], exit_on_error=False)
