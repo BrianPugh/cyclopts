@@ -1204,6 +1204,14 @@ class Argument:
 
     def _scalar_hint(self, keys: tuple[str, ...] = ()) -> Any:
         """The type under ``keys`` if it only takes a single value, so a config array can't bind to it; else ``None``."""
+        if (
+            not keys
+            and self._keyless_members
+            and self._use_pydantic_type_adapter
+            and not any(getattr(member, "__pydantic_root_model__", False) for member, _ in self._union_branches)
+        ):
+            # The TypeAdapter never builds the model from keyless values, so only a keyless member could take the array.
+            return self.hint if all(takes_scalar(m) for m in self._keyless_members) else None
         count, consume_all = self.token_count(keys)
         if count > 1 or consume_all:
             return None
