@@ -185,6 +185,9 @@ class Argument:
 
     _enum_flag_type: Any | None = field(default=None, init=False, repr=False)
 
+    _keyless_members: tuple[Any, ...] = field(factory=tuple, init=False, repr=False)
+    """Members of a keyword-accepting ``Union`` that take a keyless value, e.g. ``bool`` in ``Foo | bool``."""
+
     _union_branches: "list[tuple[Any, dict[str, FieldInfo]]]" = field(factory=list, init=False, repr=False)
     """Per-branch ``(member_type, field_infos)`` when :attr:`hint` is a ``Union`` with a keyword-accepting member.
 
@@ -235,6 +238,7 @@ class Argument:
         if self.parameter.accepts_keys is False:
             return
 
+        keyless_members = []
         for hint in hints:
             origin = get_origin(hint)
             hint_origin = {hint, origin}
@@ -281,6 +285,8 @@ class Argument:
                 self._accepts_keywords = True
                 self._update_lookup(field_infos)
             elif self.parameter.accepts_keys is None:
+                if not is_nonetype(hint):
+                    keyless_members.append(hint)
                 continue
 
             if self.parameter.accepts_keys is None:
@@ -301,6 +307,7 @@ class Argument:
 
         if self._accepts_keywords and len(hints) > 1:
             # e.g. ``Foo | Bar`` or ``Foo | bool``; see ``_union_branches``.
+            self._keyless_members = tuple(keyless_members)
             branches = [(member, fis) for member in hints if (fis := get_field_infos(member))]
             if branches:
                 self._union_branches = branches
@@ -1253,10 +1260,11 @@ class Argument:
     def show(self) -> bool:
         """Show this argument on the help page.
 
-        If an argument has child arguments, don't show it on the help-page.
+        If an argument has child arguments, don't show it on the help-page, unless a union
+        member takes a keyless value (e.g. ``--x``/``--no-x`` on ``Foo | bool``).
         Returns False for arguments that won't be parsed (including underscore-prefixed params).
         """
-        if self.children:
+        if self.children and not self._keyless_members:
             return False
         if self.parameter.show is not None:
             # User explicitly set show
@@ -1266,6 +1274,11 @@ class Argument:
             return False
         # Default to whether this argument is parsed
         return self.parse
+
+    @property
+    def _is_flag_composite(self) -> bool:
+        """A composite whose only keyless member is ``bool``, so a bare ``--x`` consumes no value."""
+        return bool(self.children) and self._keyless_members == (bool,)
 
     @property
     def parse(self) -> bool:

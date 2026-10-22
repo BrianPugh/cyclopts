@@ -44,6 +44,7 @@ from .apps import (
     app_positional_path,
     app_three_positionals,
     app_two_iterables,
+    app_union_whole_value,
 )
 
 # Each scenario:
@@ -229,6 +230,27 @@ SCENARIOS = [
         "twoiter",
         "twoiter collect a.txt b.txt ",
         None,
+        set(),
+    ),
+    # 19. A class union's own option is offered when another member takes the whole
+    # value (``--opts``/``--no-opts`` on ``Opts | bool``, ``--level`` on ``Opts | int``),
+    # alongside its fields; ``Opts | None`` offers only the fields.
+    (
+        "union-whole-value-options",
+        app_union_whole_value,
+        "unionval",
+        "unionval --",
+        {"--opts", "--no-opts", "--opts.a", "--level", "--level.a", "--plain.a"},
+        {"--plain"},
+    ),
+    # 20. ``--opts`` on ``Opts | bool`` is a flag: it must not swallow the next word
+    # (zsh registered it as value-taking, so nothing completed after it).
+    (
+        "union-whole-value-flag-then-option",
+        app_union_whole_value,
+        "unionval",
+        "unionval --opts --",
+        {"--level", "--level.a", "--plain.a"},
         set(),
     ),
 ]
