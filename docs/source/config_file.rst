@@ -116,6 +116,58 @@ This can be accomplished via a :ref:`Meta App`.
     if __name__ == "__main__":
         app.meta()
 
+Parameters of the meta app's default can be set from a config too, provided the config is assigned before ``app.meta()`` runs.
+Each level takes only its own keys: the meta default reads top-level keys like ``verbose``, and ``count`` reads its own table.
+A config assigned inside the meta function, as above, is read after the meta parameters are parsed, so it only reaches the inner commands.
+
+.. code-block:: python
+
+   # character-counter.py
+   from pathlib import Path
+   from typing import Annotated
+
+   import cyclopts
+   from cyclopts import App, Parameter
+
+   app = App(
+       name="character-counter",
+       config=cyclopts.config.Toml(
+           "pyproject.toml",
+           root_keys=["tool", "character-counter"],
+           search_parents=True,
+       ),
+   )
+
+   @app.command
+   def count(filename: Path, *, character="-"):
+       print(filename.read_text().count(character))
+
+   @app.meta.default
+   def meta(
+       *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+       verbose: bool = False,
+   ):
+       if verbose:
+           print(f"Running {tokens}")
+       app(tokens)
+
+   if __name__ == "__main__":
+       app.meta()
+
+.. code-block:: toml
+
+   [tool.character-counter]
+   verbose = true
+
+   [tool.character-counter.count]
+   character = "t"
+
+.. code-block:: console
+
+   $ python character-counter.py count README.md
+   Running ('count', 'README.md')
+   380
+
 ----------------------------
 Environment Variable Example
 ----------------------------
