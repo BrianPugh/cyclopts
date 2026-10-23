@@ -116,6 +116,10 @@ This can be accomplished via a :ref:`Meta App`.
     if __name__ == "__main__":
         app.meta()
 
+Parameters of the meta app's default can be set from a config too, provided the config is assigned before ``app.meta()`` runs.
+Each level takes only its own keys: the meta default reads top-level keys like ``verbose``, and ``count`` reads its own table.
+A config assigned inside the meta function, as above, is read after the meta parameters are parsed, so it only reaches the inner commands.
+
 ----------------------------
 Environment Variable Example
 ----------------------------
