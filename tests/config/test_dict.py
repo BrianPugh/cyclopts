@@ -721,6 +721,16 @@ def test_config_dict_binds_nested_meta_params():
     assert app.meta.meta(["run"]) == (True, (True, 0, 1))
 
 
+@pytest.mark.parametrize("config", [{"run": {"bogus": 1}}, {"verbose": True, "run": {"bogus": 1}}])
+def test_config_dict_unknown_key_with_meta_app(config):
+    from cyclopts.exceptions import UnknownOptionError
+
+    app = _meta_param_app()
+    app.config = Dict(config)
+    with pytest.raises(UnknownOptionError, match="bogus"):
+        app.meta(["run"])
+
+
 def test_config_dict_deep_nesting():
     """Test Dict config with deep root_keys nesting."""
     config_data = {"level1": {"level2": {"level3": {"level4": {"name": "Alice", "age": 30}}}}}
