@@ -656,6 +656,71 @@ def test_config_dict_with_meta_app():
     assert result == "Alice is 30 years old."
 
 
+def _meta_param_app():
+    app = App(result_action="return_value", exit_on_error=False)
+
+    @app.command
+    def run(count: int = 1):
+        return count
+
+    @app.meta.default
+    def meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        verbose: bool = False,
+        level: int = 0,
+    ):
+        return verbose, level, app(tokens)
+
+    return app
+
+
+@pytest.mark.parametrize("on_meta", [True, False])
+def test_config_dict_binds_meta_param(on_meta):
+    app = _meta_param_app()
+    (app.meta if on_meta else app).config = Dict({"verbose": True})
+    assert app.meta(["run"]) == (True, 0, 1)
+
+
+@pytest.mark.parametrize("on_meta", [True, False])
+def test_config_dict_meta_param_cli_beats_config(on_meta):
+    app = _meta_param_app()
+    (app.meta if on_meta else app).config = Dict({"verbose": True, "level": 5})
+    assert app.meta(["--no-verbose", "--level", "2", "run"]) == (False, 2, 1)
+
+
+def test_config_dict_meta_and_command_params_from_same_config():
+    app = _meta_param_app()
+    app.config = Dict({"verbose": True, "run": {"count": 7}})
+    assert app.meta(["run"]) == (True, 0, 7)
+
+
+@pytest.mark.parametrize("on_meta", [True, False])
+def test_config_dict_meta_param_shadows_inner_param(on_meta):
+    app = App(result_action="return_value", exit_on_error=False)
+
+    @app.default
+    def main(verbose: bool = False):
+        return verbose
+
+    @app.meta.default
+    def meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], verbose: bool = False):
+        return verbose, app(tokens)
+
+    (app.meta if on_meta else app).config = Dict({"verbose": True})
+    assert app.meta([]) == (True, False)
+
+
+def test_config_dict_binds_nested_meta_params():
+    app = _meta_param_app()
+
+    @app.meta.meta.default
+    def meta_meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], debug: bool = False):
+        return debug, app.meta(tokens)
+
+    app.config = Dict({"verbose": True, "debug": True})
+    assert app.meta.meta(["run"]) == (True, (True, 0, 1))
+
+
 def test_config_dict_deep_nesting():
     """Test Dict config with deep root_keys nesting."""
     config_data = {"level1": {"level2": {"level3": {"level4": {"name": "Alice", "age": 30}}}}}
