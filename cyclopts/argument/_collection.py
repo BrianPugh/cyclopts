@@ -752,7 +752,7 @@ def _resolve_groups_from_callable(
 def _meta_arguments(apps: Sequence["App"]) -> ArgumentCollection:
     argument_collection = ArgumentCollection()
     for app in apps:
-        if app._meta is None:
+        if app._meta is None or app._meta is apps[-1]:
             continue
         argument_collection.extend(app._meta.assemble_argument_collection())
     return argument_collection
