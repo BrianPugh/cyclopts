@@ -750,21 +750,9 @@ def _resolve_groups_from_callable(
 
 
 def _meta_arguments(apps: Sequence["App"]) -> ArgumentCollection:
-    """Collect the arguments of the meta apps in the config frame.
+    """Collect the arguments of meta apps in the config frame, whose keys the app being populated skips.
 
-    The app being populated skips config keys owned by these meta apps,
-    since each level binds only its own keys.
-
-    Parameters
-    ----------
-    apps : Sequence[App]
-        Stack of apps leading to the app being populated.
-        ``apps[-1]`` must be the app being populated; its own parameters are never excluded.
-
-    Returns
-    -------
-    ArgumentCollection
-        Arguments whose config keys belong to a meta app.
+    ``apps[-1]`` must be the app being populated; its own meta parameters are never excluded.
     """
     argument_collection = ArgumentCollection()
     for app in apps:
