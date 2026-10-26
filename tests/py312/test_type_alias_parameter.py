@@ -3,6 +3,7 @@
 Regression tests for https://github.com/BrianPugh/cyclopts/issues/669
 """
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -21,6 +22,21 @@ type OptionalInt = Optional[int]
 # A 'type' alias over a cyclopts.types converter type (which is itself Annotated).
 # https://github.com/BrianPugh/cyclopts/issues/836
 type ResolvedPathAlias = ct.ResolvedPath
+# A generic 'type' alias, subscripted at the use site.
+# https://github.com/BrianPugh/cyclopts/issues/1028
+type Flattened[T] = Annotated[T, Parameter(name="*")]
+type Same[T] = T
+type Swapped[A, B] = tuple[B, A]
+
+
+@dataclass(frozen=True, kw_only=True)
+class Upper:
+    upper: bool = False
+
+
+@dataclass(frozen=True, kw_only=True)
+class Lower:
+    lower: bool = False
 
 
 @pytest.mark.parametrize(
@@ -127,6 +143,36 @@ def test_type_alias_over_cyclopts_type_bare(app, assert_parse_args):
         pass
 
     assert_parse_args(main, "bar", Path("bar").resolve())
+
+
+def test_generic_type_alias_with_parameter_name_star(app, assert_parse_args):
+    """A subscripted generic 'type' alias keeps its ``Parameter(name="*")``."""
+
+    @app.default
+    def main(*, upper: Flattened[Upper] = Upper(), lower: Flattened[Lower] = Lower()):
+        pass
+
+    assert_parse_args(main, "--upper --lower", upper=Upper(upper=True), lower=Lower(lower=True))
+
+
+def test_generic_type_alias_of_bare_type_parameter(app, assert_parse_args):
+    """A generic 'type' alias whose value is the type parameter itself."""
+
+    @app.default
+    def main(foo: Same[int]):
+        pass
+
+    assert_parse_args(main, "3", 3)
+
+
+def test_generic_type_alias_substitutes_by_parameter_order(app, assert_parse_args):
+    """Type arguments bind to the alias's own parameters, not to their order in its value."""
+
+    @app.default
+    def main(foo: Swapped[str, int]):
+        pass
+
+    assert_parse_args(main, "1 a", (1, "a"))
 
 
 def test_type_alias_over_cyclopts_type_optional(app, assert_parse_args):
