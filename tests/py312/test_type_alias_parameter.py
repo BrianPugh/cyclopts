@@ -3,6 +3,7 @@
 Regression tests for https://github.com/BrianPugh/cyclopts/issues/669
 """
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -21,6 +22,24 @@ type OptionalInt = Optional[int]
 # A 'type' alias over a cyclopts.types converter type (which is itself Annotated).
 # https://github.com/BrianPugh/cyclopts/issues/836
 type ResolvedPathAlias = ct.ResolvedPath
+
+
+@dataclass(frozen=True, kw_only=True)
+class Opts:
+    test: bool = False
+
+
+@Parameter(name="*")
+@dataclass(frozen=True, kw_only=True)
+class StarOpts:
+    test: bool = False
+
+
+# 'type' aliases that carry Parameter(name="*"), directly or through another alias or a decorated class.
+# https://github.com/BrianPugh/cyclopts/issues/1029
+type OptsStar = Annotated[Opts, Parameter(name="*")]
+type OptsStarAlias = OptsStar
+type StarOptsAlias = StarOpts
 
 
 @pytest.mark.parametrize(
@@ -137,3 +156,31 @@ def test_type_alias_over_cyclopts_type_optional(app, assert_parse_args):
         pass
 
     assert_parse_args(main, "bar", Path("bar").resolve())
+
+
+@pytest.mark.parametrize(
+    "hint,class_name",
+    [
+        (OptsStar, "Opts"),
+        (OptsStarAlias, "Opts"),
+        (StarOptsAlias, "StarOpts"),
+    ],
+)
+def test_type_alias_star_parameter_without_default_raises(app, hint, class_name):
+    """A 'type' alias with ``Parameter(name="*")`` gets the same setup-time error as the inline hint."""
+
+    def cmd(opts: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    with pytest.raises(ValueError, match=rf'providing a default value "opts: {class_name} = {class_name}\(\)"'):
+        app.default(cmd)
+
+
+def test_type_alias_star_parameter_with_default(app, assert_parse_args):
+    """A 'type' alias with ``Parameter(name="*")`` and a default value parses its fields as flags."""
+
+    @app.default
+    def main(opts: OptsStar = Opts()):
+        pass
+
+    assert_parse_args(main, "--test", opts=Opts(test=True))
