@@ -27,6 +27,7 @@ type ResolvedPathAlias = ct.ResolvedPath
 type Flattened[T] = Annotated[T, Parameter(name="*")]
 type Same[T] = T
 type Swapped[A, B] = tuple[B, A]
+type Ignored[T] = int
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -173,6 +174,16 @@ def test_generic_type_alias_substitutes_by_parameter_order(app, assert_parse_arg
         pass
 
     assert_parse_args(main, "1 a", (1, "a"))
+
+
+def test_generic_type_alias_with_unused_type_parameter(app, assert_parse_args):
+    """A generic 'type' alias whose value doesn't use its type parameter."""
+
+    @app.default
+    def main(foo: Ignored[str]):
+        pass
+
+    assert_parse_args(main, "3", 3)
 
 
 def test_type_alias_over_cyclopts_type_optional(app, assert_parse_args):

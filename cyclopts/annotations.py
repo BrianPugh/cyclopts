@@ -304,7 +304,10 @@ def resolve_type_alias(type_: Any) -> Any:
         value = origin.__value__
         if value in substitutions:
             return substitutions[value]
-        return value[tuple(substitutions[p] for p in value.__parameters__)]
+        parameters = getattr(value, "__parameters__", ())
+        if not parameters:
+            return value
+        return value[tuple(substitutions[p] for p in parameters)]
     return type_
 
 
