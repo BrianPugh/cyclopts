@@ -289,9 +289,25 @@ def resolve_new_type(type_: Any) -> type:
 
 
 def resolve_type_alias(type_: Any) -> Any:
-    """Resolve TypeAliasType (Python 3.12+ 'type' statement) to its underlying type."""
-    if TypeAliasType is not None and isinstance(type_, TypeAliasType):
+    """Resolve TypeAliasType (Python 3.12+ 'type' statement) to its underlying type.
+
+    A subscripted generic alias (``type Alias[T] = ...`` used as ``Alias[int]``) resolves
+    to its value with the type arguments substituted.
+    """
+    if TypeAliasType is None:
+        return type_
+    if isinstance(type_, TypeAliasType):
         return type_.__value__
+    origin = get_origin(type_)
+    if isinstance(origin, TypeAliasType):
+        substitutions = dict(zip(origin.__type_params__, get_args(type_), strict=True))
+        value = origin.__value__
+        if value in substitutions:
+            return substitutions[value]
+        parameters = getattr(value, "__parameters__", ())
+        if not parameters:
+            return value
+        return value[tuple(substitutions[p] for p in parameters)]
     return type_
 
 
