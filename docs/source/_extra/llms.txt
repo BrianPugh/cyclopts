@@ -1,0 +1,31 @@
+# Cyclopts
+
+> Cyclopts is a Python library for building CLIs from type-hinted functions. The CLI is derived from the function signature, type hints, and docstring; `Parameter(...)` is only needed to change a specific behavior. Help text should come from docstrings, not `Parameter(help=...)`. Add short flags with `Parameter(alias="-x")`, not `Parameter(name=[...])`.
+
+Full concatenated documentation: https://cyclopts.readthedocs.io/en/latest/llms-full.txt
+
+A skill file for coding assistants ships with the package: `cyclopts skill install` (Claude Code) or `cyclopts skill show`.
+
+## Start here
+
+- [Getting Started](https://cyclopts.readthedocs.io/en/latest/getting_started.html): minimal app, commands, docstring help
+- [Commands](https://cyclopts.readthedocs.io/en/latest/commands.html): `@app.command`, `@app.default`, sub-apps
+- [Parameters](https://cyclopts.readthedocs.io/en/latest/parameters.html): naming, `alias`, positional vs keyword, booleans
+- [Rules](https://cyclopts.readthedocs.io/en/latest/rules.html): how each type hint is parsed
+- [API](https://cyclopts.readthedocs.io/en/latest/api.html): every `App` and `Parameter` attribute
+
+## Common tasks
+
+- [Parameter Validators](https://cyclopts.readthedocs.io/en/latest/parameter_validators.html): `validators.Number`, `validators.Path`, custom validators and converters
+- [Groups](https://cyclopts.readthedocs.io/en/latest/groups.html): help panels and mutually-exclusive options
+- [User Classes](https://cyclopts.readthedocs.io/en/latest/user_classes.html): dataclass/attrs/pydantic parameters
+- [Config Files](https://cyclopts.readthedocs.io/en/latest/config_file.html): TOML/JSON/YAML/env-var defaults
+- [Meta App](https://cyclopts.readthedocs.io/en/latest/meta_app.html): cross-cutting options like `--verbose`
+- [Help](https://cyclopts.readthedocs.io/en/latest/help.html): docstring formats, markdown/rst/rich
+- [Unit Testing](https://cyclopts.readthedocs.io/en/latest/cookbook/unit_testing.html)
+- [Shell Completion](https://cyclopts.readthedocs.io/en/latest/shell_completion.html)
+
+## Migrating
+
+- [Migrating From Typer](https://cyclopts.readthedocs.io/en/latest/migration/typer.html): Typer idiom to Cyclopts idiom table
+- [Typer Comparison](https://cyclopts.readthedocs.io/en/latest/vs_typer/README.html)
