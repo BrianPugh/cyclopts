@@ -650,9 +650,13 @@ def validate_command(f: Callable):
     if (f.__module__ or "").startswith("cyclopts"):  # Speed optimization.
         return
     for field_info in signature_parameters(f).values():
-        # Speed optimization: if no annotation and no cyclopts config, skip validation
-        field_info_is_annotated = is_annotated(field_info.annotation)
-        if not field_info_is_annotated and not getattr(field_info.annotation, "__cyclopts__", None):
+        # Speed optimization: if no annotation and no cyclopts config, skip validation.
+        # Look through ``type`` statement aliases (Python 3.12+), which can hide either.
+        annotation = field_info.annotation
+        while (resolved := resolve_type_alias(annotation)) is not annotation:
+            annotation = resolved
+        field_info_is_annotated = is_annotated(annotation)
+        if not field_info_is_annotated and not getattr(annotation, "__cyclopts__", None):
             # There is no annotation, so there is nothing to validate.
             continue
 
