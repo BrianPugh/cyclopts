@@ -750,9 +750,13 @@ def _resolve_groups_from_callable(
 
 
 def _meta_arguments(apps: Sequence["App"]) -> ArgumentCollection:
+    """Collect the arguments of meta apps in the config frame, whose keys the app being populated skips.
+
+    ``apps[-1]`` must be the app being populated; its own meta parameters are never excluded.
+    """
     argument_collection = ArgumentCollection()
     for app in apps:
-        if app._meta is None:
+        if app._meta is None or app._meta is apps[-1]:
             continue
         argument_collection.extend(app._meta.assemble_argument_collection())
     return argument_collection
@@ -871,9 +875,8 @@ def update_argument_collection(
     arguments : ArgumentCollection
         Collection of arguments to populate with configuration values.
     apps : Optional[Sequence[App]]
-        Stack of App instances for meta-argument handling.
-        We need to know all the meta-apps leading up to the current application so that we can
-        properly detect unknown keys.
+        Stack of apps leading to the app being populated, which is ``apps[-1]``.
+        Config keys belonging to their meta apps are skipped instead of reported as unknown.
     root_keys : Iterable[str]
         Base path keys to prepend to all configuration keys.
     allow_unknown : bool
