@@ -390,12 +390,12 @@ class CoercionError(CycloptsError):
 
         choice_strs: list[str] | None = None
         plain_choices: list[str] | None = None
+        nt = self.argument.parameter.name_transform
         if get_origin(self.target_type) is Literal:
-            args = get_args(self.target_type)
+            args = [nt(x.name) if isinstance(x, Enum) and x.name else x for x in get_args(self.target_type)]
             choice_strs = [f'"{x}"' if isinstance(x, str) else repr(x) for x in args]
             plain_choices = [x for x in args if isinstance(x, str)]
         elif isinstance(self.target_type, type) and issubclass(self.target_type, Enum):
-            nt = self.argument.parameter.name_transform
             members = [nt(x) for x in self.target_type.__members__]
             choice_strs = [f'"{x}"' for x in members]
             plain_choices = members

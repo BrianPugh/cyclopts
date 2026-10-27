@@ -3,7 +3,7 @@ decoupled from the annotated type (see issue #886).
 """
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, Flag, auto
 from typing import Annotated, Literal, Optional
 
 import pytest
@@ -202,6 +202,36 @@ def test_choices_enum_validation_normalizes_like_converter(app, assert_parse_arg
         pass
 
     assert_parse_args(foo, "--color RED", Color.RED)
+
+
+def test_choices_literal_of_enum_members(app, assert_parse_args):
+    """A ``Literal`` of members restricts an Enum parameter to that subset, listed by member name."""
+
+    @app.default
+    def foo(color: Annotated[Color, Parameter(choices=Literal[Color.RED, Color.BLUE])]):
+        pass
+
+    assert _argument(foo, "--color").get_choices() == ("red", "blue")
+    assert_parse_args(foo, "--color blue", Color.BLUE)
+    with pytest.raises(CoercionError) as e:
+        app("--color green", exit_on_error=False)
+    assert 'Choose from: "red", "blue".' in str(e.value)
+
+
+def test_choices_literal_of_nameless_flag_member(app):
+    """A nameless ``Flag`` value (``Perm(0)``, whose ``.name`` is ``None``) falls back to ``str()``."""
+
+    class Perm(Flag):
+        R = auto()
+
+    @app.default
+    def foo(perm: Literal[Perm(0), Perm.R] = Perm.R):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert _argument(foo, "--perm").get_choices() == (str(Perm(0)), "r")
+    with pytest.raises(CoercionError) as e:
+        app("--perm bogus", exit_on_error=False)
+    assert '"r"' in str(e.value)
 
 
 def test_choices_enum_converter_receives_listed_spelling(app, assert_parse_args):

@@ -1,12 +1,15 @@
 import inspect
 from collections import namedtuple
 from collections.abc import Iterable, Sequence
+from enum import Enum, IntEnum
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, Union
 
 import pytest
 
+from cyclopts._convert import convert
 from cyclopts.annotations import contains_hint, get_choices_from_hint, get_hint_name, is_iterable_type, resolve
+from cyclopts.utils import default_name_transform
 
 
 def test_resolve_annotated():
@@ -155,3 +158,18 @@ def test_get_choices_from_hint_abstract_collections():
     ]
     for hint in hints:
         assert get_choices_from_hint(hint, name_transform=lambda x: x) == ["fizz", "buzz"], hint
+
+
+def test_get_choices_from_hint_literal_enum_member():
+    """An enum member inside a ``Literal`` is listed by its transformed name, the spelling the converter accepts."""
+
+    class Color(Enum):
+        DARK_RED = 1
+
+    class Level(IntEnum):
+        HIGH = 20
+
+    hint = Literal[Color.DARK_RED, Level.HIGH, "Off"]
+    choices = get_choices_from_hint(hint, name_transform=default_name_transform)
+    assert choices == ["dark-red", "high", "Off"]
+    assert [convert(hint, [choice]) for choice in choices] == [Color.DARK_RED, Level.HIGH, "Off"]
