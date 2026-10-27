@@ -481,6 +481,17 @@ def test_coerce_literal_invalid_choice_no_did_you_mean():
     )
 
 
+def test_coerce_literal_enum_member_invalid_choice():
+    class Color(Enum):
+        DARK_RED = 1
+
+    assert_convert_coercion_error(
+        Literal[Color.DARK_RED, "Other"],
+        ["dark-reed"],
+        msg='Invalid value "dark-reed" for MOCKED_ARGUMENT_NAME. Choose from: "dark-red", "Other". Did you mean "dark-red"?',
+    )
+
+
 def test_coerce_enum_invalid_choice_did_you_mean_uses_name_transform():
     class SoftwareEnvironment(Enum):
         DEV_LOCAL = 1

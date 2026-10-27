@@ -960,6 +960,27 @@ def test_help_format_group_parameters_choices_literal_union(capture_format_group
     assert actual == expected
 
 
+def test_help_format_group_parameters_choices_literal_enum_member(capture_format_group_parameters):
+    class Color(Enum):
+        DARK_RED = 1
+
+    def cmd(
+        foo: Annotated[Literal[Color.DARK_RED, "other"], Parameter(help="Docstring for foo.")] = "other",
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO --foo  Docstring for foo. [choices: dark-red, other] [default: │
+        │            other]                                                  │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_group_parameters_choices_literal_union_python310_syntax_0(capture_format_group_parameters):
     def cmd(
         foo: Annotated[

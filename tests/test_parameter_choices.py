@@ -204,6 +204,20 @@ def test_choices_enum_validation_normalizes_like_converter(app, assert_parse_arg
     assert_parse_args(foo, "--color RED", Color.RED)
 
 
+def test_choices_literal_of_enum_members(app, assert_parse_args):
+    """A ``Literal`` of members restricts an Enum parameter to that subset, listed by member name."""
+
+    @app.default
+    def foo(color: Annotated[Color, Parameter(choices=Literal[Color.RED, Color.BLUE])]):
+        pass
+
+    assert _argument(foo, "--color").get_choices() == ("red", "blue")
+    assert_parse_args(foo, "--color blue", Color.BLUE)
+    with pytest.raises(CoercionError) as e:
+        app("--color green", exit_on_error=False)
+    assert 'Choose from: "red", "blue".' in str(e.value)
+
+
 def test_choices_enum_converter_receives_listed_spelling(app, assert_parse_args):
     seen = []
 
