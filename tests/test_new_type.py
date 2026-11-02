@@ -1,10 +1,14 @@
+from enum import Enum
 from pathlib import Path
-from typing import Literal, NewType
+from typing import Annotated, Literal, NewType
 
 import pytest
 
+from cyclopts import Parameter
 from cyclopts._convert import token_count
+from cyclopts.annotations import contains_enum, get_choices_from_hint
 from cyclopts.exceptions import CoercionError
+from cyclopts.utils import default_name_transform
 
 
 def test_new_type_str(app, assert_parse_args):
@@ -75,3 +79,38 @@ def test_new_type_nested_invalid(app):
 
     with pytest.raises(CoercionError):
         app.parse_args("foo", print_error=False, exit_on_error=False)
+
+
+class Color(Enum):
+    RED = 1
+    LIGHT_BLUE = 2
+
+
+ColorId = NewType("ColorId", Color)
+
+
+@pytest.mark.parametrize("hint", [ColorId, list[ColorId], tuple[ColorId, ...], ColorId | None, list[ColorId | int]])
+def test_new_type_enum_choices(hint):
+    assert get_choices_from_hint(hint, default_name_transform) == ["red", "light-blue"]
+    assert contains_enum(hint)
+
+
+def test_new_type_enum_choices_help(app, console):
+    @app.default
+    def main(colors: list[ColorId]):
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    assert "[choices: red, light-blue]" in capture.get()
+
+
+def test_new_type_enum_explicit_choices_normalized(app, assert_parse_args):
+    """Explicit ``choices`` match with ``name_transform`` when the hint holds a nested enum NewType."""
+
+    @app.default
+    def main(colors: Annotated[list[ColorId], Parameter(choices=("red", "light-blue"))]):
+        pass
+
+    assert_parse_args(main, "LIGHT_BLUE", [Color.LIGHT_BLUE])

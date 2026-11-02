@@ -336,7 +336,7 @@ def get_hint_name(hint) -> str:
 
 def contains_enum(hint) -> bool:
     """Whether an ``Enum`` appears anywhere in ``hint`` (through ``Annotated``, unions, iterables, aliases)."""
-    hint = resolve_type_alias(hint)
+    hint = resolve(hint, annotated=False, optional=False, required=False)
     return is_enum(hint) or any(contains_enum(arg) for arg in get_args(hint) if arg is not Ellipsis)
 
 
@@ -359,6 +359,7 @@ def get_choices_from_hint(type_: Any, name_transform: Callable[[str], str]) -> l
     """
     get_choices = partial(get_choices_from_hint, name_transform=name_transform)
     choices = []
+    type_ = resolve_new_type(type_)
     _origin = get_origin(type_)
     if is_enum(type_):
         choices.extend(name_transform(x) for x in type_.__members__)
