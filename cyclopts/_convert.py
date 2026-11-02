@@ -29,6 +29,7 @@ from cyclopts.annotations import (
     is_nonetype,
     is_union,
     resolve,
+    resolve_new_type,
     resolve_optional,
 )
 from cyclopts.exceptions import CoercionError, CycloptsError, ValidationError
@@ -600,7 +601,7 @@ def _convert_structured_type(
 
 
 def _convert(
-    type_,
+    type_: Any,
     token: Union["Token", Sequence["Token"]],
     *,
     converter: Callable[[Any, str], Any] | None,
@@ -620,6 +621,9 @@ def _convert(
     # The flag travels with the converter so recursive calls (e.g. through a preserved
     # ``Optional``/``Union`` member) keep passing the full ``Token`` rather than ``token.value``.
     converter_needs_token = getattr(converter, "_cyclopts_needs_token", False)
+    # A ``NewType`` is an identity function at runtime; convert to its underlying type instead.
+    # The top-level type is already resolved, but a nested one (e.g. ``list[UserId]``) is not.
+    type_ = resolve_new_type(type_)
     if is_annotated(type_):
         from cyclopts.parameter import Parameter
 
