@@ -34,6 +34,8 @@ import pytest
 
 from .apps import (
     app_basic,
+    app_default_and_commands,
+    app_default_path_and_commands,
     app_disabled_negative,
     app_enum,
     app_list_path,
@@ -42,6 +44,7 @@ from .apps import (
     app_nested,
     app_positional_literal,
     app_positional_path,
+    app_root_positionals,
     app_three_positionals,
     app_two_iterables,
     app_union_whole_value,
@@ -253,6 +256,73 @@ SCENARIOS = [
         {"--level", "--level.a", "--plain.a"},
         set(),
     ),
+    # 21. Root-level default positionals, position-aware.
+    (
+        "root-positionals-second-slot",
+        app_root_positionals,
+        "rootpos",
+        "rootpos red ",
+        {"small", "large"},
+        {"red", "green"},
+    ),
+    # 22-28. A default command's positionals complete alongside its subcommands at the
+    # first slot, then position-aware once that slot holds a non-subcommand (#1035).
+    (
+        "default-positional-with-subcommands-root",
+        app_default_and_commands,
+        "defcmd",
+        "defcmd ",
+        {"venv", "alpha", "beta"},
+        set(),
+    ),
+    (
+        "default-positional-with-subcommands-root-filled",
+        app_default_and_commands,
+        "defcmd",
+        "defcmd alpha ",
+        set(),
+        {"venv", "alpha", "beta"},
+    ),
+    (
+        "default-positional-with-subcommands-nested",
+        app_default_and_commands,
+        "defcmd",
+        "defcmd venv ",
+        {"status", "pkg_a", "pkg_b"},
+        {"install", "uninstall"},
+    ),
+    (
+        "default-positional-with-subcommands-second-slot",
+        app_default_and_commands,
+        "defcmd",
+        "defcmd venv pkg_a ",
+        {"install", "uninstall"},
+        {"status", "pkg_a", "pkg_b"},
+    ),
+    (
+        "default-positional-with-subcommands-after-option-value",
+        app_default_and_commands,
+        "defcmd",
+        "defcmd venv --python 3.11 pkg_a ",
+        {"install", "uninstall"},
+        {"status", "pkg_a", "pkg_b"},
+    ),
+    (
+        "default-positional-with-subcommands-all-filled",
+        app_default_and_commands,
+        "defcmd",
+        "defcmd venv pkg_a install ",
+        set(),
+        {"status", "pkg_a", "pkg_b", "install", "uninstall"},
+    ),
+    (
+        "default-positional-with-subcommands-in-subcommand",
+        app_default_and_commands,
+        "defcmd",
+        "defcmd venv status ",
+        set(),
+        {"status", "pkg_a", "pkg_b", "install", "uninstall"},
+    ),
 ]
 
 
@@ -315,6 +385,18 @@ def test_behavior(
     assert not leaked, (
         f"[{scenario_id}] completions {leaked} should NOT have been offered. partial={partial!r} got={results!r}"
     )
+
+
+def test_default_path_positional_with_subcommands(shell_tester_factory, tmp_path, monkeypatch):
+    """A default command's ``Path`` positional completes files alongside the subcommands (#1035)."""
+    (tmp_path / "sample.txt").write_text("x")
+    monkeypatch.chdir(tmp_path)
+    tester = shell_tester_factory(app_default_path_and_commands, "defpath")
+
+    results = tester.get_completions("defpath ")
+
+    assert "init" in results
+    assert any("sample.txt" in r for r in results), results
 
 
 def test_get_completion_action_abstract_collections():

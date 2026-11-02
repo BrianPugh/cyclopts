@@ -5,6 +5,7 @@ Targets bash 3.2+ with no external dependencies.
 """
 
 import re
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from cyclopts.annotations import is_iterable_type
@@ -122,7 +123,7 @@ def _emit_completer_completion(indent: str, prog_name: str) -> list[str]:
     ]
 
 
-def _emit_choice_completion(choices: list[str], indent: str) -> list[str]:
+def _emit_choice_completion(choices: list[str], indent: str, append: bool = False) -> list[str]:
     """Emit bash that prefix-matches ``$cur`` against an array of choices.
 
     Avoids ``compgen -W`` whitespace tokenization, which mangles choices
@@ -139,6 +140,8 @@ def _emit_choice_completion(choices: list[str], indent: str) -> list[str]:
         Raw choice strings (already cleaned via ``clean_choice_text``).
     indent : str
         Indentation prefix.
+    append : bool
+        Add to the existing ``COMPREPLY`` instead of replacing it.
 
     Returns
     -------
@@ -150,7 +153,7 @@ def _emit_choice_completion(choices: list[str], indent: str) -> list[str]:
     return [
         f"{indent}local -a _c=({array_body})",
         f"{indent}local _q",
-        f"{indent}COMPREPLY=()",
+        *([] if append else [f"{indent}COMPREPLY=()"]),
         f'{indent}for _x in "${{_c[@]}}"; do',
         f'{indent}  [[ "$_x" == "${{cur}}"* ]] && {{ printf -v _q \'%q\' "$_x"; COMPREPLY+=("$_q"); }}',
         f"{indent}done",
@@ -473,6 +476,9 @@ def _generate_completions_for_path(
     local_arguments = data.launcher_arguments + data.own_arguments
     positional_args = [arg for arg in local_arguments if arg.index is not None and arg.show]
     positional_args.sort(key=lambda a: a.index if a.index is not None else 0)
+    if commands and any(arg.index is not None for arg in data.launcher_arguments):
+        # Launcher positionals shift the subcommand's slot, which bash doesn't model.
+        positional_args = []
 
     lines.append(f"{indent}if [[ ${{cur}} == -* ]]; then")
 
@@ -490,10 +496,10 @@ def _generate_completions_for_path(
             data.arguments, commands, positional_args, f"{indent}  ", prog_name
         )
         lines.extend(value_completion_lines)
+    elif positional_args:
+        lines.extend(_generate_positional_completion(positional_args, f"{indent}  ", prog_name, commands))
     elif commands:
         lines.extend(_emit_choice_completion(commands, f"{indent}  "))
-    elif positional_args:
-        lines.extend(_generate_positional_completion(positional_args, f"{indent}  ", prog_name))
     else:
         lines.append(f"{indent}  COMPREPLY=()")
 
@@ -502,7 +508,9 @@ def _generate_completions_for_path(
     return lines
 
 
-def _generate_positional_completion(positional_args, indent: str, prog_name: str) -> list[str]:
+def _generate_positional_completion(
+    positional_args, indent: str, prog_name: str, commands: Sequence[str] = ()
+) -> list[str]:
     """Generate position-aware positional argument completion.
 
     Parameters
@@ -513,6 +521,9 @@ def _generate_positional_completion(positional_args, indent: str, prog_name: str
         Indentation string.
     prog_name : str
         Program name (fallback command for dynamic completer callbacks).
+    commands : Sequence[str]
+        Subcommand names, offered alongside the first positional slot (a word
+        there that isn't a subcommand goes to the default command).
 
     Returns
     -------
@@ -521,17 +532,19 @@ def _generate_positional_completion(positional_args, indent: str, prog_name: str
     """
     lines = []
 
-    def _emit_one(argument, body_indent: str) -> list[str]:
+    def _emit_one(argument, body_indent: str, commands: Sequence[str] = ()) -> list[str]:
         if argument.parameter.completer is not None:
-            return _emit_completer_completion(body_indent, prog_name)
-        choices = argument.get_choices(force=True)
-        if choices:
+            out = _emit_completer_completion(body_indent, prog_name)
+        elif choices := argument.get_choices(force=True):
             cleaned = [clean_choice_text(c) for c in choices]
-            return _emit_choice_completion(cleaned, body_indent)
-        compgen_flag = _map_completion_action_to_bash(get_completion_action(argument.hint))
-        if compgen_flag:
-            return [f'{body_indent}COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )']
-        return [f"{body_indent}COMPREPLY=()"]
+            return _emit_choice_completion([*commands, *cleaned], body_indent)
+        elif compgen_flag := _map_completion_action_to_bash(get_completion_action(argument.hint)):
+            out = [f'{body_indent}COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )']
+        else:
+            out = [f"{body_indent}COMPREPLY=()"]
+        if commands:
+            out += _emit_choice_completion(list(commands), body_indent, append=True)
+        return out
 
     # An iterable positional (``list[X]``, ``set[X]``, or ``*args``) greedily
     # consumes all remaining positions starting at its index. The args that
@@ -554,11 +567,15 @@ def _generate_positional_completion(positional_args, indent: str, prog_name: str
     head = positional_args if rest_idx is None else positional_args[:rest_idx]
     rest_owner = None if rest_idx is None else positional_args[rest_idx]
 
+    if commands and not head and rest_owner is not None:
+        # The rest-owner shares only slot 0 with the subcommands.
+        head = [rest_owner]
+
     if not head and rest_owner is not None:
         # Rest-owner at index 0 — no case statement needed; the iterable
         # answers every position.
         lines.extend(_emit_one(rest_owner, indent))
-    elif len(head) == 1 and rest_owner is None and head[0].parameter.completer is None:
+    elif len(head) == 1 and rest_owner is None and head[0].parameter.completer is None and not commands:
         # Single non-iterable positional — simple case. Completer-backed args
         # take the case statement below so an already-filled slot doesn't spawn
         # a useless ``__complete`` subprocess on every TAB.
@@ -567,7 +584,7 @@ def _generate_positional_completion(positional_args, indent: str, prog_name: str
         lines.append(f"{indent}case ${{positional_count}} in")
         for idx, argument in enumerate(head):
             lines.append(f"{indent}  {idx})")
-            lines.extend(_emit_one(argument, f"{indent}    "))
+            lines.extend(_emit_one(argument, f"{indent}    ", commands if idx == 0 else ()))
             lines.append(f"{indent}    ;;")
         lines.append(f"{indent}  *)")
         if rest_owner is not None:
@@ -668,20 +685,20 @@ def _generate_value_completion_for_prev(
 
     if has_cases:
         lines.append(f"{indent}  *)")
-        if commands:
+        if positional_args:
+            lines.extend(_generate_positional_completion(positional_args, f"{indent}    ", prog_name, commands))
+        elif commands:
             lines.extend(_emit_choice_completion(commands, f"{indent}    "))
-        elif positional_args:
-            lines.extend(_generate_positional_completion(positional_args, f"{indent}    ", prog_name))
         else:
             lines.append(f"{indent}    COMPREPLY=()")
         lines.append(f"{indent}    ;;")
         lines.append(f"{indent}esac")
     else:
         lines = []
-        if commands:
+        if positional_args:
+            lines.extend(_generate_positional_completion(positional_args, indent, prog_name, commands))
+        elif commands:
             lines.extend(_emit_choice_completion(commands, indent))
-        elif positional_args:
-            lines.extend(_generate_positional_completion(positional_args, indent, prog_name))
         else:
             lines.append(f"{indent}COMPREPLY=()")
 

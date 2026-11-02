@@ -323,3 +323,59 @@ def union_whole_value_main(
 ):
     """App with class unions."""
     pass
+
+
+# Default commands with positionals alongside subcommands, at the root and nested (#1035).
+app_default_and_commands = App(name="defcmd")
+
+
+@app_default_and_commands.default
+def default_and_commands_main(target: Literal["alpha", "beta"], /):
+    """Act on a target."""
+    pass
+
+
+default_and_commands_venv = App(name="venv")
+app_default_and_commands.command(default_and_commands_venv)
+
+
+@default_and_commands_venv.command
+def status():
+    """Show the status of all venvs."""
+    pass
+
+
+@default_and_commands_venv.default
+def manage(
+    package: Literal["pkg_a", "pkg_b"],
+    operation: Literal["install", "uninstall"],
+    /,
+    *,
+    python: Literal["3.11", "3.12"] = "3.12",
+):
+    """Manage the venv of a single package."""
+    pass
+
+
+app_default_path_and_commands = App(name="defpath")
+
+
+@app_default_path_and_commands.default
+def default_path_main(src: Path, /):
+    """Process a file."""
+    pass
+
+
+@app_default_path_and_commands.command
+def init():
+    """Initialize."""
+    pass
+
+
+app_root_positionals = App(name="rootpos")
+
+
+@app_root_positionals.default
+def root_positionals_main(color: Literal["red", "green"], size: Literal["small", "large"], /):
+    """Root-level positionals only."""
+    pass

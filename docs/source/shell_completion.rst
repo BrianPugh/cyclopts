@@ -224,10 +224,6 @@ Use ``ctx.incomplete`` (the partial word typed so far) to *narrow expensive look
 
 .. note::
 
-   In fish, a completer on a *positional* parameter of the **root** command (``@app.default`` with no subcommand) is not wired up; fish falls back to its default file completion there. Positional completers on subcommands, and option-value completers everywhere, work in every shell. PowerShell is not affected.
-
-.. note::
-
    A value that looks like an option (begins with ``-``, such as a negative number, or any value for a parameter with :attr:`.Parameter.allow_leading_hyphen`) is not completer-dispatched: the shells treat a ``-``-prefixed word as an option name and offer option-name completion instead.
 
 Descriptions

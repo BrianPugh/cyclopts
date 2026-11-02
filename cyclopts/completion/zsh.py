@@ -310,6 +310,7 @@ def _generate_describe_completion(
     argument: "Argument",
     help_format: str,
     indent_str: str,
+    prog_name: str = "",
 ) -> list[str]:
     """Generate _describe-based completion for a single positional argument.
 
@@ -321,6 +322,8 @@ def _generate_describe_completion(
         Help text format.
     indent_str : str
         Indentation string.
+    prog_name : str
+        Program name; enables the runtime helper for a completer-backed argument.
 
     Returns
     -------
@@ -332,7 +335,9 @@ def _generate_describe_completion(
 
     # Check for choices (Literal/Enum types)
     choices = argument.get_choices(force=True)
-    if choices:
+    if argument.parameter.completer is not None and prog_name:
+        lines.append(f"{indent_str}{_completer_action_fn(prog_name)}")
+    elif choices:
         # Generate choices array with descriptions
         escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
         lines.append(f"{indent_str}local -a choices")
@@ -520,6 +525,14 @@ def _generate_completion_for_path(
 
     # Positional specs and the subcommand's word slot.
     command_position = 1
+    # A default command's positionals compete with the subcommands for the first
+    # word; a word there that isn't a subcommand goes to the default command.
+    shares_first_slot = (
+        has_non_flag_commands
+        and not launcher_positionals
+        and bool(own_positionals)
+        and (own_positionals[0].index == 0 or _is_variadic(own_positionals[0]))
+    )
     if has_non_flag_commands:
         # The subcommand slot shifts past the fixed launcher positionals only
         # when every one of them is required (occupies a definite word) and
@@ -562,6 +575,7 @@ def _generate_completion_for_path(
         # Add positionals BEFORE options to prioritize them in completion
         args_specs = positional_specs + args_specs
 
+    keyword_specs = list(args_specs)
     if has_non_flag_commands:
         args_specs.append(f"'{command_position}: :->cmds'")
         args_specs.append("'*::arg:->args'")
@@ -604,6 +618,10 @@ def _generate_completion_for_path(
             lines.append(f"{indent_str}      {cmd}")
         lines.append(f"{indent_str}    )")
         lines.append(f"{indent_str}    _describe -t commands 'command' commands")
+        if shares_first_slot:
+            lines.extend(
+                _generate_describe_completion(own_positionals[0], data.help_format, f"{indent_str}    ", prog_name)
+            )
         lines.append(f"{indent_str}    ;;")
 
         lines.append(f"{indent_str}  args)")
@@ -633,6 +651,25 @@ def _generate_completion_for_path(
                     )
                     lines.extend(sub_lines)
                     lines.append(f"{indent_str}        ;;")
+
+        if shares_first_slot:
+            # ``$words[1]`` is the default command's first positional here, so
+            # ``_arguments`` slot N is its positional index N.
+            later_specs = _generate_nested_positional_specs(
+                [arg for arg in own_positionals if _is_variadic(arg) or (arg.index or 0) >= 1],
+                data.help_format,
+                offset=-1,
+                prog_name=prog_name,
+            )
+            fallback_specs = later_specs + keyword_specs
+            lines.append(f"{indent_str}      *)")
+            lines.extend(_generate_eq_form_prepass(keyword_args, f"{indent_str}        ", prog_name=prog_name))
+            if fallback_specs:
+                lines.append(f"{indent_str}        _arguments \\")
+                for spec in fallback_specs[:-1]:
+                    lines.append(f"{indent_str}          {spec} \\")
+                lines.append(f"{indent_str}          {fallback_specs[-1]}")
+            lines.append(f"{indent_str}        ;;")
 
         lines.append(f"{indent_str}    esac")
         lines.append(f"{indent_str}    ;;")
