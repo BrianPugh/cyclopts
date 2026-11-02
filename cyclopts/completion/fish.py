@@ -108,11 +108,14 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
     ]
 
     has_nested_commands = any(len(path) > 0 for path in completion_data.keys())
-    if has_nested_commands:
+    has_positional_choices = _any_positional_choices(completion_data)
+    if has_nested_commands or has_positional_choices:
         lines.extend(_generate_helper_functions(prog_name, completion_data))
         lines.append("")
 
-    if _any_nested_positional_choices(completion_data):
+    if has_positional_choices or any(
+        _subcommands_share_first_slot(path, data) for path, data in completion_data.items()
+    ):
         lines.extend(_generate_positional_index_helper(prog_name, completion_data))
         lines.append("")
 
@@ -128,23 +131,35 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _any_nested_positional_choices(completion_data: dict[tuple[str, ...], CompletionData]) -> bool:
-    """Whether any nested command path has a positional argument with choices or a completer.
+def _any_positional_choices(completion_data: dict[tuple[str, ...], CompletionData]) -> bool:
+    """Whether any command path has a positional argument with choices or a completer.
 
     The positional-index helper is only needed when there is at least one
-    nested positional that emits a per-slot rule (a choice list or a dynamic
+    positional that emits a per-slot rule (a choice list or a dynamic
     completer) — without either, fish's default file fallback already produces
     sensible completions.
     """
-    for path, data in completion_data.items():
-        if not path:
-            continue
+    for data in completion_data.values():
         for argument in data.arguments:
             if argument.index is None or not argument.show:
                 continue
             if argument.parameter.completer is not None or argument.get_choices(force=True):
                 return True
     return False
+
+
+def _subcommands_share_first_slot(command_path: tuple[str, ...], data: CompletionData) -> bool:
+    """Whether a nested path's subcommands compete with its default command's positionals.
+
+    Subcommand names are then only valid at the first positional slot. Paths with
+    meta-launcher positionals are left alone: those shift the subcommand's slot.
+    """
+    return (
+        bool(command_path)
+        and any(not name.startswith("-") for rc in data.commands for name in rc.names)
+        and any(arg.index is not None for arg in data.own_arguments)
+        and not any(arg.index is not None for arg in data.launcher_arguments)
+    )
 
 
 def _escape_fish_string(text: str) -> str:
@@ -227,8 +242,8 @@ def _generate_helper_functions(
         [
             "    set -l skip_next 0",
             "    # Extract command words (only real subcommand names) from command line",
-            "    for i in (seq 2 (count $cmd))",
-            "        set -l word $cmd[$i]",
+            "    set -e cmd[1]",
+            "    for word in $cmd",
             "        if test $skip_next -eq 1",
             "            set skip_next 0",
             "            continue",
@@ -249,6 +264,8 @@ def _generate_helper_functions(
             "    if test (count $subcommands) -ne (count $argv)",
             "        return 1",
             "    end",
+            "    # macOS ``seq 1 0`` counts down instead of yielding nothing.",
+            "    test (count $argv) -eq 0; and return 0",
             "    for i in (seq 1 (count $argv))",
             "        if test $subcommands[$i] != $argv[$i]",
             "            return 1",
@@ -300,8 +317,8 @@ def _generate_positional_index_helper(
             "    set -l skip_next 0",
             "    set -l consumed_path 0",
             "    set -l count 0",
-            "    for i in (seq 2 (count $cmd))",
-            "        set -l word $cmd[$i]",
+            "    set -e cmd[1]",
+            "    for word in $cmd",
             "        if test $skip_next -eq 1",
             "            set skip_next 0",
             "            continue",
@@ -421,7 +438,12 @@ def _generate_completions_for_path(
     lines = []
     condition = _get_condition_for_path(command_path, prog_name)
 
-    lines.extend(_generate_subcommand_completions(data, command_path, prog_name, condition))
+    subcommand_condition = condition
+    if _subcommands_share_first_slot(command_path, data):
+        subcommand_condition = _get_condition_for_path(
+            command_path, prog_name, extra=f"test (__fish_{prog_name}_positional_index {len(command_path)}) = 0"
+        )
+    lines.extend(_generate_subcommand_completions(data, command_path, prog_name, subcommand_condition))
 
     keyword_args = [arg for arg in data.arguments if not arg.is_positional_only() and arg.show]
     if keyword_args or help_flags or version_flags:
@@ -440,13 +462,7 @@ def _generate_positional_completions(
     command_path: tuple[str, ...],
     prog_name: str,
 ) -> list[str]:
-    """Emit per-position choice rules for positional args at a nested path.
-
-    Only nested paths (``len(command_path) > 0``) are handled. At root, the
-    natural fish gate ``__fish_use_subcommand`` flips false as soon as the
-    first positional is typed, so a position-N rule for N>0 can't be
-    expressed cleanly there; root-level positional values (rare in practice)
-    fall back to fish's default behavior.
+    """Emit per-position choice rules for the positional args at a command path.
 
     Positionals without choices (e.g. ``Path``) emit nothing — fish's
     default file completion kicks in automatically at positions where no
@@ -458,9 +474,6 @@ def _generate_positional_completions(
     the first iterable contributes a rest rule; later iterables remain
     reachable via their ``--name`` keyword forms.
     """
-    if not command_path:
-        return []
-
     # Exclude inherited (ancestor-meta) positionals: they were consumed before
     # this path's command name, so they must not claim a slot here. (This PR
     # does not attempt the full #759-style subcommand shifting for fish.)
@@ -488,8 +501,7 @@ def _generate_positional_completions(
     helper_fn = f"__fish_{prog_name}_positional_index"
     using_cmd_fn = f"__fish_{prog_name}_using_command"
     path_len = len(command_path)
-    escaped_commands = " ".join(_escape_fish_string(cmd) for cmd in command_path)
-    base_predicate = f"{using_cmd_fn} {escaped_commands}"
+    base_predicate = " ".join([using_cmd_fn, *(_escape_fish_string(cmd) for cmd in command_path)])
 
     lines: list[str] = []
     header_emitted = False
@@ -497,7 +509,7 @@ def _generate_positional_completions(
     def _ensure_header() -> None:
         nonlocal header_emitted
         if not header_emitted:
-            lines.append(f"# Positionals for: {' '.join(command_path)}")
+            lines.append(f"# Positionals for: {' '.join(command_path) or '(root)'}")
             header_emitted = True
 
     # Fish evaluates ``-a`` command substitutions even while the user is typing
@@ -779,7 +791,7 @@ def _generate_command_option_completions(
     return lines
 
 
-def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str) -> str:
+def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str, extra: str = "") -> str:
     """Generate fish condition string for a command path.
 
     Parameters
@@ -788,6 +800,8 @@ def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str) -> st
         Command path (empty for root).
     prog_name : str
         Program name.
+    extra : str
+        Additional fish predicate joined onto a nested path's condition with ``and``.
 
     Returns
     -------
@@ -799,4 +813,6 @@ def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str) -> st
 
     func_name = f"__fish_{prog_name}_using_command"
     escaped_commands = " ".join(_escape_fish_string(cmd) for cmd in command_path)
+    if extra:
+        return f"-n '{func_name} {escaped_commands}; and {extra}'"
     return f"-n '{func_name} {escaped_commands}'"

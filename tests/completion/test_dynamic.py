@@ -1163,3 +1163,37 @@ def test_e2e_wire_protocol_forward_compat(dynamic_completion_tester, shell):
     # The reserved 3rd field must not leak into any candidate or its description.
     assert not any("STYLE" in c for c in completions)
     assert not any("global-directive" in c for c in completions)
+
+
+E2E_DEFAULT_WITH_SUBCOMMANDS_SOURCE = """
+from typing import Annotated, Literal
+
+from cyclopts import App, Parameter
+
+app = App(name="deployer")
+
+
+@app.command
+def status():
+    pass
+
+
+@app.default
+def main(
+    service: Annotated[str, Parameter(completer=lambda ctx: ["api", "web"])],
+    action: Literal["start", "stop"],
+    /,
+):
+    pass
+
+
+if __name__ == "__main__":
+    app()
+"""
+
+
+def test_e2e_default_completer_positional_with_subcommands(dynamic_completion_tester, shell):
+    """A default command's completer positional completes alongside the subcommands, then position-aware (#1035)."""
+    tester = dynamic_completion_tester(E2E_DEFAULT_WITH_SUBCOMMANDS_SOURCE, prog_name="deployer", shell=shell)
+    assert sorted(_lead(c) for c in tester.get_completions("deployer ")) == ["api", "status", "web"]
+    assert sorted(_lead(c) for c in tester.get_completions("deployer api ")) == ["start", "stop"]
