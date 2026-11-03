@@ -236,7 +236,8 @@ def _merged_combined_short_scan(
 
     - a flag/count match consumes its character;
     - the first value-taking match absorbs the rest of the token as an attached
-      value (or, with no remainder, the next stream token) and ends the scan;
+      value and ends the scan (any further values come from the following
+      stream tokens, claimed by the caller);
     - an unknown character is routed to the child's stream, which reports it.
 
     Characters are routed to per-owner reconstructed tokens in scan order, so
@@ -475,22 +476,40 @@ def _scope_tokens_for_meta(
             scanned_positions.add(position)
             newly_replaced[position] = scan.child_part
             bubbled.append(scan.meta_part)
-            if scan.meta_awaits_value:
-                # The meta's value-taking option ended the token; the NEXT
-                # stream token is its value — if the child didn't claim it.
-                value_position = position + 1
-                value_synthetics = child_unclaimed_by_position.get(value_position)
-                if (
-                    value_position < delimiter_pos
-                    and value_synthetics is not None
-                    and len(value_synthetics) == 1
-                    and value_synthetics[0] == stream_tokens[value_position]
-                ):
-                    scanned_positions.add(value_position)
-                    newly_replaced[value_position] = None
-                    bubbled.append(stream_tokens[value_position])
-                # Otherwise the meta's real parse raises the proper
-                # missing-value error.
+            # A meta value-taking option in the token may consume following
+            # stream tokens (as many as its token count, or more with
+            # ``consume_multiple``) — those the child left wholly unclaimed.
+            follower_positions: list[int] = []
+            follower_position = position + 1
+            while follower_position < delimiter_pos and child_unclaimed_by_position.get(follower_position) == [
+                stream_tokens[follower_position]
+            ]:
+                follower_positions.append(follower_position)
+                follower_position += 1
+            if not follower_positions:
+                continue
+            follower_probe = _probe_unclaimed(
+                meta_collection,
+                [scan.meta_part, *(stream_tokens[p] for p in follower_positions)],
+                end_of_options_delimiter=end_of_options_delimiter,
+            )
+            if follower_probe is None:
+                # Malformed for the meta (e.g. too few values); hand it the
+                # next token so its real parse raises the proper error.
+                claimed_followers = follower_positions[:1] if scan.meta_awaits_value else []
+            else:
+                claimed_followers = []
+                for follower_position in follower_positions:
+                    if follower_probe.kw_claims.get(follower_position - position) != (
+                        stream_tokens[follower_position],
+                        None,
+                    ):
+                        break
+                    claimed_followers.append(follower_position)
+            for follower_position in claimed_followers:
+                scanned_positions.add(follower_position)
+                newly_replaced[follower_position] = None
+                bubbled.append(stream_tokens[follower_position])
 
         candidates = [
             (position, token)

@@ -1612,3 +1612,40 @@ class TestMergedShortNamespace:
 
         app.meta.meta(argv, exit_on_error=False)
         assert captured == expected
+
+    @pytest.mark.parametrize(
+        "argv, expected",
+        [
+            (["cmd", "-vp", "1", "2"], {"verbose": True, "point": (1, 2), "tags": None, "pos": ""}),
+            (["cmd", "-vp1", "2"], {"verbose": True, "point": (1, 2), "tags": None, "pos": ""}),
+            (["cmd", "-xp", "1", "2"], {"verbose": False, "point": (1, 2), "tags": None, "pos": ""}),
+            (["cmd", "-vt", "a", "b"], {"verbose": True, "point": None, "tags": ["a", "b"], "pos": ""}),
+            (["cmd", "-vt", "a", "b", "--", "c"], {"verbose": True, "point": None, "tags": ["a", "b"], "pos": "c"}),
+        ],
+    )
+    def test_meta_multi_token_option_in_combined(self, argv, expected):
+        """A meta option ending a combined token takes as many following tokens
+        as it would standalone, not exactly one (formerly ``-vt a b`` bound
+        ``tags=['a']`` and gave ``b`` to the child's positional).
+        """
+        app = App(name="demo", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def main(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
+            point: Annotated[tuple[int, int] | None, Parameter(name=["--point", "-p"])] = None,
+            tags: Annotated[list[str] | None, Parameter(name=["--tag", "-t"], consume_multiple=True)] = None,
+        ):
+            captured["verbose"] = verbose
+            captured["point"] = point
+            captured["tags"] = tags
+            return app(tokens)
+
+        @app.command
+        def cmd(pos: str = "", *, extract: Annotated[bool, Parameter(name=["--extract", "-x"])] = False):
+            captured["pos"] = pos
+
+        app.meta(argv, exit_on_error=False)
+        assert captured == expected
