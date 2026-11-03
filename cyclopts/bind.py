@@ -160,21 +160,20 @@ def _is_combined_short_candidate(
     """Whether ``token`` should be resolved by the merged combined-short scan.
 
     Mirrors the gate in :func:`_parse_kw_and_flags`'s combined-short branch:
-    single-dash, multi-character, non-numeric, no ``=``, and not an exact match
-    of any collection (exact matches are ordinary options, handled by the
-    normal probing paths).
+    single-dash, multi-character, non-numeric, and neither the token nor its
+    ``=``-prefix an exact match of any collection (exact matches are ordinary
+    options, handled by the normal probing paths).
     """
-    if "=" in token:
-        return False
     if not (token.startswith("-") and not token.startswith("--") and len(token) > 2):
         return False
     if not is_option_like(token, allow_numbers=False):
         return False
+    option = token.split("=", 1)[0]
     for collection in collections:
         if collection is None:
             continue
         try:
-            collection.match(token)
+            collection.match(option)
         except ValueError:
             continue
         return False
