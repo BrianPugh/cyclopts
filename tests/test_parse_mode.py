@@ -1522,3 +1522,50 @@ class TestMergedShortNamespace:
         with pytest.raises(UnknownOptionError) as exc_info:
             app.meta(argv, exit_on_error=False, print_error=False)
         assert str(exc_info.value) == f"Unknown option: {argv[1]}. -z is not a recognized option."
+
+    @staticmethod
+    def _build_nested():
+        app = App(name="demo", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.command
+        def cmd(*, file: Annotated[bool, Parameter(name=["--file", "-f"])] = False):
+            captured["file"] = file
+
+        @app.meta.default
+        def inner(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            quiet: Annotated[bool, Parameter(name=["--quiet", "-q"])] = False,
+            output: Annotated[str, Parameter(name=["--output", "-o"])] = "text",
+        ):
+            captured["quiet"] = quiet
+            captured["output"] = output
+            return app(tokens)
+
+        @app.meta.meta.default
+        def outer(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
+        ):
+            captured["verbose"] = verbose
+            return app.meta(tokens)
+
+        return app, captured
+
+    @pytest.mark.parametrize(
+        "flags, expected",
+        [
+            ("-qv", {"quiet": True, "verbose": True, "output": "text", "file": False}),
+            ("-fqv", {"quiet": True, "verbose": True, "output": "text", "file": True}),
+            ("-qvojson", {"quiet": True, "verbose": True, "output": "json", "file": False}),
+            ("-fovjson", {"quiet": False, "verbose": False, "output": "vjson", "file": True}),
+        ],
+    )
+    def test_nested_meta_letters_are_known(self, flags, expected):
+        """An intermediate meta's short flags count as known in the outer
+        meta's scan: they neither trip the unknown-first-character rule nor
+        let the outer meta claim letters of the intermediate's attached value.
+        """
+        app, captured = self._build_nested()
+        app.meta.meta(["cmd", flags], exit_on_error=False)
+        assert captured == expected
