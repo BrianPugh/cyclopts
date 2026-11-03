@@ -1545,6 +1545,8 @@ class TestMergedShortNamespace:
             (["cmd", "-xp", "1", "2"], {"extract": True, "point": (1, 2)}),
             (["cmd", "-vt", "a", "b"], {"verbose": True, "tags": ["a", "b"]}),
             (["cmd", "-vt", "a", "b", "--", "c"], {"verbose": True, "tags": ["a", "b"], "pos": "c"}),
+            (["cmd", "-tkey=val", "more"], {"tags": ["key=val", "more"]}),
+            (["cmd", "-vtkey=val", "more"], {"verbose": True, "tags": ["key=val", "more"]}),
             # The follower is a combined token sharing ``-x`` with the child: the child's ``-x`` wins.
             (["cmd", "-vq", "-wx"], {"verbose": True, "quiet": True, "wide": True, "extract": True}),
             (["cmd", "-vp", "1", "2", "-wx"], {"verbose": True, "point": (1, 2), "wide": True, "extract": True}),
