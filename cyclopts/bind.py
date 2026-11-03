@@ -192,9 +192,10 @@ def _merged_combined_short_scan(
     Fallthrough mode presents the user with one flat flag namespace; this scan
     makes that literal: a single GNU left-to-right pass where each character is
     matched against the child first (child wins name collisions after its
-    command), then any ``intermediate_collections`` (meta levels between this
-    meta and the child, which receive their characters via the child's
-    stream), then the meta. Standard rules apply to the merged table:
+    command), then the meta, then any ``intermediate_collections`` (meta levels
+    between this meta and the child, which receive their characters via the
+    child's stream). The meta outranks intermediates, as it does for
+    standalone options. Standard rules apply to the merged table:
 
     - a flag/count match consumes its character;
     - the first value-taking match absorbs the rest of the token as an attached
@@ -214,8 +215,8 @@ def _merged_combined_short_scan(
         matched = None
         for owner_chars, collection in (
             (child_chars, child_collection),
-            *((child_chars, collection) for collection in intermediate_collections),
             (meta_chars, meta_collection),
+            *((child_chars, collection) for collection in intermediate_collections),
         ):
             if collection is None:
                 continue

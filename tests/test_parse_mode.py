@@ -1569,3 +1569,46 @@ class TestMergedShortNamespace:
         app, captured = self._build_nested()
         app.meta.meta(["cmd", flags], exit_on_error=False)
         assert captured == expected
+
+    @pytest.mark.parametrize(
+        "argv, expected",
+        [
+            (["cmd", "-v"], {"outer_v": True, "inner_v": False, "outer_o": "", "inner_o": "", "file": False}),
+            (["cmd", "-fv"], {"outer_v": True, "inner_v": False, "outer_o": "", "inner_o": "", "file": True}),
+            (["cmd", "-o", "x"], {"outer_v": False, "inner_v": False, "outer_o": "x", "inner_o": "", "file": False}),
+            (["cmd", "-fox"], {"outer_v": False, "inner_v": False, "outer_o": "x", "inner_o": "", "file": True}),
+        ],
+    )
+    def test_nested_meta_shared_letter_outer_wins(self, argv, expected):
+        """When nested metas share a short letter, a combined token binds it
+        at the same level as the standalone option (the outer meta).
+        """
+        app = App(name="demo", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.command
+        def cmd(*, file: Annotated[bool, Parameter(name=["--file", "-f"])] = False):
+            captured["file"] = file
+
+        @app.meta.default
+        def inner(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            inner_v: Annotated[bool, Parameter(name=["--inner-v", "-v"])] = False,
+            inner_o: Annotated[str, Parameter(name=["--inner-o", "-o"])] = "",
+        ):
+            captured["inner_v"] = inner_v
+            captured["inner_o"] = inner_o
+            return app(tokens)
+
+        @app.meta.meta.default
+        def outer(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            outer_v: Annotated[bool, Parameter(name=["--outer-v", "-v"])] = False,
+            outer_o: Annotated[str, Parameter(name=["--outer-o", "-o"])] = "",
+        ):
+            captured["outer_v"] = outer_v
+            captured["outer_o"] = outer_o
+            return app.meta(tokens)
+
+        app.meta.meta(argv, exit_on_error=False)
+        assert captured == expected
