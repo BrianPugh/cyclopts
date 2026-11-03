@@ -1613,21 +1613,8 @@ class TestMergedShortNamespace:
         app.meta.meta(argv, exit_on_error=False)
         assert captured == expected
 
-    @pytest.mark.parametrize(
-        "argv, expected",
-        [
-            (["cmd", "-vp", "1", "2"], {"verbose": True, "point": (1, 2), "tags": None, "pos": ""}),
-            (["cmd", "-vp1", "2"], {"verbose": True, "point": (1, 2), "tags": None, "pos": ""}),
-            (["cmd", "-xp", "1", "2"], {"verbose": False, "point": (1, 2), "tags": None, "pos": ""}),
-            (["cmd", "-vt", "a", "b"], {"verbose": True, "point": None, "tags": ["a", "b"], "pos": ""}),
-            (["cmd", "-vt", "a", "b", "--", "c"], {"verbose": True, "point": None, "tags": ["a", "b"], "pos": "c"}),
-        ],
-    )
-    def test_meta_multi_token_option_in_combined(self, argv, expected):
-        """A meta option ending a combined token takes as many following tokens
-        as it would standalone, not exactly one (formerly ``-vt a b`` bound
-        ``tags=['a']`` and gave ``b`` to the child's positional).
-        """
+    @staticmethod
+    def _build_multi_token():
         app = App(name="demo", result_action="return_value")
         captured: dict[str, object] = {}
 
@@ -1635,17 +1622,47 @@ class TestMergedShortNamespace:
         def main(
             *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
             verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
+            quiet: Annotated[bool, Parameter(name=["--quiet", "-q"])] = False,
+            wide: Annotated[bool, Parameter(name=["--wide", "-w"])] = False,
+            meta_x: Annotated[bool, Parameter(name=["--meta-x", "-x"])] = False,
             point: Annotated[tuple[int, int] | None, Parameter(name=["--point", "-p"])] = None,
             tags: Annotated[list[str] | None, Parameter(name=["--tag", "-t"], consume_multiple=True)] = None,
         ):
-            captured["verbose"] = verbose
-            captured["point"] = point
-            captured["tags"] = tags
+            captured.update(verbose=verbose, quiet=quiet, wide=wide, meta_x=meta_x, point=point, tags=tags)
             return app(tokens)
 
         @app.command
         def cmd(pos: str = "", *, extract: Annotated[bool, Parameter(name=["--extract", "-x"])] = False):
             captured["pos"] = pos
+            captured["extract"] = extract
 
+        return app, captured
+
+    @pytest.mark.parametrize(
+        "argv, expected",
+        [
+            (["cmd", "-vp", "1", "2"], {"verbose": True, "point": (1, 2)}),
+            (["cmd", "-vp1", "2"], {"verbose": True, "point": (1, 2)}),
+            (["cmd", "-xp", "1", "2"], {"extract": True, "point": (1, 2)}),
+            (["cmd", "-vt", "a", "b"], {"verbose": True, "tags": ["a", "b"]}),
+            (["cmd", "-vt", "a", "b", "--", "c"], {"verbose": True, "tags": ["a", "b"], "pos": "c"}),
+            # The follower is a combined token sharing ``-x`` with the child: the child's ``-x`` wins.
+            (["cmd", "-vq", "-wx"], {"verbose": True, "quiet": True, "wide": True, "extract": True}),
+            (["cmd", "-vp", "1", "2", "-wx"], {"verbose": True, "point": (1, 2), "wide": True, "extract": True}),
+        ],
+    )
+    def test_meta_multi_token_option_in_combined(self, argv, expected):
+        """A meta option ending a combined token takes as many following tokens
+        as it would standalone, not exactly one (formerly ``-vt a b`` bound
+        ``tags=['a']`` and gave ``b`` to the child's positional).
+        """
+        app, captured = self._build_multi_token()
         app.meta(argv, exit_on_error=False)
-        assert captured == expected
+        defaults = {"verbose": False, "quiet": False, "wide": False, "meta_x": False, "point": None, "tags": None}
+        assert captured == {**defaults, "pos": "", "extract": False, **expected}
+
+    def test_meta_multi_token_option_in_combined_missing_value(self):
+        """Too few values for the meta option: the meta reports it."""
+        app, _ = self._build_multi_token()
+        with pytest.raises(MissingArgumentError, match="-p requires 2"):
+            app.meta(["cmd", "-vp", "1"], exit_on_error=False, print_error=False)
