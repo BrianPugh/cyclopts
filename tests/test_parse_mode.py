@@ -1511,3 +1511,14 @@ class TestMergedShortNamespace:
         app, captured = self._build()
         with pytest.raises(MissingArgumentError, match="-u"):
             app.meta(["cmd", "-xu"], exit_on_error=False)
+
+    @pytest.mark.parametrize("argv", [["cmd", "-zu"], ["cmd", "-zv", "--verbose"]])
+    def test_unknown_first_char_reported_intact(self, argv):
+        """A token whose first character is unknown is not a combined-short
+        group, so the child reports it whole instead of the meta claiming a
+        later character (issue #1039).
+        """
+        app, captured = self._build()
+        with pytest.raises(UnknownOptionError) as exc_info:
+            app.meta(argv, exit_on_error=False, print_error=False)
+        assert str(exc_info.value) == f"Unknown option: {argv[1]}. -z is not a recognized option."

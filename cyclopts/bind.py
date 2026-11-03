@@ -219,6 +219,10 @@ def _merged_combined_short_scan(
             matched = (owner_chars, argument, implicit)
             break
         if matched is None:
+            if position == 0:
+                # Not a combined-short group (GNU groups must begin with a known
+                # option); the child keeps the token intact. See issue #932.
+                return _MergedScanResult(token, None, False)
             child_chars.append(char)  # Unknown flag; the child's parse reports it.
             position += 1
             continue
