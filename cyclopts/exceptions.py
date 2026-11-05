@@ -383,14 +383,17 @@ class CoercionError(CycloptsError):
                 yield f"Invalid value for {self.token.keyword}: {verbosified}", ""
             return
 
-        assert self.argument is not None
         assert self.target_type is not None
 
         yield from super()._segments()
 
+        # ``argument`` is filled in only once the error reaches the binding
+        # layer. Raised by ``convert`` directly, e.g. inside a custom
+        # converter, it is still None, so the message must not depend on it.
+        argument = self.argument
         choice_strs: list[str] | None = None
         plain_choices: list[str] | None = None
-        nt = self.argument.parameter.name_transform
+        nt = argument.parameter.name_transform if argument is not None else cyclopts.utils.default_name_transform
         if get_origin(self.target_type) is Literal:
             args = [nt(x.name) if isinstance(x, Enum) and x.name else x for x in get_args(self.target_type)]
             choice_strs = [f'"{x}"' if isinstance(x, str) else repr(x) for x in args]
@@ -402,11 +405,19 @@ class CoercionError(CycloptsError):
 
         # Branch 3: Literal/Enum with a token -- "Choose from" + suggestion.
         if choice_strs is not None and self.token is not None:
-            name = self.token.keyword if self.token.keyword else self.argument.name.lstrip("-").upper()
+            if self.token.keyword:
+                name = self.token.keyword
+            elif argument is not None:
+                name = argument.name.lstrip("-").upper()
+            else:
+                name = None
             yield 'Invalid value "', ""
             yield self.token.value, STYLE_OFFENDING_VALUE
-            yield '" for ', ""
-            yield name, STYLE_NAME
+            if name is None:
+                yield '"', ""
+            else:
+                yield '" for ', ""
+                yield name, STYLE_NAME
             if self.token.source not in ("", "cli"):
                 yield f" from {self.token.source}", STYLE_SOURCE
             yield ". Choose from: ", ""
@@ -431,15 +442,26 @@ class CoercionError(CycloptsError):
         )
 
         if not self.token:
+            if argument is None:
+                yield f"Unable to convert value to {target_type_name}.", ""
+                return
             yield "Invalid value for ", ""
-            yield self.argument.name, STYLE_NAME
+            yield argument.name, STYLE_NAME
             yield f": unable to convert value to {target_type_name}.", ""
             return
 
-        if self.token.keyword is None:
-            display_name = self.argument.name.lstrip("-").upper()
-        else:
+        if self.token.keyword is not None:
             display_name = self.token.keyword
+        elif argument is not None:
+            display_name = argument.name.lstrip("-").upper()
+        else:
+            yield 'Unable to convert "', ""
+            yield self.token.value, STYLE_OFFENDING_VALUE
+            yield '"', ""
+            if self.token.source not in ("", "cli"):
+                yield f" from {self.token.source}", STYLE_SOURCE
+            yield f" into {target_type_name}.", ""
+            return
 
         yield "Invalid value for ", ""
         yield display_name, STYLE_NAME
