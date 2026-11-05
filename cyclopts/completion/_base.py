@@ -145,8 +145,13 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
                 # represent it; its ``--[KEYWORD]`` placeholder name is invalid shell
                 # syntax (zsh's ``_arguments`` aborts on it, breaking completion for the
                 # entire command).
+                # Unparsed arguments (``Parameter(parse=False)``) are never read from the
+                # command line, so they are never completed; inspecting their type hint
+                # (e.g. via ``is_flag()``) may also fail for values injected at runtime.
                 app_arguments = ArgumentCollection(
-                    argument for argument in app_arguments if argument.field_info.kind is not VAR_KEYWORD
+                    argument
+                    for argument in app_arguments
+                    if argument.field_info.kind is not VAR_KEYWORD and argument.parse
                 )
                 arguments.extend(app_arguments)
                 if not any(subapp is a for a in current):
