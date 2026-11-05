@@ -25,7 +25,7 @@ from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 from pydantic_core import core_schema
 
-from cyclopts import CoercionError, MissingArgumentError, Parameter, UnknownOptionError, ValidationError
+from cyclopts import CoercionError, MissingArgumentError, Parameter, UnknownOptionError, ValidationError, convert
 
 
 # Modified from https://docs.pydantic.dev/latest/#pydantic-examples
@@ -1233,6 +1233,16 @@ def test_pydantic_custom_schema_type_error_message(app, monkeypatch, cmd, name):
     assert str(e.value) == (
         f'Invalid value for {name}: unable to convert "ftp://example.com" into HttpUrl. '
         "URL scheme should be 'http' or 'https'."
+    )
+
+
+def test_pydantic_custom_schema_type_error_message_without_argument():
+    with pytest.raises(CoercionError) as e:
+        convert(HttpUrl, ["ftp://example.com"])
+
+    e.value.verbose = False
+    assert str(e.value) == (
+        "Unable to convert \"ftp://example.com\" into HttpUrl. URL scheme should be 'http' or 'https'."
     )
 
 

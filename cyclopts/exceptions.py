@@ -456,21 +456,23 @@ class CoercionError(CycloptsError):
         elif argument is not None:
             display_name = argument.name.lstrip("-").upper()
         else:
+            display_name = None
+
+        if display_name is None:
             yield 'Unable to convert "', ""
             yield self.token.value, STYLE_OFFENDING_VALUE
             yield '"', ""
             if self.token.source not in ("", "cli"):
                 yield f" from {self.token.source}", STYLE_SOURCE
             yield f" into {target_type_name}.", ""
-            return
-
-        yield "Invalid value for ", ""
-        yield display_name, STYLE_NAME
-        if self.token.source not in ("", "cli"):
-            yield f" from {self.token.source}", STYLE_SOURCE
-        yield ': unable to convert "', ""
-        yield self.token.value, STYLE_OFFENDING_VALUE
-        yield f'" into {target_type_name}.', ""
+        else:
+            yield "Invalid value for ", ""
+            yield display_name, STYLE_NAME
+            if self.token.source not in ("", "cli"):
+                yield f" from {self.token.source}", STYLE_SOURCE
+            yield ': unable to convert "', ""
+            yield self.token.value, STYLE_OFFENDING_VALUE
+            yield f'" into {target_type_name}.', ""
 
         if "pydantic" in sys.modules:
             import pydantic
