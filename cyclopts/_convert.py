@@ -27,6 +27,7 @@ from cyclopts.annotations import (
     is_annotated,
     is_enum_flag,
     is_nonetype,
+    is_pydantic_leaf,
     is_union,
     resolve,
     resolve_new_type,
@@ -820,6 +821,11 @@ def _convert(
             try:
                 if token.implicit_value is not UNSET:
                     out = token.implicit_value
+                elif converter is None and is_pydantic_leaf(type_):
+                    # Validate like pydantic would; the constructor may not take the string form.
+                    import pydantic
+
+                    out = pydantic.TypeAdapter(type_).validate_python(token.value)
                 elif converter is None:
                     out = _converters.get(type_, type_)(token.value)  # pyright: ignore[reportOptionalCall]
                 elif converter_needs_token:

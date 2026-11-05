@@ -8,9 +8,12 @@ import pydantic
 import pytest
 from pydantic import (
     AfterValidator,
+    AnyUrl,
     BaseModel,
+    ByteSize,
     ConfigDict,
     Field,
+    HttpUrl,
     PositiveInt,
     SecretBytes,
     SecretStr,
@@ -19,6 +22,7 @@ from pydantic import (
 )
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
+from pydantic_core import core_schema
 
 from cyclopts import CoercionError, MissingArgumentError, Parameter, UnknownOptionError, ValidationError
 
@@ -1102,6 +1106,77 @@ def test_pydantic_secret_explicit_value(app, assert_parse_args, secret_type, val
         f"test-cmd --some-secret {value}",
         ScriptSettings(some_secret=expected_value),
     )
+
+
+def test_pydantic_url_field(app, assert_parse_args):
+    """Pydantic URL types are a single value; their self-referencing ``__init__`` recursed forever.
+
+    Regression test for https://github.com/BrianPugh/cyclopts/issues/1046
+    """
+
+    @Parameter(name="*")
+    class Settings(BaseModel):
+        url: AnyUrl
+        timeout: int = 60
+
+    @app.default
+    def main(*, settings: Settings):
+        pass
+
+    assert_parse_args(main, "--url https://example.com", settings=Settings(url=AnyUrl("https://example.com")))
+
+
+def test_pydantic_url_parameter(app, assert_parse_args):
+    @app.default
+    def main(url: HttpUrl, urls: list[HttpUrl] | None = None, optional: AnyUrl | None = None):
+        pass
+
+    assert_parse_args(
+        main,
+        "https://a.com --urls https://b.com --urls https://c.com --optional https://d.com",
+        HttpUrl("https://a.com"),
+        [HttpUrl("https://b.com"), HttpUrl("https://c.com")],
+        AnyUrl("https://d.com"),
+    )
+
+
+def test_pydantic_url_help(app, console):
+    @app.default
+    def main(*, url: AnyUrl):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    assert "--url ANYURL" in capture.get()
+
+
+def test_pydantic_custom_schema_type_uses_type_adapter(app, assert_parse_args):
+    """A standalone custom-schema type converts like pydantic would, not through its constructor."""
+
+    class Person:
+        def __init__(self, name: str, email: str):
+            self.name = name
+            self.email = email
+
+        def __eq__(self, other):
+            return (self.name, self.email) == (other.name, other.email)
+
+        @classmethod
+        def __get_pydantic_core_schema__(cls, source, handler):
+            def parse(value):
+                if isinstance(value, cls):
+                    return value
+                name, email = value.rstrip(">").split(" <")
+                return cls(name, email)
+
+            return core_schema.no_info_plain_validator_function(parse)
+
+    @app.default
+    def main(*, person: Person, size: ByteSize):
+        pass
+
+    assert_parse_args(main, "--person 'John <j@x.com>' --size 1KB", person=Person("John", "j@x.com"), size=1000)
 
 
 def test_pydantic_inheritance_simple(app, console):
