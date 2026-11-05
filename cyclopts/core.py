@@ -2229,6 +2229,7 @@ class App:
                 "verbose": verbose,
                 "backend": backend,
                 "result_action": _result_action_converter(result_action),
+                "end_of_options_delimiter": end_of_options_delimiter,
                 "error_formatter": error_formatter,
             }.items()
             if v is not None
@@ -2359,6 +2360,7 @@ class App:
                 "verbose": verbose,
                 "backend": backend,
                 "result_action": _result_action_converter(result_action),
+                "end_of_options_delimiter": end_of_options_delimiter,
                 "error_formatter": error_formatter,
             }.items()
             if v is not None
@@ -3145,6 +3147,8 @@ class App:
             overrides["_console"] = console
         if error_console is not None:
             overrides["_error_console"] = error_console
+        if kwargs.get("end_of_options_delimiter") is not None:
+            overrides["end_of_options_delimiter"] = kwargs["end_of_options_delimiter"]
         overrides["exit_on_error"] = exit_on_error
         overrides["remap_flags"] = remap_flags
 

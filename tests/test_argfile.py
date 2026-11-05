@@ -198,3 +198,29 @@ def test_argfile_prefix_on_sub_app_has_no_effect_interactive_shell(console, mock
     mocker.patch("builtins.input", side_effect=["sub @values.args", "quit"])
     app.interactive_shell()
     assert seen == [("@values.args",)]
+
+
+def test_argfile_call_level_end_of_options_delimiter(console):
+    app = App(argfile_prefix="@", error_console=console, result_action="return_value")
+
+    @app.default
+    def main(*values: str):
+        return values
+
+    Path("values.args").write_text("x\n")
+    assert app(["@values.args", "!!", "@values.args"], end_of_options_delimiter="!!") == ("x", "@values.args")
+    assert asyncio.run(app.run_async(["!!", "@values.args"], end_of_options_delimiter="!!")) == ("@values.args",)
+
+
+def test_argfile_call_level_end_of_options_delimiter_interactive_shell(console, mocker):
+    app = App(argfile_prefix="@", error_console=console, result_action="return_value")
+    seen = []
+
+    @app.default
+    def main(*values: str):
+        seen.append(values)
+
+    Path("values.args").write_text("x\n")
+    mocker.patch("builtins.input", side_effect=["!! @values.args", "quit"])
+    app.interactive_shell(end_of_options_delimiter="!!")
+    assert seen == [("@values.args",)]
