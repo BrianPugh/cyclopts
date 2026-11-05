@@ -2116,6 +2116,9 @@ class App:
 
     def _expand_argfiles(self, tokens: list[str]) -> list[str]:
         """Expand :attr:`argfile_prefix` tokens. Must be called inside an :attr:`app_stack` context."""
+        if tokens and tokens[0] == _COMPLETE_COMMAND:
+            # The shell's words may hold a half-typed ``@path``; reading it would abort completion.
+            return tokens
         return expand_argfiles(
             tokens,
             self.app_stack.resolve("argfile_prefix"),

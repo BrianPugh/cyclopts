@@ -155,3 +155,15 @@ def test_argfile_interactive_shell(app, mocker):
     seen = []
     app.interactive_shell(dispatcher=lambda command, bound, ignored: seen.append(bound.arguments))
     assert seen == [{"host": "h"}]
+
+
+def test_argfile_not_expanded_during_completion(console, capsys):
+    """A half-typed ``@path`` on the command line must not abort dynamic completion."""
+    app = App(argfile_prefix="@", error_console=console, result_action="return_value")
+
+    @app.command
+    def run(*, host: Annotated[str, Parameter(completer=lambda ctx: ["alpha", "beta"])], port: int = 1):
+        pass
+
+    app(["__complete", "run", "@missing", "--host", ""])
+    assert capsys.readouterr().out.split("\x1fbegin\n")[1].split() == ["alpha", "beta"]
