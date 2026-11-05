@@ -1212,15 +1212,28 @@ def test_pydantic_custom_schema_type_env_var(app, assert_parse_args, monkeypatch
     assert_parse_args(main, "", size=2048)
 
 
-def test_pydantic_custom_schema_type_error_message(app):
+@pytest.mark.parametrize(
+    "cmd,name",
+    [
+        ("--url ftp://example.com", "--url"),
+        ("ftp://example.com", "URL"),
+        ("", "URL_VAR from env"),
+    ],
+)
+def test_pydantic_custom_schema_type_error_message(app, monkeypatch, cmd, name):
+    monkeypatch.setenv("URL_VAR", "ftp://example.com")
+
     @app.default
-    def main(*, url: HttpUrl):
+    def main(url: Annotated[HttpUrl, Parameter(env_var="URL_VAR")]):
         pass
 
     with pytest.raises(CoercionError) as e:
-        app("--url ftp://example.com", exit_on_error=False)
+        app(cmd, exit_on_error=False)
 
-    assert str(e.value) == "Invalid value for --url: URL scheme should be 'http' or 'https'"
+    assert str(e.value) == (
+        f'Invalid value for {name}: unable to convert "ftp://example.com" into HttpUrl. '
+        "URL scheme should be 'http' or 'https'."
+    )
 
 
 def test_pydantic_custom_schema_type_without_pydantic_imported(app, assert_parse_args, monkeypatch):
@@ -1244,6 +1257,7 @@ def test_pydantic_custom_schema_type_without_pydantic_imported(app, assert_parse
         pass
 
     assert_parse_args(main, "--tag foo", tag=Tag("foo"))
+    assert "pydantic" not in sys.modules
 
 
 def test_pydantic_inheritance_simple(app, console):

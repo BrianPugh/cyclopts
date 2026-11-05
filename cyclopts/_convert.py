@@ -829,7 +829,8 @@ def _convert(
                     try:
                         out = pydantic.TypeAdapter(type_).validate_python(token.value)
                     except pydantic.ValidationError as e:
-                        raise CoercionError(msg=e.errors()[0]["msg"], token=token, target_type=type_) from None
+                        # ``CoercionError`` appends the pydantic reason from ``__cause__``.
+                        raise CoercionError(token=token, target_type=type_) from e
                 elif converter is None:
                     out = _converters.get(type_, type_)(token.value)  # pyright: ignore[reportOptionalCall]
                 elif converter_needs_token:

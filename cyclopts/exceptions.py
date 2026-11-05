@@ -1,4 +1,5 @@
 import inspect
+import sys
 from collections.abc import Callable, Iterator, Sequence
 from enum import Enum
 from itertools import chain
@@ -470,6 +471,13 @@ class CoercionError(CycloptsError):
         yield ': unable to convert "', ""
         yield self.token.value, STYLE_OFFENDING_VALUE
         yield f'" into {target_type_name}.', ""
+
+        if "pydantic" in sys.modules:
+            import pydantic
+
+            if isinstance(self.__cause__, pydantic.ValidationError):
+                reason = self.__cause__.errors()[0]["msg"]
+                yield f" {reason[:1].upper()}{reason[1:]}.", ""
 
 
 class UnknownCommandError(CycloptsError):
