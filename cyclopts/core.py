@@ -2119,11 +2119,12 @@ class App:
         if tokens and tokens[0] == _COMPLETE_COMMAND:
             # The shell's words may hold a half-typed ``@path``; reading it would abort completion.
             return tokens
-        return expand_argfiles(
-            tokens,
-            self.app_stack.resolve("argfile_prefix"),
-            self.app_stack.resolve("end_of_options_delimiter", fallback="--"),
-        )
+        # Files are expanded before any command is resolved, so resolve from the entry app alone,
+        # even when an enclosing ``app_stack`` already holds the invoked command chain.
+        with self.app_stack([self]):
+            prefix = self.app_stack.resolve("argfile_prefix")
+            delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
+        return expand_argfiles(tokens, prefix, delimiter)
 
     def _handle_parse_error(self, e: CycloptsError, tokens: list[str]) -> NoReturn:
         """Print ``e`` according to the resolved error settings, then exit or re-raise it."""

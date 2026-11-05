@@ -167,3 +167,34 @@ def test_argfile_not_expanded_during_completion(console, capsys):
 
     app(["__complete", "run", "@missing", "--host", ""])
     assert capsys.readouterr().out.split("\x1fbegin\n")[1].split() == ["alpha", "beta"]
+
+
+def test_argfile_prefix_on_sub_app_has_no_effect(console):
+    app = App(error_console=console, result_action="return_value")
+    sub = App(name="sub", argfile_prefix="@")
+
+    @sub.default
+    def main(*values: str):
+        return values
+
+    app.command(sub)
+
+    Path("values.args").write_text("x\n")
+    assert app(["sub", "@values.args"]) == ("@values.args",)
+
+
+def test_argfile_prefix_on_sub_app_has_no_effect_interactive_shell(console, mocker):
+    app = App(error_console=console, result_action="return_value")
+    sub = App(name="sub", argfile_prefix="@")
+    seen = []
+
+    @sub.default
+    def main(*values: str):
+        seen.append(values)
+
+    app.command(sub)
+
+    Path("values.args").write_text("x\n")
+    mocker.patch("builtins.input", side_effect=["sub @values.args", "quit"])
+    app.interactive_shell()
+    assert seen == [("@values.args",)]
