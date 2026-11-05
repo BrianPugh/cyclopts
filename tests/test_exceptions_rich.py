@@ -1,6 +1,7 @@
 """Rich-formatted output tests for cyclopts exceptions."""
 
 import re
+from enum import Enum
 from io import StringIO
 from typing import Literal
 from unittest.mock import Mock
@@ -689,3 +690,46 @@ def test_argument_order_error_plural_styles_list_literal():
     # The list literal "['--a', '--b']" appears twice, styled as a single bold span each time.
     bold_strs = [text for text, style in spans if style == "bold"]
     assert bold_strs.count("['--a', '--b']") == 2
+
+
+# ---------------------------------------------------------------------------
+# No argument: convert() called directly, e.g. inside a custom converter (#1044).
+# ---------------------------------------------------------------------------
+
+
+def _coercion_error_without_argument(*args, **kwargs) -> CoercionError:
+    """Provoke a CoercionError from ``convert`` directly, so ``argument`` stays None."""
+    try:
+        convert(*args, **kwargs)
+    except CoercionError as e:
+        assert e.argument is None
+        e.verbose = False
+        return e
+    raise AssertionError("convert() did not raise CoercionError")
+
+
+def test_str_no_argument_fallback_int_conversion():
+    e = _coercion_error_without_argument(int, ["abc"])
+    assert str(e) == 'Unable to convert "abc" into int.'
+
+
+def test_str_no_argument_enum_uses_default_name_transform():
+    class Color(Enum):
+        RED = 1
+        GREEN = 2
+
+    e = _coercion_error_without_argument(Color, ["blue"])
+    assert str(e) == 'Invalid value "blue". Choose from: "red", "green".'
+
+
+def test_str_no_argument_literal_with_suggestion():
+    e = _coercion_error_without_argument(Literal["pishock", "openshock"], ["pisock"])
+    assert str(e) == 'Invalid value "pisock". Choose from: "pishock", "openshock". Did you mean "pishock"?'
+
+
+def test_rich_no_argument_fallback_styles_value_and_source():
+    e = _coercion_error_without_argument(int, [Token(value="abc", source="ENV")])
+    assert str(e) == 'Unable to convert "abc" from ENV into int.'
+    spans = _spans(e.__rich__())
+    assert ("abc", "bold red") in spans
+    assert (" from ENV", "dim") in spans

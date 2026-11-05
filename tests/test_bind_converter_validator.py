@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from cyclopts import Parameter, ValidationError
+from cyclopts import Parameter, ValidationError, convert
 from cyclopts.exceptions import CoercionError
 from cyclopts.token import Token
 
@@ -458,3 +458,22 @@ def test_staticmethod_validator_string_reference_var_positional(app, assert_pars
 
     assert_parse_args(main, "1 2", Bounded(1), Bounded(2))
     assert seen == [(Bounded, 1), (Bounded, 2)]
+
+
+def test_custom_converter_can_log_coercion_error(app):
+    """A converter that catches convert()'s error to report it and fall back (#1044)."""
+    messages = []
+
+    def lenient(type_, tokens):
+        try:
+            return convert(int, [t.value for t in tokens])
+        except CoercionError as e:
+            messages.append(str(e).splitlines()[-1])
+            return 0
+
+    @app.default
+    def main(x: Annotated[int, Parameter(converter=lenient)]):
+        return x
+
+    assert app(["abc"]) == 0
+    assert messages == ['Unable to convert "abc" into int.']
