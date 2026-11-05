@@ -821,11 +821,15 @@ def _convert(
             try:
                 if token.implicit_value is not UNSET:
                     out = token.implicit_value
-                elif converter is None and is_pydantic_leaf(type_):
+                elif converter is None and is_pydantic_leaf(type_) and "pydantic" in sys.modules:
                     # Validate like pydantic would; the constructor may not take the string form.
+                    # Non-pydantic libraries (e.g. ``whenever``) may define the hook without pydantic installed.
                     import pydantic
 
-                    out = pydantic.TypeAdapter(type_).validate_python(token.value)
+                    try:
+                        out = pydantic.TypeAdapter(type_).validate_python(token.value)
+                    except pydantic.ValidationError as e:
+                        raise CoercionError(msg=e.errors()[0]["msg"], token=token, target_type=type_) from None
                 elif converter is None:
                     out = _converters.get(type_, type_)(token.value)  # pyright: ignore[reportOptionalCall]
                 elif converter_needs_token:

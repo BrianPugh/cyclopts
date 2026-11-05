@@ -1,4 +1,5 @@
 import json
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from textwrap import dedent
@@ -1151,32 +1152,98 @@ def test_pydantic_url_help(app, console):
     assert "--url ANYURL" in capture.get()
 
 
+class Person:
+    """Mimics ``pydantic.NameEmail``: ``__init__`` takes fields, but pydantic validates a single string."""
+
+    def __init__(self, name: str, email: str):
+        self.name = name
+        self.email = email
+
+    def __eq__(self, other):
+        return (self.name, self.email) == (other.name, other.email)
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source, handler):
+        def parse(value):
+            if isinstance(value, cls):
+                return value
+            name, email = value.rstrip(">").split(" <")
+            return cls(name, email)
+
+        return core_schema.no_info_plain_validator_function(parse)
+
+
 def test_pydantic_custom_schema_type_uses_type_adapter(app, assert_parse_args):
     """A standalone custom-schema type converts like pydantic would, not through its constructor."""
-
-    class Person:
-        def __init__(self, name: str, email: str):
-            self.name = name
-            self.email = email
-
-        def __eq__(self, other):
-            return (self.name, self.email) == (other.name, other.email)
-
-        @classmethod
-        def __get_pydantic_core_schema__(cls, source, handler):
-            def parse(value):
-                if isinstance(value, cls):
-                    return value
-                name, email = value.rstrip(">").split(" <")
-                return cls(name, email)
-
-            return core_schema.no_info_plain_validator_function(parse)
 
     @app.default
     def main(*, person: Person, size: ByteSize):
         pass
 
     assert_parse_args(main, "--person 'John <j@x.com>' --size 1KB", person=Person("John", "j@x.com"), size=1000)
+
+
+def test_pydantic_custom_schema_type_accepts_keys(app, assert_parse_args):
+    @app.default
+    def main(*, person: Annotated[Person, Parameter(accepts_keys=True)]):
+        pass
+
+    assert_parse_args(main, "--person.name John --person.email j@x.com", person=Person("John", "j@x.com"))
+
+
+def test_pydantic_custom_schema_type_converter(app, assert_parse_args):
+    def converter(type_, tokens):
+        return type_(*tokens[0].value.split(","))
+
+    @app.default
+    def main(*, person: Annotated[Person, Parameter(converter=converter)]):
+        pass
+
+    assert_parse_args(main, "--person John,j@x.com", person=Person("John", "j@x.com"))
+
+
+def test_pydantic_custom_schema_type_env_var(app, assert_parse_args, monkeypatch):
+    monkeypatch.setenv("SIZE", "2KiB")
+
+    @app.default
+    def main(*, size: Annotated[ByteSize, Parameter(env_var="SIZE")]):
+        pass
+
+    assert_parse_args(main, "", size=2048)
+
+
+def test_pydantic_custom_schema_type_error_message(app):
+    @app.default
+    def main(*, url: HttpUrl):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app("--url ftp://example.com", exit_on_error=False)
+
+    assert str(e.value) == "Invalid value for --url: URL scheme should be 'http' or 'https'"
+
+
+def test_pydantic_custom_schema_type_without_pydantic_imported(app, assert_parse_args, monkeypatch):
+    """Non-pydantic libraries (e.g. ``whenever``) may define the hook; don't import pydantic for them."""
+
+    class Tag:
+        def __init__(self, value: str):
+            self.value = value
+
+        def __eq__(self, other):
+            return self.value == other.value
+
+        @classmethod
+        def __get_pydantic_core_schema__(cls, source, handler):
+            raise AssertionError("pydantic should not be used")
+
+    monkeypatch.delitem(sys.modules, "pydantic")
+
+    @app.default
+    def main(*, tag: Tag):
+        pass
+
+    assert_parse_args(main, "--tag foo", tag=Tag("foo"))
 
 
 def test_pydantic_inheritance_simple(app, console):
