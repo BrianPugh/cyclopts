@@ -581,6 +581,49 @@ API
       If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to POSIX-standard ``"--"``.
       Set to an empty string to disable.
 
+   .. attribute:: argfile_prefix
+      :type: Optional[str]
+      :value: None
+
+      Read CLI arguments from a file when a token starts with this prefix.
+      Similar to :mod:`argparse`'s ``fromfile_prefix_chars``.
+      Defaults to :obj:`None` (disabled).
+      Set it on the root :class:`.App`: files are expanded before commands are resolved,
+      so a value set on a sub-command has no effect.
+
+      Each line of the file is one argument, used as-is.
+      The token is replaced in-place by the file's arguments before any other parsing,
+      so a file can contain commands, options and values.
+      Paths are relative to the current working directory.
+      An argument file may reference other argument files.
+      Tokens after :attr:`end_of_options_delimiter` are not expanded.
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(argfile_prefix="@")
+
+         @app.command
+         def run(*, host: str, port: int = 8080):
+             print(f"{host}:{port}")
+
+         app()
+
+      .. code-block:: text
+
+         # run.args
+         run
+         --host
+         db.example.internal
+         --port
+         5432
+
+      .. code-block:: console
+
+         $ my-app @run.args
+         db.example.internal:5432
+
    .. attribute:: parse_mode
       :type: Optional[Literal["fallthrough", "strict"]]
       :value: None

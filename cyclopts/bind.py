@@ -6,6 +6,7 @@ import sys
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, get_args
 
 from cyclopts._convert import _bool, _none, create_empty_instance
@@ -61,6 +62,42 @@ def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     else:
         tokens = list(tokens)
     return tokens
+
+
+def expand_argfiles(tokens: list[str], prefix: str | None, end_of_options_delimiter: str) -> list[str]:
+    """Replace each ``<prefix><path>`` token with the lines of the file at ``path``.
+
+    Mirrors :mod:`argparse`'s ``fromfile_prefix_chars``: one argument per line, paths
+    relative to the current directory, and argument files may reference other argument files.
+    Tokens after ``end_of_options_delimiter`` are not expanded.
+    """
+    if not prefix:
+        return tokens
+
+    expanded: list[str] = []
+    end_of_options = False
+
+    def expand(tokens: Iterable[str], parents: tuple[Path, ...]) -> None:
+        nonlocal end_of_options
+        for token in tokens:
+            if end_of_options or not token.startswith(prefix) or token == prefix:
+                if end_of_options_delimiter and token == end_of_options_delimiter:
+                    end_of_options = True
+                expanded.append(token)
+                continue
+
+            path = Path(token[len(prefix) :])
+            resolved = path.resolve()
+            if resolved in parents:
+                raise TokenizationError(msg=f"Argument file {str(path)!r} is referenced recursively.")
+            try:
+                lines = path.read_text(encoding="utf-8").splitlines()
+            except OSError as e:
+                raise TokenizationError(msg=f"Cannot read argument file {str(path)!r}: {e.strerror}.") from e
+            expand(lines, (*parents, resolved))
+
+    expand(tokens, ())
+    return expanded
 
 
 class _ProbeResult(NamedTuple):

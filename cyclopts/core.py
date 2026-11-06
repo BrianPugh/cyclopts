@@ -34,6 +34,7 @@ from cyclopts.bind import (
     _parse_kw_and_flags,
     _scope_tokens_for_meta,
     create_bound_arguments,
+    expand_argfiles,
     is_option_like,
     normalize_tokens,
 )
@@ -505,6 +506,8 @@ class App:
     )
 
     end_of_options_delimiter: str | None = field(default=None, kw_only=True)
+
+    argfile_prefix: str | None = field(default=None, kw_only=True)
 
     parse_mode: Literal["fallthrough", "strict"] | None = field(
         default=None,
@@ -1713,7 +1716,11 @@ class App:
             "_error_console": error_console,
             "end_of_options_delimiter": end_of_options_delimiter,
         }
+        if tokens is None:
+            _log_framework_warning(_detect_test_framework())
+
         with self.app_stack([], overrides=overrides):
+            tokens = self._expand_argfiles(normalize_tokens(tokens))
             command, bound, unused_tokens, ignored, _ = self._parse_known_args(tokens)
 
         return command, bound, unused_tokens, ignored
@@ -2103,9 +2110,21 @@ class App:
         Must be called inside an :attr:`app_stack` context so error settings resolve.
         """
         try:
-            return normalize_tokens(tokens)
+            return self._expand_argfiles(normalize_tokens(tokens))
         except CycloptsError as e:
             self._handle_parse_error(e, [])
+
+    def _expand_argfiles(self, tokens: list[str]) -> list[str]:
+        """Expand :attr:`argfile_prefix` tokens. Must be called inside an :attr:`app_stack` context."""
+        if tokens and tokens[0] == _COMPLETE_COMMAND:
+            # The shell's words may hold a half-typed ``@path``; reading it would abort completion.
+            return tokens
+        # Files are expanded before any command is resolved, so resolve from the entry app alone,
+        # even when an enclosing ``app_stack`` already holds the invoked command chain.
+        with self.app_stack([self]):
+            prefix = self.app_stack.resolve("argfile_prefix")
+            delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
+        return expand_argfiles(tokens, prefix, delimiter)
 
     def _handle_parse_error(self, e: CycloptsError, tokens: list[str]) -> NoReturn:
         """Print ``e`` according to the resolved error settings, then exit or re-raise it."""
@@ -2210,6 +2229,7 @@ class App:
                 "verbose": verbose,
                 "backend": backend,
                 "result_action": _result_action_converter(result_action),
+                "end_of_options_delimiter": end_of_options_delimiter,
                 "error_formatter": error_formatter,
             }.items()
             if v is not None
@@ -2340,6 +2360,7 @@ class App:
                 "verbose": verbose,
                 "backend": backend,
                 "result_action": _result_action_converter(result_action),
+                "end_of_options_delimiter": end_of_options_delimiter,
                 "error_formatter": error_formatter,
             }.items()
             if v is not None
@@ -3126,6 +3147,8 @@ class App:
             overrides["_console"] = console
         if error_console is not None:
             overrides["_error_console"] = error_console
+        if kwargs.get("end_of_options_delimiter") is not None:
+            overrides["end_of_options_delimiter"] = kwargs["end_of_options_delimiter"]
         overrides["exit_on_error"] = exit_on_error
         overrides["remap_flags"] = remap_flags
 
