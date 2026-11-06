@@ -27,6 +27,7 @@ from cyclopts.annotations import (
     is_annotated,
     is_enum_flag,
     is_nonetype,
+    is_pydantic_leaf,
     is_union,
     resolve,
     resolve_new_type,
@@ -820,6 +821,16 @@ def _convert(
             try:
                 if token.implicit_value is not UNSET:
                     out = token.implicit_value
+                elif converter is None and is_pydantic_leaf(type_) and "pydantic" in sys.modules:
+                    # Validate like pydantic would; the constructor may not take the string form.
+                    # Non-pydantic libraries (e.g. ``whenever``) may define the hook without pydantic installed.
+                    import pydantic
+
+                    try:
+                        out = pydantic.TypeAdapter(type_).validate_python(token.value)
+                    except pydantic.ValidationError as e:
+                        # ``CoercionError`` appends the pydantic reason from ``__cause__``.
+                        raise CoercionError(token=token, target_type=type_) from e
                 elif converter is None:
                     out = _converters.get(type_, type_)(token.value)  # pyright: ignore[reportOptionalCall]
                 elif converter_needs_token:

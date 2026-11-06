@@ -77,6 +77,14 @@ def is_pydantic(hint) -> bool:
     return hasattr(hint, "__pydantic_core_schema__")
 
 
+def is_pydantic_leaf(hint) -> bool:
+    """Check if a type is a non-model Pydantic custom-schema type (``AnyUrl``, ``ByteSize``, etc.).
+
+    Pydantic validates these from a single value, so their ``__init__`` isn't a set of fields.
+    """
+    return hasattr(hint, "__get_pydantic_core_schema__") and not is_pydantic(hint)
+
+
 def is_pydantic_secret(hint) -> bool:
     """Check if a type is a Pydantic secret type (SecretStr, SecretBytes, Secret, etc.)."""
     return (
