@@ -26,10 +26,10 @@ def test_app_name_derivation_not_main_module(mocker):
     assert app.name == ("my-script.py",)
 
 
-def _mock_main_spec(mocker, spec_name):
+def _mock_main_spec(mocker, spec_name, origin):
     """Pretend the interpreter was started with ``python -m <spec_name>``."""
     main = types.ModuleType("__main__")
-    main.__spec__ = types.SimpleNamespace(name=spec_name)  # pyright: ignore[reportAttributeAccessIssue]
+    main.__spec__ = types.SimpleNamespace(name=spec_name, origin=origin)  # pyright: ignore[reportAttributeAccessIssue]
     mocker.patch.dict(sys.modules, {"__main__": main})
     mocker.patch("cyclopts.core.sys.executable", "/usr/bin/python3")
 
@@ -44,15 +44,23 @@ def _mock_main_spec(mocker, spec_name):
 )
 def test_app_name_derivation_python_m(mocker, argv0, spec_name, expected):
     mocker.patch("cyclopts.core.sys.argv", [argv0])
-    _mock_main_spec(mocker, spec_name)
+    _mock_main_spec(mocker, spec_name, argv0)
 
     assert App().name == (expected,)
+
+
+def test_app_name_derivation_python_m_wrapper(mocker):
+    """``python -m cProfile script.py`` names the app after the script."""
+    mocker.patch("cyclopts.core.sys.argv", ["script.py"])
+    _mock_main_spec(mocker, "cProfile", "/usr/lib/python3/cProfile.py")
+
+    assert App().name == ("script.py",)
 
 
 def test_app_name_derivation_python_m_usage(mocker, console):
     """The usage line of an app with a default command also shows ``python -m``."""
     mocker.patch("cyclopts.core.sys.argv", ["/src/mypkg/__main__.py"])
-    _mock_main_spec(mocker, "mypkg.__main__")
+    _mock_main_spec(mocker, "mypkg.__main__", "/src/mypkg/__main__.py")
     app = App(result_action="return_value")
 
     @app.default

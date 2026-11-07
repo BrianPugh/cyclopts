@@ -141,7 +141,8 @@ def _default_app_name() -> str:
         spec = sys.modules["__main__"].__spec__
     except (KeyError, AttributeError):
         spec = None
-    if spec is not None and spec.name != "__main__":
+    # Wrappers like ``python -m cProfile script.py`` point ``sys.argv[0]`` at the script.
+    if spec is not None and spec.name != "__main__" and sys.argv[0] == spec.origin:
         # Started with ``python -m``; a package's ``__main__`` is run as the package.
         module_name = spec.name.removesuffix(".__main__")
         return f"{Path(sys.executable).name} -m {module_name}"
