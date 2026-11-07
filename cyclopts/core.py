@@ -131,6 +131,28 @@ def _get_root_module_name():
     raise _CannotDeriveCallingModuleNameError  # pragma: no cover
 
 
+def _default_app_name() -> str:
+    """Name of the running program, for an :class:`App` without an explicit ``name``.
+
+    Like :mod:`argparse`'s default ``prog``: ``python -m <module>`` when the program
+    was started with ``python -m``, otherwise the script's file name.
+    """
+    try:
+        spec = sys.modules["__main__"].__spec__
+    except (KeyError, AttributeError):
+        spec = None
+    # Wrappers like ``python -m cProfile script.py`` point ``sys.argv[0]`` at the script.
+    if spec is not None and spec.name != "__main__" and sys.argv[0] == spec.origin:
+        # Started with ``python -m``; a package's ``__main__`` is run as the package.
+        module_name = spec.name.removesuffix(".__main__")
+        return f"{Path(sys.executable).name} -m {module_name}"
+
+    name = Path(sys.argv[0]).name
+    if name == "__main__.py":
+        name = _get_root_module_name()
+    return name
+
+
 def _validate_default_command(x: Callable[..., Any] | None) -> Callable[..., Any] | None:
     if isinstance(x, App):
         raise TypeError("Cannot register a sub-App to default.")
@@ -659,10 +681,7 @@ class App:
         if self._name:
             return self._name + self.alias  # pyright: ignore
         elif self.default_command is None:
-            name = Path(sys.argv[0]).name
-            if name == "__main__.py":
-                name = _get_root_module_name()
-            return (name,) + self.alias  # pyright: ignore
+            return (_default_app_name(),) + self.alias  # pyright: ignore
         else:
             try:
                 func_name = self.default_command.__name__
