@@ -185,9 +185,10 @@ class _MergedScanResult(NamedTuple):
     meta_part: str | None
     """Reconstructed token for the meta's keyword stream, or ``None``."""
 
-    meta_awaits_value: bool
-    """A meta value-taking option ended the token with no attached value; the
-    next stream token is its value."""
+    meta_value_option: str | None
+    """The meta value-taking option that ended the token, with its attached
+    value (e.g. ``-uroot``), or ``None``. Bare (``-u``) means its values come
+    from the following stream tokens."""
 
 
 def _is_combined_short_candidate(
@@ -236,7 +237,8 @@ def _merged_combined_short_scan(
 
     - a flag/count match consumes its character;
     - the first value-taking match absorbs the rest of the token as an attached
-      value (or, with no remainder, the next stream token) and ends the scan;
+      value and ends the scan (any further values come from the following
+      stream tokens, claimed by the caller);
     - an unknown character is routed to the child's stream, which reports it.
 
     Characters are routed to per-owner reconstructed tokens in scan order, so
@@ -245,7 +247,7 @@ def _merged_combined_short_scan(
     chars = token.lstrip("-")
     child_chars: list[str] = []
     meta_chars: list[str] = []
-    meta_awaits_value = False
+    meta_value_option: str | None = None
     position = 0
     while position < len(chars):
         char = chars[position]
@@ -267,7 +269,7 @@ def _merged_combined_short_scan(
             if position == 0:
                 # Not a combined-short group (GNU groups must begin with a known
                 # option); the child keeps the token intact. See issue #932.
-                return _MergedScanResult(token, None, False)
+                return _MergedScanResult(token, None, None)
             child_chars.append(char)  # Unknown flag; the child's parse reports it.
             position += 1
             continue
@@ -278,15 +280,14 @@ def _merged_combined_short_scan(
             continue
         # Value-taking option: the rest of the token is its attached value.
         remainder = chars[position + 1 :]
-        if remainder:
-            owner_chars.extend(remainder)
-        elif owner_chars is meta_chars:
-            meta_awaits_value = True
+        owner_chars.extend(remainder)
+        if owner_chars is meta_chars:
+            meta_value_option = f"-{char}{remainder}"
         break
     return _MergedScanResult(
         "-" + "".join(child_chars) if child_chars else None,
         "-" + "".join(meta_chars) if meta_chars else None,
-        meta_awaits_value,
+        meta_value_option,
     )
 
 
@@ -475,22 +476,45 @@ def _scope_tokens_for_meta(
             scanned_positions.add(position)
             newly_replaced[position] = scan.child_part
             bubbled.append(scan.meta_part)
-            if scan.meta_awaits_value:
-                # The meta's value-taking option ended the token; the NEXT
-                # stream token is its value — if the child didn't claim it.
-                value_position = position + 1
-                value_synthetics = child_unclaimed_by_position.get(value_position)
-                if (
-                    value_position < delimiter_pos
-                    and value_synthetics is not None
-                    and len(value_synthetics) == 1
-                    and value_synthetics[0] == stream_tokens[value_position]
-                ):
-                    scanned_positions.add(value_position)
-                    newly_replaced[value_position] = None
-                    bubbled.append(stream_tokens[value_position])
-                # Otherwise the meta's real parse raises the proper
-                # missing-value error.
+            if scan.meta_value_option is None:
+                continue
+            # The meta's value-taking option may consume following stream
+            # tokens the child left wholly unclaimed (as many as its token
+            # count, or more with ``consume_multiple``). Probe that option
+            # alone, so no other meta option claims a follower the child's
+            # flags should win.
+            follower_positions: list[int] = []
+            follower_position = position + 1
+            while follower_position < delimiter_pos and child_unclaimed_by_position.get(follower_position) == [
+                stream_tokens[follower_position]
+            ]:
+                follower_positions.append(follower_position)
+                follower_position += 1
+            if not follower_positions:
+                continue
+            value_argument = meta_collection.match(scan.meta_value_option[:2])[0]
+            follower_probe = _probe_unclaimed(
+                ArgumentCollection([value_argument]),
+                [scan.meta_value_option, *(stream_tokens[p] for p in follower_positions)],
+                end_of_options_delimiter=end_of_options_delimiter,
+            )
+            if follower_probe is None:
+                # Malformed for the meta (e.g. too few values); hand it the
+                # next token so its real parse raises the proper error.
+                claimed_followers = follower_positions[:1] if len(scan.meta_value_option) == 2 else []
+            else:
+                claimed_followers = []
+                for follower_position in follower_positions:
+                    if follower_probe.kw_claims.get(follower_position - position) != (
+                        stream_tokens[follower_position],
+                        None,
+                    ):
+                        break
+                    claimed_followers.append(follower_position)
+            for follower_position in claimed_followers:
+                scanned_positions.add(follower_position)
+                newly_replaced[follower_position] = None
+                bubbled.append(stream_tokens[follower_position])
 
         candidates = [
             (position, token)
