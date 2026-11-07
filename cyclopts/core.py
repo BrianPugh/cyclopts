@@ -1919,6 +1919,14 @@ class App:
                                 # forwarded tokens reach the child's own parse.
                                 pass
                             else:
+                                intermediate_collections: list[ArgumentCollection] = []
+                                intermediate = command_app._meta_parent
+                                while intermediate is not None and intermediate._meta_parent is not None:
+                                    if intermediate.default_command and (
+                                        collection := _safe_assemble_argument_collection(intermediate)
+                                    ):
+                                        intermediate_collections.append(collection)
+                                    intermediate = intermediate._meta_parent
                                 scoped = _scope_tokens_for_meta(
                                     argument_collection,
                                     child_argument_collection,
@@ -1926,6 +1934,7 @@ class App:
                                     hier_command_indices,
                                     parse_mode=parse_mode,
                                     end_of_options_delimiter=end_of_options_delimiter,
+                                    intermediate_collections=intermediate_collections,
                                 )
 
                         # A meta level's captured tokens are forwarded to
