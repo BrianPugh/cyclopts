@@ -1511,3 +1511,42 @@ class TestMergedShortNamespace:
         app, captured = self._build()
         with pytest.raises(MissingArgumentError, match="-u"):
             app.meta(["cmd", "-xu"], exit_on_error=False)
+
+    @pytest.mark.parametrize(
+        "flags, expected",
+        [
+            ("-vn=sue", {"verbose": True, "user": "nobody", "name": "sue", "count": 0}),
+            ("-vc=-1", {"verbose": True, "user": "nobody", "name": "", "count": -1}),
+            ("-xu=nan", {"verbose": False, "user": "nan", "name": "", "count": 0}),
+        ],
+    )
+    def test_combined_with_equals_value(self, flags, expected):
+        """A combined token whose value is attached with ``=`` (``-vn=bob``)
+        still goes through the merged scan, so no level misreads the other's
+        letters (formerly ``-vn=sue`` bound ``user='e'``).
+        """
+        app = App(name="demo", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def main(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
+            user: Annotated[str, Parameter(name=["--user", "-u"])] = "nobody",
+        ):
+            captured["verbose"] = verbose
+            captured["user"] = user
+            return app(tokens)
+
+        @app.command
+        def cmd(
+            *,
+            extract: Annotated[bool, Parameter(name=["--extract", "-x"])] = False,
+            name: Annotated[str, Parameter(name=["--name", "-n"])] = "",
+            count: Annotated[int, Parameter(name=["--count", "-c"])] = 0,
+        ):
+            captured["name"] = name
+            captured["count"] = count
+
+        app.meta(["cmd", flags], exit_on_error=False)
+        assert captured == expected
