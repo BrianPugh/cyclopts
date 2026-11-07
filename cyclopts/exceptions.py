@@ -1,4 +1,5 @@
 import inspect
+import sys
 from collections.abc import Callable, Iterator, Sequence
 from enum import Enum
 from itertools import chain
@@ -455,21 +456,34 @@ class CoercionError(CycloptsError):
         elif argument is not None:
             display_name = argument.name.lstrip("-").upper()
         else:
+            display_name = None
+
+        if display_name is None:
             yield 'Unable to convert "', ""
             yield self.token.value, STYLE_OFFENDING_VALUE
             yield '"', ""
             if self.token.source not in ("", "cli"):
                 yield f" from {self.token.source}", STYLE_SOURCE
             yield f" into {target_type_name}.", ""
-            return
+        else:
+            yield "Invalid value for ", ""
+            yield display_name, STYLE_NAME
+            if self.token.source not in ("", "cli"):
+                yield f" from {self.token.source}", STYLE_SOURCE
+            yield ': unable to convert "', ""
+            yield self.token.value, STYLE_OFFENDING_VALUE
+            yield f'" into {target_type_name}.', ""
 
-        yield "Invalid value for ", ""
-        yield display_name, STYLE_NAME
-        if self.token.source not in ("", "cli"):
-            yield f" from {self.token.source}", STYLE_SOURCE
-        yield ': unable to convert "', ""
-        yield self.token.value, STYLE_OFFENDING_VALUE
-        yield f'" into {target_type_name}.', ""
+        if "pydantic" in sys.modules:
+            import pydantic
+
+            if isinstance(self.__cause__, pydantic.ValidationError):
+                error = self.__cause__.errors()[0]
+                reason = error["msg"]
+                if error["type"] == "value_error":
+                    reason = reason.removeprefix("Value error, ")
+                reason = reason.rstrip(".")
+                yield f" {reason[:1].upper()}{reason[1:]}.", ""
 
 
 class UnknownCommandError(CycloptsError):
