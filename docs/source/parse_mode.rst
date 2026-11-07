@@ -90,7 +90,9 @@ left-to-right scan applies standard GNU rules to the merged table:
 - Each flag character binds at the level that owns it (the subcommand wins if
   both levels define the same letter).
 - The first value-taking option absorbs the rest of the token as its attached
-  value (or, with no remainder, the next token) and ends the scan.
+  value and ends the scan. If it takes more values, or has no attached value,
+  they come from the following tokens, as for a standalone option (e.g.
+  ``-vp 1 2`` for a ``tuple[int, int]``).
 - An unknown character is reported as an unknown option.
 
 .. code-block:: console
