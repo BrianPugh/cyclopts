@@ -1246,6 +1246,25 @@ def test_pydantic_custom_schema_type_error_message_without_argument():
     )
 
 
+def test_pydantic_custom_schema_type_error_message_value_error():
+    """A custom validator's ``ValueError`` message drops pydantic's prefix and isn't double-punctuated."""
+
+    class Version:
+        @classmethod
+        def __get_pydantic_core_schema__(cls, source, handler):
+            return core_schema.no_info_plain_validator_function(cls._validate)
+
+        @staticmethod
+        def _validate(value):
+            raise ValueError("version must look like 1.2.3.")
+
+    with pytest.raises(CoercionError) as e:
+        convert(Version, ["abc"])
+
+    e.value.verbose = False
+    assert str(e.value) == 'Unable to convert "abc" into Version. Version must look like 1.2.3.'
+
+
 def test_pydantic_custom_schema_type_without_pydantic_imported(app, assert_parse_args, monkeypatch):
     """Non-pydantic libraries (e.g. ``whenever``) may define the hook; don't import pydantic for them."""
 

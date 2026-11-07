@@ -478,7 +478,11 @@ class CoercionError(CycloptsError):
             import pydantic
 
             if isinstance(self.__cause__, pydantic.ValidationError):
-                reason = self.__cause__.errors()[0]["msg"]
+                error = self.__cause__.errors()[0]
+                reason = error["msg"]
+                if error["type"] == "value_error":
+                    reason = reason.removeprefix("Value error, ")
+                reason = reason.rstrip(".")
                 yield f" {reason[:1].upper()}{reason[1:]}.", ""
 
 

@@ -1046,6 +1046,7 @@ Cyclopts supports classically defined user classes, as well as classes defined b
    Non-model pydantic types that define ``__get_pydantic_core_schema__`` (e.g. :class:`~pydantic.AnyUrl`, :class:`~pydantic.ByteSize`, :class:`~pydantic.NameEmail`, and similar third-party types) take a single value that pydantic validates.
    If pydantic hasn't been imported (e.g. a non-pydantic library that defines the hook), the class is instead called with that single value.
    To instead parse such a class's ``__init__`` arguments as subkeys, use ``Parameter(accepts_keys=True)``.
+   A hook that only accepts instances (e.g. ``core_schema.is_instance_schema(cls)``) rejects the CLI string; supply a ``Parameter(converter=...)`` to build the instance yourself.
 
 Subkey parsing allows for assigning values positionally and by keyword with a dot-separator.
 
