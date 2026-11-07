@@ -1,9 +1,7 @@
 import inspect
-import sys
 from collections.abc import Iterable, Sequence
 from enum import Enum
 from functools import lru_cache, partial
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -27,7 +25,7 @@ from cyclopts.annotations import (
     resolve_optional,
 )
 from cyclopts.argument.utils import is_short_flag
-from cyclopts.core import _get_root_module_name, _iter_resolution_argument_collections
+from cyclopts.core import _default_app_name, _iter_resolution_argument_collections
 from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
@@ -351,13 +349,10 @@ def format_usage(
     usage = []
 
     # If we're at the root level (no command chain), the app has a default_command,
-    # and no explicit name was set, derive a better name from sys.argv[0]
+    # and no explicit name was set, derive the name of the running program
     if not command_chain and app.default_command and not app._name:
         # Use the same logic as in App.name property for apps without default_command
-        name = Path(sys.argv[0]).name
-        if name == "__main__.py":
-            name = _get_root_module_name()
-        app_name = name
+        app_name = _default_app_name()
     else:
         app_name = app.name[0]
 

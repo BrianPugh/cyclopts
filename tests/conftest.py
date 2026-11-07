@@ -86,9 +86,12 @@ def patch_sys_argv(request, monkeypatch):
     - `python -m pytest`: sys.argv[0] is the pytest module's __main__.py
 
     We patch it to always be the test module's __main__.py to trigger
-    consistent stack-based name derivation.
+    consistent stack-based name derivation. ``python -m pytest`` also sets
+    ``__main__.__spec__``, which would name every app ``python -m pytest``;
+    clear it so both invocations look like a script.
     """
     monkeypatch.setattr(sys, "argv", ["__main__.py"] + sys.argv[1:])
+    monkeypatch.setattr(sys.modules["__main__"], "__spec__", None, raising=False)
 
 
 @pytest.fixture(autouse=True)

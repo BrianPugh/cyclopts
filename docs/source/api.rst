@@ -18,8 +18,10 @@ API
 
       1. User specified :attr:`~.App.name` parameter.
       2. If a :attr:`~.App.default` function has been registered, the name of that function.
-      3. If the module name is ``__main__.py``, the name of the encompassing package.
-      4. The value of :data:`sys.argv[0] <sys.argv>`; i.e. the name of the python script.
+      3. If the program was started with ``python -m <module>``, ``python -m <module>``
+         (like :mod:`argparse`; the interpreter's own name is used, e.g. ``python3``).
+      4. If the module name is ``__main__.py``, the name of the encompassing package.
+      5. The value of :data:`sys.argv[0] <sys.argv>`; i.e. the name of the python script.
 
       Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
 
