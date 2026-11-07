@@ -1511,3 +1511,104 @@ class TestMergedShortNamespace:
         app, captured = self._build()
         with pytest.raises(MissingArgumentError, match="-u"):
             app.meta(["cmd", "-xu"], exit_on_error=False)
+
+    @pytest.mark.parametrize("argv", [["cmd", "-zu"], ["cmd", "-zv", "--verbose"]])
+    def test_unknown_first_char_reported_intact(self, argv):
+        """A token whose first character is unknown is not a combined-short
+        group, so the child reports it whole instead of the meta claiming a
+        later character (issue #1039).
+        """
+        app, captured = self._build()
+        with pytest.raises(UnknownOptionError) as exc_info:
+            app.meta(argv, exit_on_error=False, print_error=False)
+        assert str(exc_info.value) == f"Unknown option: {argv[1]}. -z is not a recognized option."
+
+    @staticmethod
+    def _build_nested():
+        app = App(name="demo", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.command
+        def cmd(*, file: Annotated[bool, Parameter(name=["--file", "-f"])] = False):
+            captured["file"] = file
+
+        @app.meta.default
+        def inner(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            quiet: Annotated[bool, Parameter(name=["--quiet", "-q"])] = False,
+            output: Annotated[str, Parameter(name=["--output", "-o"])] = "text",
+        ):
+            captured["quiet"] = quiet
+            captured["output"] = output
+            return app(tokens)
+
+        @app.meta.meta.default
+        def outer(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
+        ):
+            captured["verbose"] = verbose
+            return app.meta(tokens)
+
+        return app, captured
+
+    @pytest.mark.parametrize(
+        "flags, expected",
+        [
+            ("-qv", {"quiet": True, "verbose": True, "output": "text", "file": False}),
+            ("-fqv", {"quiet": True, "verbose": True, "output": "text", "file": True}),
+            ("-qvojson", {"quiet": True, "verbose": True, "output": "json", "file": False}),
+            ("-fovjson", {"quiet": False, "verbose": False, "output": "vjson", "file": True}),
+        ],
+    )
+    def test_nested_meta_letters_are_known(self, flags, expected):
+        """An intermediate meta's short flags count as known in the outer
+        meta's scan: they neither trip the unknown-first-character rule nor
+        let the outer meta claim letters of the intermediate's attached value.
+        """
+        app, captured = self._build_nested()
+        app.meta.meta(["cmd", flags], exit_on_error=False)
+        assert captured == expected
+
+    @pytest.mark.parametrize(
+        "argv, expected",
+        [
+            (["cmd", "-v"], {"outer_v": True, "inner_v": False, "outer_o": "", "inner_o": "", "file": False}),
+            (["cmd", "-fv"], {"outer_v": True, "inner_v": False, "outer_o": "", "inner_o": "", "file": True}),
+            (["cmd", "-o", "x"], {"outer_v": False, "inner_v": False, "outer_o": "x", "inner_o": "", "file": False}),
+            (["cmd", "-fox"], {"outer_v": False, "inner_v": False, "outer_o": "x", "inner_o": "", "file": True}),
+        ],
+    )
+    def test_nested_meta_shared_letter_outer_wins(self, argv, expected):
+        """When nested metas share a short letter, a combined token binds it
+        at the same level as the standalone option (the outer meta).
+        """
+        app = App(name="demo", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.command
+        def cmd(*, file: Annotated[bool, Parameter(name=["--file", "-f"])] = False):
+            captured["file"] = file
+
+        @app.meta.default
+        def inner(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            inner_v: Annotated[bool, Parameter(name=["--inner-v", "-v"])] = False,
+            inner_o: Annotated[str, Parameter(name=["--inner-o", "-o"])] = "",
+        ):
+            captured["inner_v"] = inner_v
+            captured["inner_o"] = inner_o
+            return app(tokens)
+
+        @app.meta.meta.default
+        def outer(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            outer_v: Annotated[bool, Parameter(name=["--outer-v", "-v"])] = False,
+            outer_o: Annotated[str, Parameter(name=["--outer-o", "-o"])] = "",
+        ):
+            captured["outer_v"] = outer_v
+            captured["outer_o"] = outer_o
+            return app.meta(tokens)
+
+        app.meta.meta(argv, exit_on_error=False)
+        assert captured == expected

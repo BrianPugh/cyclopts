@@ -222,13 +222,17 @@ def _merged_combined_short_scan(
     token: str,
     child_collection: "ArgumentCollection | None",
     meta_collection: ArgumentCollection,
+    intermediate_collections: Sequence[ArgumentCollection] = (),
 ) -> _MergedScanResult:
     """Resolve a combined short-option token against the MERGED flag namespace.
 
     Fallthrough mode presents the user with one flat flag namespace; this scan
     makes that literal: a single GNU left-to-right pass where each character is
     matched against the child first (child wins name collisions after its
-    command), then the meta. Standard rules apply to the merged table:
+    command), then the meta, then any ``intermediate_collections`` (meta levels
+    between this meta and the child, which receive their characters via the
+    child's stream). The meta outranks intermediates, as it does for
+    standalone options. Standard rules apply to the merged table:
 
     - a flag/count match consumes its character;
     - the first value-taking match absorbs the rest of the token as an attached
@@ -246,7 +250,11 @@ def _merged_combined_short_scan(
     while position < len(chars):
         char = chars[position]
         matched = None
-        for owner_chars, collection in ((child_chars, child_collection), (meta_chars, meta_collection)):
+        for owner_chars, collection in (
+            (child_chars, child_collection),
+            (meta_chars, meta_collection),
+            *((child_chars, collection) for collection in intermediate_collections),
+        ):
             if collection is None:
                 continue
             try:
@@ -256,6 +264,10 @@ def _merged_combined_short_scan(
             matched = (owner_chars, argument, implicit)
             break
         if matched is None:
+            if position == 0:
+                # Not a combined-short group (GNU groups must begin with a known
+                # option); the child keeps the token intact. See issue #932.
+                return _MergedScanResult(token, None, False)
             child_chars.append(char)  # Unknown flag; the child's parse reports it.
             position += 1
             continue
@@ -291,6 +303,7 @@ def _scope_tokens_for_meta(
     *,
     parse_mode: str,
     end_of_options_delimiter: str = "--",
+    intermediate_collections: Sequence[ArgumentCollection] = (),
 ) -> tuple[list[str], list[str], int | None]:
     """Scope tokens between a meta-app level and the subcommand it forwards to.
 
@@ -321,6 +334,10 @@ def _scope_tokens_for_meta(
         ``"fallthrough"`` or ``"strict"``.
     end_of_options_delimiter: str
         Token that marks the end of options.
+    intermediate_collections: Sequence[ArgumentCollection]
+        Collections of the meta levels between this meta and the child (a meta
+        of a meta). Their short flags count as known in the combined-short
+        scan; their characters stay in the child's stream.
 
     Returns
     -------
@@ -445,10 +462,10 @@ def _scope_tokens_for_meta(
             synthetics = child_unclaimed_by_position[position]
             partially_claimed = not (len(synthetics) == 1 and synthetics[0] == original)
             if not partially_claimed and not _is_combined_short_candidate(
-                original, (child_collection, meta_collection)
+                original, (child_collection, *intermediate_collections, meta_collection)
             ):
                 continue
-            scan = _merged_combined_short_scan(original, child_collection, meta_collection)
+            scan = _merged_combined_short_scan(original, child_collection, meta_collection, intermediate_collections)
             if scan.meta_part is None:
                 if partially_claimed:
                     # Nothing for the meta; keep the child's own reading and
