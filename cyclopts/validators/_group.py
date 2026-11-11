@@ -82,7 +82,9 @@ class LimitedChoice:
             received = f"Received {n_arguments} argument{'' if n_arguments == 1 else 's'}"
             if n_arguments:
                 received += f": {offenders}"
-            choices = "{" + ", ".join(a.name for a in argument_collection) + "}"
+            choices = (
+                "{" + ", ".join("/".join(a.positives_names) for a in argument_collection if a.positives_names) + "}"
+            )
             verb = "may" if self.min == 0 else "must"
             raise ValueError(f"{received}. {requirement} of {choices} {verb} be specified.")
 
