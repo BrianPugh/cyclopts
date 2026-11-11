@@ -15,6 +15,10 @@ class LimitedChoice:
 
         Commonly used for enforcing mutually-exclusive parameters (default behavior).
 
+        A parameter counts as selected when it is given a value from any source, regardless of
+        the value itself; e.g. ``--no-flag`` counts the same as ``--flag``.
+        Set ``Parameter(negative="")`` on boolean flags to remove their negative variants.
+
         Parameters
         ----------
         min: int
@@ -64,10 +68,23 @@ class LimitedChoice:
             )
             if self.min == 0 and self.max == 1:
                 raise ValueError(f"Mutually exclusive arguments: {offenders}")
+
+            if self.min == self.max:
+                requirement = f"Exactly {self.min}"
+            elif self.min == 0:
+                requirement = f"At most {self.max}"
+            elif self.max >= group_size:
+                requirement = f"At least {self.min}"
             else:
-                raise ValueError(
-                    f"Received {n_arguments} arguments: {offenders}. Only [{self.min}, {self.max}] choices may be specified."
-                )
+                requirement = f"Between {self.min} and {self.max}"
+            if self.allow_none:
+                requirement += " (or none)"
+            received = f"Received {n_arguments} argument{'' if n_arguments == 1 else 's'}"
+            if n_arguments:
+                received += f": {offenders}"
+            choices = "{" + ", ".join(a.name for a in argument_collection) + "}"
+            verb = "may" if self.min == 0 else "must"
+            raise ValueError(f"{received}. {requirement} of {choices} {verb} be specified.")
 
 
 class MutuallyExclusive(LimitedChoice):

@@ -236,3 +236,63 @@ def test_limited_choice_negative_flag_error_message(app):
     error_message = str(exc_info.value)
     assert "-a" in error_message
     assert "--opt" in error_message
+
+
+@pytest.mark.parametrize(
+    "validator, cmd, expected",
+    [
+        (
+            LimitedChoice(min=1, max=1),
+            "",
+            "Received 0 arguments. Exactly 1 of {--car, --truck, --bike} must be specified.",
+        ),
+        (
+            LimitedChoice(min=1, max=1),
+            "--car --bike",
+            "Received 2 arguments: {--car, --bike}. Exactly 1 of {--car, --truck, --bike} must be specified.",
+        ),
+        (
+            LimitedChoice(min=2, max=2),
+            "--no-car",
+            "Received 1 argument: {--no-car}. Exactly 2 of {--car, --truck, --bike} must be specified.",
+        ),
+        (
+            LimitedChoice(min=2, max=3),
+            "--car",
+            "Received 1 argument: {--car}. At least 2 of {--car, --truck, --bike} must be specified.",
+        ),
+        (
+            LimitedChoice(min=1, max=2),
+            "--car --truck --bike",
+            "Received 3 arguments: {--car, --truck, --bike}. "
+            "Between 1 and 2 of {--car, --truck, --bike} must be specified.",
+        ),
+        (
+            LimitedChoice(min=0, max=2),
+            "--car --truck --bike",
+            "Received 3 arguments: {--car, --truck, --bike}. At most 2 of {--car, --truck, --bike} may be specified.",
+        ),
+        (
+            LimitedChoice(min=2, max=2, allow_none=True),
+            "--truck",
+            "Received 1 argument: {--truck}. Exactly 2 (or none) of {--car, --truck, --bike} must be specified.",
+        ),
+    ],
+)
+def test_limited_choice_count_error_message(app, validator, cmd, expected):
+    """The error names the requirement and the group's options (#1059)."""
+    vehicle = Group("Vehicle", validator=validator)
+
+    @app.default
+    def main(
+        *,
+        car: Annotated[bool, Parameter(group=vehicle)] = False,
+        truck: Annotated[bool, Parameter(group=vehicle)] = False,
+        bike: Annotated[bool, Parameter(group=vehicle)] = False,
+    ):
+        pass
+
+    with pytest.raises(ValidationError) as e:
+        app(cmd, exit_on_error=False)
+
+    assert str(e.value) == f"Invalid values for group Vehicle. {expected}"
