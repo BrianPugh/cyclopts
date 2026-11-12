@@ -156,6 +156,60 @@ def test_coerce_int():
     assert 123 == convert(int, ["123"])
 
 
+@pytest.mark.parametrize(
+    ("hint", "value"),
+    [
+        (int, "1.0e309"),
+        (int, "-1.0e309"),
+        (timedelta, "1000000000d"),
+        (timedelta, "-1000000000d"),
+    ],
+)
+def test_coerce_overflow(hint, value):
+    with pytest.raises(CoercionError) as exc:
+        convert(hint, [value])
+
+    assert exc.value.target_type is hint
+    assert exc.value.token is not None
+    assert exc.value.token.value == value
+
+
+@pytest.mark.parametrize(("hint", "value"), [(int, "1.0e309"), (timedelta, "1000000000d")])
+def test_coerce_overflow_cli(app, hint, value):
+    @app.default
+    def main(*, limit: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pytest.fail("An overflowing value must not reach the command.")
+
+    with pytest.raises(SystemExit) as exc:
+        app([f"--limit={value}"], print_error=False)
+
+    assert exc.value.code == 2
+
+
+def test_custom_converter_overflow():
+    def converter(type_, value):
+        raise OverflowError
+
+    with pytest.raises(CoercionError) as exc:
+        convert(int, ["123"], converter=converter)
+
+    assert exc.value.target_type is int
+    assert exc.value.token is not None
+    assert exc.value.token.value == "123"
+
+
+def test_custom_converter_unexpected_error():
+    error = RuntimeError("implementation failure")
+
+    def converter(type_, value):
+        raise error
+
+    with pytest.raises(RuntimeError) as exc:
+        convert(int, ["123"], converter=converter)
+
+    assert exc.value is error
+
+
 def test_coerce_int_based():
     assert 255 == convert(int, ["0xff"])
     assert 15 == convert(int, ["0o17"])

@@ -843,7 +843,7 @@ def _convert(
                 if e.token is None:
                     e.token = token
                 raise
-            except ValueError:
+            except (ValueError, OverflowError):
                 raise CoercionError(token=token, target_type=type_) from None
         else:
             # Convert it into a user-supplied class.
