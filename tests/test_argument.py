@@ -1081,3 +1081,21 @@ def test_argument_collection_contains_with_keys():
 
     # Check non-existent nested fields
     assert "--config.username" not in collection
+
+
+def test_argument_positives_negatives_names():
+    def foo(
+        flag: Annotated[bool, Parameter(name=("--flag", "-f"))] = False,
+        src: str = "",
+        /,
+    ):
+        pass
+
+    flag, src = ArgumentCollection._from_callable(foo)
+
+    assert flag.positives == ("--flag", "-f")
+    assert flag.negatives == ("--no-flag",)
+    assert flag.names == ("--flag", "-f", "--no-flag")
+
+    assert src.positives == ("SRC",)
+    assert src.names == ("SRC",)

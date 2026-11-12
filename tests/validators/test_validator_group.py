@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Annotated
 
 import pytest
@@ -296,3 +297,46 @@ def test_limited_choice_count_error_message(app, validator, cmd, expected):
         app(cmd, exit_on_error=False)
 
     assert str(e.value) == f"Invalid values for group Vehicle. {expected}"
+
+
+def test_limited_choice_count_error_message_aliases(app):
+    """Each option is listed with all of its positive names, and never its negatives."""
+    mode = Group("Mode", validator=LimitedChoice(min=1, max=1))
+
+    @app.default
+    def main(
+        *,
+        formatted_list: Annotated[bool, Parameter(name=("--list", "-l"), group=mode)] = False,
+        file_path: Annotated[bool, Parameter(alias="-f", group=mode)] = False,
+    ):
+        pass
+
+    with pytest.raises(ValidationError) as e:
+        app("-l -f", exit_on_error=False)
+
+    assert str(e.value) == (
+        "Invalid values for group Mode. Received 2 arguments: {-l, -f}. "
+        "Exactly 1 of {--list/-l, --file-path/-f} must be specified."
+    )
+
+
+def test_limited_choice_count_error_message_nested_alias_deduplicated(app):
+    """An alias shared by every parent name is listed once."""
+    contact = Group("Contact", validator=LimitedChoice(min=1, max=1))
+
+    @dataclass
+    class User:
+        email: Annotated[str | None, Parameter(alias="-e", group=contact)] = None
+        phone: Annotated[str | None, Parameter(group=contact)] = None
+
+    @app.default
+    def main(*, user: Annotated[User | None, Parameter(name=("--user", "--u"))] = None):
+        pass
+
+    with pytest.raises(ValidationError) as e:
+        app("", exit_on_error=False)
+
+    assert str(e.value) == (
+        "Invalid values for group Contact. Received 0 arguments. "
+        "Exactly 1 of {--user.email/-e/--u.email, --user.phone/--u.phone} must be specified."
+    )

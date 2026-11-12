@@ -4,7 +4,7 @@ import inspect
 import operator
 import re
 import sys
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from functools import partial, reduce
 from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
@@ -1262,19 +1262,15 @@ class Argument:
         return self.names[0]
 
     @property
-    def names(self) -> tuple[str, ...]:
-        """Names the argument goes by (both positive and negative)."""
-        import itertools
-
+    def positives(self) -> tuple[str, ...]:
+        """Names the argument goes by, excluding :attr:`negatives`."""
         assert isinstance(self.parameter.name, tuple)
-        return tuple(itertools.chain(self.parameter.name, self.negatives))
+        return self.parameter.name
 
     @property
-    def positives_names(self) -> Iterable:
-        """Names only the positives arguments."""
-        if not self.parameter.name:
-            return ()
-        return self.parameter.name if isinstance(self.parameter.name, Iterable) else (self.parameter.name,)
+    def names(self) -> tuple[str, ...]:
+        """Names the argument goes by (both positive and negative)."""
+        return self.positives + self.negatives
 
     def env_var_split(self, value: str, delimiter: str | None = None) -> list[str]:
         """Split a given value with :meth:`.Parameter.env_var_split`."""
