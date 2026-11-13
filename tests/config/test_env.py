@@ -67,6 +67,22 @@ def test_config_env_command_true(apps, monkeypatch):
     assert argument_collection[0].tokens[0].keys == ()
 
 
+def test_config_env_command_with_hyphen(apps, monkeypatch):
+    """A hyphenated command name becomes underscores, so the variable can be set from a shell."""
+
+    def foo(bar: int):
+        pass
+
+    argument_collection = ArgumentCollection._from_callable(foo)
+
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_MY_CMD_BAR", "100")
+    Env("CYCLOPTS_TEST_APP_", command=True)(apps, ("my-cmd",), argument_collection)
+
+    assert len(argument_collection[0].tokens) == 1
+    assert argument_collection[0].tokens[0].keyword == "CYCLOPTS_TEST_APP_MY_CMD_BAR"
+    assert argument_collection[0].tokens[0].value == "100"
+
+
 def test_config_env_dict(apps, monkeypatch):
     def foo(bar_bar: dict):
         pass

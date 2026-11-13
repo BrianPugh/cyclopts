@@ -24,7 +24,7 @@ class Env:
     def _prefix(self, commands: tuple[str, ...]) -> str:
         prefix = self.prefix
         if self.command and commands:
-            prefix += "_".join(x.upper() for x in commands) + "_"
+            prefix += "_".join(_transform(x) for x in commands) + "_"
 
         return prefix
 
