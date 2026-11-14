@@ -44,6 +44,12 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
         the :class:`App` object. If not specified, will search for :class:`App`
         objects in the script's global namespace.
 
+    Notes
+    -----
+    Each successful script execution remains registered as a separate module.
+    This preserves the globals used by forward references and lazy app metadata,
+    even when another script, or the same path again, is loaded later.
+
     Returns
     -------
     tuple[App, str]
@@ -85,17 +91,26 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
         print(f"Error: '{script_path}' is not a Python file.", file=sys.stderr)
         sys.exit(1)
 
-    # Load the module
-    spec = importlib.util.spec_from_file_location("__cyclopts_doc_module", script_path)
+    # Keep every loaded app's forward references and lazy metadata tied to
+    # that script's globals, including when the same path is loaded again.
+    from uuid import uuid4
+
+    module_name = f"__cyclopts_doc_module_{uuid4().hex}"
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
     if spec is None or spec.loader is None:
         print(f"Error: Could not load module from '{script_path}'.", file=sys.stderr)
         sys.exit(1)
 
     module = importlib.util.module_from_spec(spec)
-    sys.modules["__cyclopts_doc_module"] = module
+    sys.modules[module_name] = module
 
-    with _suppress_app_execution():
-        spec.loader.exec_module(module)
+    try:
+        with _suppress_app_execution():
+            spec.loader.exec_module(module)
+    except BaseException:
+        # Match normal import behavior: don't retain a partially loaded module.
+        sys.modules.pop(module_name, None)
+        raise
 
     # Find the App object
     if app_name:
