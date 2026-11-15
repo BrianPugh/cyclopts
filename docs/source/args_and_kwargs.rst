@@ -63,7 +63,8 @@ Individual elements are converted to the annotated type.
 --------------------------
 Kwargs (Variable Keywords)
 --------------------------
-A variable number of keyword arguments consume all remaining CLI tokens starting with ``--``.
+A variable number of keyword arguments consume all remaining CLI options (tokens starting with ``-`` or ``--``) that don't match another parameter.
+Negative numbers and slices (e.g. ``-5``, ``-3:``) are values, and are parsed positionally.
 Individual values are converted to the annotated type.
 
 .. code-block:: python

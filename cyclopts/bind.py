@@ -645,6 +645,22 @@ def _is_optional_bool_none_assignment(match: _KeywordMatch, value: str) -> bool:
     return True
 
 
+def _match_option(argument_collection: ArgumentCollection, cli_option: str, token: str) -> _KeywordMatch:
+    """Match ``cli_option`` (the option part of ``token``) to its argument.
+
+    Raises
+    ------
+    ValueError
+        If nothing matches, or only ``**kwargs`` matches a negative number or slice.
+        ``**kwargs`` matches any hyphenated token, but such a token is a value, so
+        only an explicitly named option (e.g. ``-1``) claims it.
+    """
+    match = _KeywordMatch(cli_option, *argument_collection.match(cli_option))
+    if match.argument.field_info.kind is match.argument.field_info.VAR_KEYWORD and not is_option_like(token):
+        raise ValueError
+    return match
+
+
 def _parse_kw_and_flags(
     argument_collection: ArgumentCollection,
     tokens: Sequence[str],
@@ -747,7 +763,7 @@ def _parse_kw_and_flags(
         claimed_part: str = token
         partial_remainder: str | None = None
         try:
-            matches.append(_KeywordMatch(cli_option, *argument_collection.match(cli_option)))
+            matches.append(_match_option(argument_collection, cli_option, token))
         except ValueError:
             # Length has to be greater than 2 (hyphen + character) to be exploded.
             # Also exclude numeric values (e.g., -10, -3.14) from combined flag parsing.
