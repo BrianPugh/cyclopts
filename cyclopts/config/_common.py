@@ -197,6 +197,7 @@ class ConfigFromFile(ConfigBase):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(self.path))
 
         self._config = {}
+        self._config_cache_key = None
         return self._config
 
     @property
