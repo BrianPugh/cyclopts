@@ -656,11 +656,7 @@ def _match_option(argument_collection: ArgumentCollection, cli_option: str, toke
         only an explicitly named option (e.g. ``-1``) claims it.
     """
     match = _KeywordMatch(cli_option, *argument_collection.match(cli_option))
-    if (
-        match.keys
-        and match.argument.field_info.kind is match.argument.field_info.VAR_KEYWORD
-        and not is_option_like(token, allow_numbers=False)
-    ):
+    if match.argument.field_info.kind is match.argument.field_info.VAR_KEYWORD and not is_option_like(token):
         raise ValueError
     return match
 
