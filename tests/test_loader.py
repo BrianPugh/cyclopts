@@ -361,3 +361,43 @@ app = App(name="unicode")
     app, name = load_app_from_script(script)
     assert name == "app"
     assert "unicode" in app.name
+
+
+def test_loaded_scripts_keep_their_own_globals(tmp_path, capsys):
+    """An earlier app must not resolve forward references or its version from a later load.
+
+    Both loads use the same path, which also covers a path-derived module name.
+    """
+    script = tmp_path / "app.py"
+    apps = []
+    # Versions differ in length so the rewrite can't be served from a stale .pyc (same mtime and size).
+    for value_type, version in [("int", "1.0"), ("str", "2.0.0")]:
+        script.write_text(
+            f"""\
+from __future__ import annotations
+from dataclasses import dataclass
+from cyclopts import App
+
+Value = {value_type}
+__version__ = "{version}"
+
+@dataclass
+class Config:
+    value: Value
+
+app = App(result_action="return_value")
+
+@app.default
+def main(config: Config):
+    return config.value
+"""
+        )
+        apps.append(load_app_from_script(script)[0])
+
+    first, second = apps
+    assert first(["--config.value", "7"]) == 7
+    assert second(["--config.value", "7"]) == "7"
+    first(["--version"])
+    assert capsys.readouterr().out.strip() == "1.0"
+    second(["--version"])
+    assert capsys.readouterr().out.strip() == "2.0.0"

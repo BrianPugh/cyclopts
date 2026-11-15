@@ -1,6 +1,7 @@
 """Load Cyclopts App objects from Python scripts."""
 
 import importlib.util
+import itertools
 import sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -10,6 +11,8 @@ if TYPE_CHECKING:
     from cyclopts import App
 
 from cyclopts.command_spec import CommandSpec
+
+_module_counter = itertools.count()
 
 
 @contextmanager
@@ -43,12 +46,6 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
         Python script path, optionally with ``':app_object'`` notation to specify
         the :class:`App` object. If not specified, will search for :class:`App`
         objects in the script's global namespace.
-
-    Notes
-    -----
-    Each successful script execution remains registered as a separate module.
-    This preserves the globals used by forward references and lazy app metadata,
-    even when another script, or the same path again, is loaded later.
 
     Returns
     -------
@@ -91,11 +88,10 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
         print(f"Error: '{script_path}' is not a Python file.", file=sys.stderr)
         sys.exit(1)
 
-    # Keep every loaded app's forward references and lazy metadata tied to
-    # that script's globals, including when the same path is loaded again.
-    from uuid import uuid4
-
-    module_name = f"__cyclopts_doc_module_{uuid4().hex}"
+    # A unique name per load: class type hints and App metadata resolve their
+    # globals through sys.modules by name, so a reused name would hand an
+    # earlier app the globals of a later script.
+    module_name = f"__cyclopts_doc_module_{next(_module_counter)}"
     spec = importlib.util.spec_from_file_location(module_name, script_path)
     if spec is None or spec.loader is None:
         print(f"Error: Could not load module from '{script_path}'.", file=sys.stderr)
@@ -104,13 +100,8 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
 
-    try:
-        with _suppress_app_execution():
-            spec.loader.exec_module(module)
-    except BaseException:
-        # Match normal import behavior: don't retain a partially loaded module.
-        sys.modules.pop(module_name, None)
-        raise
+    with _suppress_app_execution():
+        spec.loader.exec_module(module)
 
     # Find the App object
     if app_name:
