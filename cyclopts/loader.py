@@ -90,8 +90,11 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
 
     # A unique name per load: class type hints and App metadata resolve their
     # globals through sys.modules by name, so a reused name would hand an
-    # earlier app the globals of a later script.
-    module_name = f"__cyclopts_doc_module_{next(_module_counter)}"
+    # earlier app the globals of a later script. The first load keeps the
+    # plain name, which generated docs show as the name of an unnamed App.
+    module_name = "__cyclopts_doc_module"
+    if module_name in sys.modules:
+        module_name += f"_{next(_module_counter)}"
     spec = importlib.util.spec_from_file_location(module_name, script_path)
     if spec is None or spec.loader is None:
         print(f"Error: Could not load module from '{script_path}'.", file=sys.stderr)

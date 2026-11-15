@@ -401,3 +401,12 @@ def main(config: Config):
     assert capsys.readouterr().out.strip() == "1.0"
     second(["--version"])
     assert capsys.readouterr().out.strip() == "2.0.0"
+
+
+def test_first_load_keeps_plain_module_name(tmp_path, monkeypatch):
+    """Generated docs show the module name for an unnamed App, so a lone load must not change it."""
+    monkeypatch.delitem(sys.modules, "__cyclopts_doc_module", raising=False)
+    script = tmp_path / "app.py"
+    script.write_text("from cyclopts import App\napp = App()\n")
+    app, _ = load_app_from_script(script)
+    assert sys.modules["__cyclopts_doc_module"].app is app
