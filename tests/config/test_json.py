@@ -201,3 +201,17 @@ def test_config_json_symlink_retarget_invalidates_cache(tmp_path):
     config_path.unlink()
     config_path.symlink_to(targets[1])
     assert config.config == {"port": 9000}
+
+
+def test_config_json_restored_file_invalidates_cache(tmp_path):
+    """A file that goes missing and returns unchanged (same size and mtime) is read again."""
+    config_path = tmp_path / "config.json"
+    parked = tmp_path / "config.json.bak"
+    config_path.write_text(json.dumps({"port": 8123}))
+    config = Json(config_path)
+
+    assert config.config == {"port": 8123}
+    config_path.rename(parked)
+    assert config.config == {}
+    parked.rename(config_path)
+    assert config.config == {"port": 8123}
