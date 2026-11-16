@@ -670,6 +670,9 @@ def _convert(
         out = convert(dict[str, str], token)
     elif type_ in _implicit_iterable_type_mapping:
         out = convert(_implicit_iterable_type_mapping[type_], token)
+    elif origin_type in _implicit_iterable_type_mapping and not inner_types:
+        # Bare ``typing`` alias (e.g., ``typing.List`` or ``typing.Iterable`` with no [T]).
+        out = convert(_implicit_iterable_type_mapping[origin_type], token)
     elif type_ in _abstract_to_concrete_type_mapping:
         # Bare abstract type (e.g., collections.abc.Set with no [T])
         # Convert to default parameterized concrete type
