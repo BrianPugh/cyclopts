@@ -1,4 +1,5 @@
 import collections.abc
+import typing
 from collections.abc import MutableSequence as AbcMutableSequence
 from collections.abc import MutableSet as AbcMutableSet
 from collections.abc import Sequence
@@ -205,6 +206,30 @@ def test_abstract_collection_types(app, assert_parse_args, hint, expected):
     Tests both parameterized types (e.g., Set[str]) and bare types (e.g., Set).
     Bare abstract types should default to [str] like bare concrete types.
     """
+
+    @app.default
+    def main(test: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return test
+
+    assert_parse_args(main, "1 2 3", expected)
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        (typing.List, ["1", "2", "3"]),  # noqa: UP006
+        (typing.Set, {"1", "2", "3"}),  # noqa: UP006
+        (typing.FrozenSet, frozenset({"1", "2", "3"})),  # noqa: UP006
+        (typing.Iterable, ["1", "2", "3"]),
+        (typing.Collection, ["1", "2", "3"]),
+        (typing.MutableSequence, ["1", "2", "3"]),
+        (typing.AbstractSet, {"1", "2", "3"}),
+        (typing.MutableSet, {"1", "2", "3"}),
+        (typing.Optional[typing.List], ["1", "2", "3"]),  # noqa: UP006
+    ],
+)
+def test_bare_typing_collection_types(app, assert_parse_args, hint, expected):
+    """Bare ``typing`` aliases default to ``[str]`` like bare ``list`` and ``set``."""
 
     @app.default
     def main(test: hint):  # pyright: ignore[reportInvalidTypeForm]
