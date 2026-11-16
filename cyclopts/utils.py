@@ -251,7 +251,7 @@ def grouper(iterable: Sequence[Any], n: int) -> Iterator[tuple[Any, ...]]:
 def is_option_like(token: str, *, allow_numbers=False) -> bool:
     """Checks if a token looks like an option.
 
-    Namely, negative numbers, slices and durations are not options, but a token like ``--foo`` is.
+    Namely, negative numbers and slices are not options, but a token like ``--foo`` is.
 
     Parameters
     ----------
@@ -259,8 +259,8 @@ def is_option_like(token: str, *, allow_numbers=False) -> bool:
         String to interpret.
     allow_numbers: bool
         If :obj:`True`, then negative numbers (e.g. ``"-2"``) will return :obj:`True`.
-        Otherwise, numbers, slices (e.g. ``"-10:"``) and durations (e.g. ``"-1h30m"``)
-        will be interpreted as non-option-like (:obj:`False`).
+        Otherwise, numbers and slices (e.g. ``"-10:"``) will be interpreted as
+        non-option-like (:obj:`False`).
         Note: ``-j`` **is option-like**, even though it can represent an imaginary number.
 
     Returns
@@ -282,15 +282,11 @@ def is_option_like(token: str, *, allow_numbers=False) -> bool:
             int(token, 0)
             return False
         # Lazy imports to avoid a circular import (exceptions/_convert import utils).
-        from cyclopts._convert import _slice, _timedelta
+        from cyclopts._convert import _slice
         from cyclopts.exceptions import CoercionError
 
         with suppress(CoercionError):
             _slice(token)
-            return False
-        with suppress(ValueError):
-            # Negative durations, e.g. ``-1h30m``.
-            _timedelta(token)
             return False
     return token.startswith("-")
 

@@ -343,19 +343,104 @@ def test_negative_base_prefixed_number_positional(app, cmd_str, assert_parse_arg
     assert_parse_args(main, cmd_str, cmd_str)
 
 
-def test_negative_timedelta_value(app, assert_parse_args):
-    """Negative durations should be parsed as values, not as options."""
+@pytest.mark.parametrize(
+    "hint, cmd_str, expected",
+    [
+        (timedelta, "-1h30m", timedelta(hours=-1, minutes=-30)),
+        (timedelta, "-1.5d", timedelta(days=-1.5)),
+        (timedelta | None, "-30m", timedelta(minutes=-30)),
+        (tuple[int, timedelta], "-3 -1h", (-3, timedelta(hours=-1))),
+    ],
+)
+def test_negative_timedelta_value(app, assert_parse_args, hint, cmd_str, expected):
+    """Negative durations are values for a parameter that accepts a timedelta."""
 
+    @app.command
+    def positional(value: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    @app.command
+    def keyword(*, value: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(positional, f"positional {cmd_str}", expected)
+    assert_parse_args(keyword, f"keyword --value {cmd_str}", value=expected)
+
+
+def test_negative_timedelta_value_after_keyword(app, assert_parse_args):
     @app.default
-    def main(value: timedelta, *, offset: timedelta = timedelta()):
+    def main(*values: timedelta, offset: timedelta = timedelta(), limit: list[timedelta] | None = None):
         pass
 
     assert_parse_args(
         main,
-        "-1h30m --offset -30m",
+        "--offset -30m --limit -1h --limit -2h -1h30m 2h -1w",
         timedelta(hours=-1, minutes=-30),
+        timedelta(hours=2),
+        timedelta(weeks=-1),
         offset=timedelta(minutes=-30),
+        limit=[timedelta(hours=-1), timedelta(hours=-2)],
     )
+
+
+@pytest.mark.parametrize("hint", [str, int, list[str]])
+def test_negative_duration_is_option_for_non_timedelta_keyword(app, hint):
+    """A duration-shaped token is only a value where a timedelta is accepted."""
+
+    @app.default
+    def main(*, name: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("--name -5m", print_error=False, exit_on_error=False)
+
+
+def test_negative_duration_is_option_for_non_timedelta_positional(app):
+    @app.default
+    def main(n: int = 0, *args: str):
+        pass
+
+    with pytest.raises(UnknownOptionError):
+        app.parse_args("-5m", print_error=False, exit_on_error=False)
+    with pytest.raises(UnknownOptionError):
+        app.parse_args("1 -2d", print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize("hint", [str, timedelta])
+def test_duration_shaped_combined_short_flags(app, assert_parse_args, hint):
+    """Digit-named short flags still combine with unit-letter flags (``-1d``), even next to a timedelta."""
+
+    @app.default
+    def main(
+        value: hint | None = None,  # pyright: ignore[reportInvalidTypeForm]
+        *,
+        one: Annotated[bool, Parameter(name="-1")] = False,
+        d: Annotated[bool, Parameter(name="-d")] = False,
+        m: Annotated[int, Parameter(name="-m")] = 0,
+    ):
+        pass
+
+    assert_parse_args(main, "-1d", one=True, d=True)
+    assert_parse_args(main, "-1m 5", one=True, m=5)
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("-1m", print_error=False, exit_on_error=False)
+
+
+def test_duration_shaped_combined_short_flags_meta():
+    app = App(result_action="return_value")
+
+    @app.command
+    def cmd(*, s: Annotated[bool, Parameter(name="-s")] = False):
+        return s
+
+    @app.meta.default
+    def meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        one: Annotated[bool, Parameter(name="-1")] = False,
+    ):
+        return one, app(tokens)
+
+    assert app.meta(["cmd", "-1s"], exit_on_error=False) == (True, True)
 
 
 @pytest.mark.parametrize(
