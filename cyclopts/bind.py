@@ -651,12 +651,19 @@ def _match_option(argument_collection: ArgumentCollection, cli_option: str, toke
     Raises
     ------
     ValueError
-        If nothing matches, or only ``**kwargs`` matches a negative number or slice.
+        If nothing matches, or only ``**kwargs`` matches a negative number, slice, or
+        a negative duration that a positional parameter accepts.
         ``**kwargs`` matches any hyphenated token, but such a token is a value, so
         only an explicitly named option (e.g. ``-1``) claims it.
     """
     match = _KeywordMatch(cli_option, *argument_collection.match(cli_option))
-    if match.argument.field_info.kind is match.argument.field_info.VAR_KEYWORD and not is_option_like(token):
+    if match.argument.field_info.kind is match.argument.field_info.VAR_KEYWORD and (
+        not is_option_like(token)
+        or (
+            not token.startswith("--")
+            and any(x.field_info.is_positional and x._is_duration(token) for x in argument_collection)
+        )
+    ):
         raise ValueError
     return match
 
@@ -779,7 +786,7 @@ def _parse_kw_and_flags(
                     test_flag = f"-{char}"
 
                     try:
-                        arg, keys, implicit = argument_collection.match(test_flag)
+                        _, arg, keys, implicit = _match_option(argument_collection, test_flag, token)
 
                         if implicit is not UNSET or arg.parameter.count:
                             # This is a flag (boolean or counting) - consume just this character

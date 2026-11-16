@@ -494,13 +494,14 @@ class Argument:
         A negative duration (e.g. ``-1h30m``) is a value only where a :class:`~datetime.timedelta`
         is accepted; elsewhere it could be combined short flags (e.g. ``-1d``).
         """
-        if self.parameter.allow_leading_hyphen or not is_option_like(token):
-            return False
+        return not self.parameter.allow_leading_hyphen and is_option_like(token) and not self._is_duration(token)
+
+    def _is_duration(self, token: str) -> bool:
         if _accepts_timedelta(self.hint):
             with suppress(ValueError):
                 _timedelta(token)
-                return False
-        return True
+                return True
+        return False
 
     def match(
         self,
