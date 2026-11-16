@@ -6,6 +6,7 @@ import re
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
+from datetime import timedelta
 from functools import partial, reduce
 from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
 
@@ -13,6 +14,7 @@ from attrs import define, field
 
 from cyclopts._convert import (
     _convert_entry,
+    _timedelta,
     _validate_json_extra_keys,
     create_empty_instance,
     instantiate_from_dict,
@@ -58,7 +60,7 @@ from cyclopts.field_info import (
 )
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, grouper, is_builtin, is_class_and_subclass, parse_version
+from cyclopts.utils import UNSET, grouper, is_builtin, is_class_and_subclass, is_option_like, parse_version
 
 from .utils import (
     enum_flag_from_dict,
@@ -82,6 +84,11 @@ def _admits_none(hint: Any) -> bool:
     if get_origin(hint) is Literal:
         return None in get_args(hint)
     return is_nonetype(hint)
+
+
+def _accepts_timedelta(hint: Any) -> bool:
+    hint = resolve(hint)
+    return is_class_and_subclass(hint, timedelta) or any(_accepts_timedelta(x) for x in get_args(hint))
 
 
 @define(kw_only=True)
@@ -479,6 +486,25 @@ class Argument:
         for arg in get_args(hint) or (str,):
             if contains_hint(arg, str):
                 return False
+        return True
+
+    def _is_option_like(self, token: str) -> bool:
+        """Whether ``token`` is an option rather than a value for this argument.
+
+        A negative duration (e.g. ``-1h30m``) is a value only where a :class:`~datetime.timedelta`
+        is accepted; elsewhere it could be combined short flags (e.g. ``-1d``).
+        """
+        return not self.parameter.allow_leading_hyphen and is_option_like(token) and not self._is_duration(token)
+
+    def _is_duration(self, token: str) -> bool:
+        if not _accepts_timedelta(self.hint):
+            return False
+        try:
+            _timedelta(token)
+        except ValueError:
+            return False
+        except OverflowError:
+            pass  # Out of range, but still a duration; conversion reports it.
         return True
 
     def match(

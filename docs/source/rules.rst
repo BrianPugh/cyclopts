@@ -1015,6 +1015,11 @@ Combining durations is also supported:
 - "1h30m" - 1 hour and 30 minutes
 - "1d12h" - 1 day and 12 hours
 
+A leading ``-`` makes the duration negative.
+For a parameter that accepts a :class:`~datetime.timedelta`, such a token (e.g. ``-1h30m``) is parsed as a value instead of an option.
+As a positional argument, explicitly named short flags still take priority: if ``-1`` and ``-d`` are both flags, ``-1d`` is the two flags combined.
+Directly after an option that accepts a :class:`~datetime.timedelta` (e.g. ``--offset -1d``), it is that option's value, the same as a negative number.
+
 *****
 slice
 *****

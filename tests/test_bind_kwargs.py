@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Annotated
 
 import pytest
@@ -63,6 +64,53 @@ def test_kwargs_do_not_capture_negative_slice(app, assert_parse_args):
         pass
 
     assert_parse_args(foo, "-3:-1 --bar baz", slice(-3, -1), bar="baz")
+
+
+@pytest.mark.parametrize(
+    "cmd, args, kwargs",
+    [
+        ("-1h30m", (timedelta(hours=-1, minutes=-30),), {}),
+        ("-1h --bar baz -2d", (timedelta(hours=-1), timedelta(days=-2)), {"bar": "baz"}),
+    ],
+)
+def test_kwargs_do_not_capture_negative_durations(app, assert_parse_args, cmd, args, kwargs):
+    @app.default
+    def foo(*args: timedelta, **kwargs: str):
+        pass
+
+    assert_parse_args(foo, cmd, *args, **kwargs)
+
+
+def test_meta_child_kwargs_do_not_capture_negative_durations(app):
+    @app.default
+    def foo(*args: timedelta, **kwargs: str):
+        return args, kwargs
+
+    @app.meta.default
+    def meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        verbose: Annotated[bool, Parameter(name="-v")] = False,
+    ):
+        return app(tokens, result_action="return_value"), verbose
+
+    expected = (((timedelta(hours=-1),), {"bar": "baz"}), True)
+    assert app.meta("-1h --bar baz -v", result_action="return_value") == expected
+
+
+def test_kwargs_capture_duration_shaped_key_without_timedelta_positional(app, assert_parse_args):
+    @app.default
+    def foo(*args: str, **kwargs: str):
+        pass
+
+    assert_parse_args(foo, "-1h baz", **{"1h": "baz"})
+
+
+def test_kwargs_capture_duration_shaped_key_with_unparsed_timedelta_positional(app, assert_parse_args):
+    @app.default
+    def foo(offset: Annotated[timedelta, Parameter(parse=False)] = timedelta(), **kwargs: str):
+        pass
+
+    assert_parse_args(foo, "-1h baz", **{"1h": "baz"})
 
 
 def test_kwargs_explicit_numeric_option_still_matches(app, assert_parse_args):

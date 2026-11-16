@@ -651,12 +651,19 @@ def _match_option(argument_collection: ArgumentCollection, cli_option: str, toke
     Raises
     ------
     ValueError
-        If nothing matches, or only ``**kwargs`` matches a negative number or slice.
+        If nothing matches, or only ``**kwargs`` matches a negative number, slice, or
+        a negative duration that a positional parameter accepts.
         ``**kwargs`` matches any hyphenated token, but such a token is a value, so
         only an explicitly named option (e.g. ``-1``) claims it.
     """
     match = _KeywordMatch(cli_option, *argument_collection.match(cli_option))
-    if match.argument.field_info.kind is match.argument.field_info.VAR_KEYWORD and not is_option_like(token):
+    if match.argument.field_info.kind is match.argument.field_info.VAR_KEYWORD and (
+        not is_option_like(token)
+        or (
+            not token.startswith("--")
+            and any(x.parse and x.field_info.is_positional and x._is_duration(token) for x in argument_collection)
+        )
+    ):
         raise ValueError
     return match
 
@@ -779,7 +786,7 @@ def _parse_kw_and_flags(
                     test_flag = f"-{char}"
 
                     try:
-                        arg, keys, implicit = argument_collection.match(test_flag)
+                        _, arg, keys, implicit = _match_option(argument_collection, test_flag, token)
 
                         if implicit is not UNSET or arg.parameter.count:
                             # This is a flag (boolean or counting) - consume just this character
@@ -914,10 +921,7 @@ def _parse_kw_and_flags(
                 and not match.keys
                 and is_union(match.argument.resolved_hint)
                 and bool in get_args(match.argument.resolved_hint)
-                and (
-                    i + 1 >= len(tokens)
-                    or (not match.argument.parameter.allow_leading_hyphen and is_option_like(tokens[i + 1]))
-                )
+                and (i + 1 >= len(tokens) or match.argument._is_option_like(tokens[i + 1]))
             ):
                 # A union containing ``bool`` (e.g. ``bool | list[str]``) given no value acts as a flag.
                 match.argument.append(CliToken(keyword=match.matched_token, implicit_value=True))
@@ -977,7 +981,7 @@ def _parse_kw_and_flags(
                         # Then consume from the remaining tokens
                         for j in itertools.count(pre_extracted_count):
                             token = upcoming_tokens[j]
-                            if not match.argument.parameter.allow_leading_hyphen and is_option_like(token.value):
+                            if match.argument._is_option_like(token.value):
                                 break
                             consumed_tokens.append(token)
                             cli_values.append(token.value)
@@ -1003,7 +1007,7 @@ def _parse_kw_and_flags(
                                 break
 
                             token = upcoming_tokens[idx]
-                            if not match.argument.parameter.allow_leading_hyphen and is_option_like(token.value):
+                            if match.argument._is_option_like(token.value):
                                 raise MissingArgumentError(
                                     argument=match.argument,
                                     tokens_so_far=cli_values,
@@ -1203,7 +1207,7 @@ def _parse_pos(
                 # end-of-options delimiter, and ``force_positional`` marks tokens
                 # after it, which must not be treated as options.
                 token, force_positional = tokens_and_force_positional[0]
-                if not force_positional and not argument.parameter.allow_leading_hyphen and is_option_like(token):
+                if not force_positional and argument._is_option_like(token):
                     # It's more meaningful to interpret the token as an intended option,
                     # rather than an intended positional value for ``argument``.
                     raise UnknownOptionError(token=CliToken(value=token), argument_collection=argument_collection)
@@ -1247,7 +1251,7 @@ def _parse_pos(
                 )
 
             for index, (token_str, force_positional) in enumerate(tokens_and_force_positional[:tokens_per_element]):
-                if not force_positional and not argument.parameter.allow_leading_hyphen and is_option_like(token_str):
+                if not force_positional and argument._is_option_like(token_str):
                     raise UnknownOptionError(token=CliToken(value=token_str), argument_collection=argument_collection)
                 new_tokens.append(CliToken(value=token_str, index=index))
             tokens_and_force_positional = tokens_and_force_positional[tokens_per_element:]
