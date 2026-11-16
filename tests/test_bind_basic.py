@@ -1,3 +1,4 @@
+from datetime import timedelta
 from enum import Enum
 from functools import partial
 from typing import Annotated, Any
@@ -340,6 +341,21 @@ def test_negative_base_prefixed_number_positional(app, cmd_str, assert_parse_arg
         pass
 
     assert_parse_args(main, cmd_str, cmd_str)
+
+
+def test_negative_timedelta_value(app, assert_parse_args):
+    """Negative durations should be parsed as values, not as options."""
+
+    @app.default
+    def main(value: timedelta, *, offset: timedelta = timedelta()):
+        pass
+
+    assert_parse_args(
+        main,
+        "-1h30m --offset -30m",
+        timedelta(hours=-1, minutes=-30),
+        offset=timedelta(minutes=-30),
+    )
 
 
 @pytest.mark.parametrize(

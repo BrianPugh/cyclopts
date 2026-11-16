@@ -36,13 +36,16 @@ def test_grouper():
         ("-0b101", False),
         ("0xFF", False),
         ("-0x", True),  # Not a valid number.
+        ("-1h30m", False),  # Negative timedelta.
+        ("-1.5d", False),
+        ("-1x", True),  # Not a valid duration.
     ],
 )
 def test_is_option_like(token, expected):
     assert is_option_like(token) == expected
 
 
-@pytest.mark.parametrize("token", ["-255", "-3.14", "-0xFF", "-0b101", "-10:"])
+@pytest.mark.parametrize("token", ["-255", "-3.14", "-0xFF", "-0b101", "-10:", "-1h30m"])
 def test_is_option_like_allow_numbers(token):
     """With ``allow_numbers=True``, any leading-hyphen token is option-like."""
     assert is_option_like(token, allow_numbers=True)
