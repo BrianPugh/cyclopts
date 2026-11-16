@@ -105,6 +105,14 @@ def test_kwargs_capture_duration_shaped_key_without_timedelta_positional(app, as
     assert_parse_args(foo, "-1h baz", **{"1h": "baz"})
 
 
+def test_kwargs_capture_duration_shaped_key_with_unparsed_timedelta_positional(app, assert_parse_args):
+    @app.default
+    def foo(offset: Annotated[timedelta, Parameter(parse=False)] = timedelta(), **kwargs: str):
+        pass
+
+    assert_parse_args(foo, "-1h baz", **{"1h": "baz"})
+
+
 def test_kwargs_explicit_numeric_option_still_matches(app, assert_parse_args):
     @app.default
     def foo(*args: int, one: Annotated[bool, Parameter(name="-1")] = False, **kwargs: str):

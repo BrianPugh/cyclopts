@@ -436,6 +436,21 @@ def test_duration_shaped_combined_short_flags(app, assert_parse_args, hint):
         app.parse_args("-1m", print_error=False, exit_on_error=False)
 
 
+def test_duration_after_timedelta_option_is_value(app, assert_parse_args):
+    """Like ``--n 5 -1`` for numbers, a value slot takes a duration even if it could be combined short flags."""
+
+    @app.default
+    def main(
+        *,
+        offsets: Annotated[list[timedelta], Parameter(consume_multiple=True)],
+        one: Annotated[bool, Parameter(name="-1")] = False,
+        d: Annotated[bool, Parameter(name="-d")] = False,
+    ):
+        pass
+
+    assert_parse_args(main, "--offsets 2h -1d", offsets=[timedelta(hours=2), timedelta(days=-1)])
+
+
 def test_duration_shaped_combined_short_flags_meta():
     app = App(result_action="return_value")
 

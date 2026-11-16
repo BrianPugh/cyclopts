@@ -661,7 +661,7 @@ def _match_option(argument_collection: ArgumentCollection, cli_option: str, toke
         not is_option_like(token)
         or (
             not token.startswith("--")
-            and any(x.field_info.is_positional and x._is_duration(token) for x in argument_collection)
+            and any(x.parse and x.field_info.is_positional and x._is_duration(token) for x in argument_collection)
         )
     ):
         raise ValueError
