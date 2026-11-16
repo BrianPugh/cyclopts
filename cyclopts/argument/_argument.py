@@ -497,11 +497,15 @@ class Argument:
         return not self.parameter.allow_leading_hyphen and is_option_like(token) and not self._is_duration(token)
 
     def _is_duration(self, token: str) -> bool:
-        if _accepts_timedelta(self.hint):
-            with suppress(ValueError):
-                _timedelta(token)
-                return True
-        return False
+        if not _accepts_timedelta(self.hint):
+            return False
+        try:
+            _timedelta(token)
+        except ValueError:
+            return False
+        except OverflowError:
+            pass  # Out of range, but still a duration; conversion reports it.
+        return True
 
     def match(
         self,

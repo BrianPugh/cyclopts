@@ -383,6 +383,16 @@ def test_negative_timedelta_value_after_keyword(app, assert_parse_args):
     )
 
 
+@pytest.mark.parametrize("cmd_str", ["-1000000000d", "--offset -1000000000d"])
+def test_negative_timedelta_out_of_range(app, cmd_str):
+    @app.default
+    def main(value: timedelta = timedelta(), *, offset: timedelta = timedelta()):
+        pass
+
+    with pytest.raises(CoercionError):
+        app.parse_args(cmd_str, print_error=False, exit_on_error=False)
+
+
 @pytest.mark.parametrize("hint", [str, int, list[str]])
 def test_negative_duration_is_option_for_non_timedelta_keyword(app, hint):
     """A duration-shaped token is only a value where a timedelta is accepted."""
