@@ -8,9 +8,16 @@ def test_types_web_email(convert):
     convert(Email, "foo@bar.com")
 
 
-def test_types_web_email_invalid(convert):
+@pytest.mark.parametrize(
+    "tokens",
+    [
+        "foo",
+        ["foo@bar.com\n"],  # a list keeps the trailing newline (a string is split by shlex)
+    ],
+)
+def test_types_web_email_invalid(convert, tokens):
     with pytest.raises(ValidationError):
-        convert(Email, "foo")
+        convert(Email, tokens)
 
 
 @pytest.mark.parametrize(
@@ -34,6 +41,8 @@ def test_types_url(convert, url):
         "foo",
         "bar.",
         "foo bar.com",
+        ["https://example.com\n"],  # a list keeps the trailing newline (a string is split by shlex)
+        ["https://example.com/path\n"],
     ],
 )
 def test_types_url_invalid(convert, url):
