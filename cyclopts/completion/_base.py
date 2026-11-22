@@ -298,7 +298,8 @@ def strip_markup(text: str, format: str = "markdown", max_length: int = 80) -> s
     inline = InlineText.from_format(text, format=format)
     text = extract_text(inline)
 
-    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
+    # Drop control characters, but keep \t \n \r so the next line turns them into spaces.
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
 
     if len(text) > max_length:
