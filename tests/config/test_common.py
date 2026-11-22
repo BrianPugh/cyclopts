@@ -311,6 +311,19 @@ def test_config_exception_during_load_config_msg(tmp_path):
     assert str(e.value) == "ValueError: My exception's message."
 
 
+class DummyErrorConfigNoneArg(ConfigFromFile):
+    def _load_config(self, path: Path) -> dict[str, Any]:
+        raise ValueError(None)
+
+
+def test_config_exception_during_load_config_non_str_arg(tmp_path):
+    path = tmp_path / "config"
+    path.touch()
+    with pytest.raises(CycloptsError) as e:
+        _ = DummyErrorConfigNoneArg(path).config
+    assert str(e.value).startswith("ValueError")
+
+
 class DummyEmptyDocument(ConfigFromFile):
     def _load_config(self, path: Path) -> dict[str, Any]:
         return None  # pyright: ignore[reportReturnType]

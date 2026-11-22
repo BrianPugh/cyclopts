@@ -1,9 +1,10 @@
+from pathlib import Path
 from textwrap import dedent
 from typing import Annotated
 
 import pytest
 
-from cyclopts import App, Parameter
+from cyclopts import App, CycloptsError, Parameter
 from cyclopts.config import Toml
 
 
@@ -69,3 +70,31 @@ def test_duplicate_config_toml_with_meta(config_path):
         return name
 
     assert app.meta([], exit_on_error=False) == "Alice"
+
+
+def test_config_toml_path_is_directory(tmp_path):
+    """An unreadable config path raises a CycloptsError, not a TypeError from message building."""
+    path = tmp_path / "config.toml"
+    path.mkdir()
+    app = App(config=Toml(path))
+
+    @app.default
+    def default(foo: str = "bar"):
+        pass
+
+    with pytest.raises(CycloptsError) as e:
+        app([], exit_on_error=False)
+    assert str(e.value).startswith(("IsADirectoryError: ", "PermissionError: "))
+
+
+def test_config_toml_permission_error(tmp_path, monkeypatch):
+    path = tmp_path / "config.toml"
+    path.write_text('foo = "baz"\n')
+
+    def raise_permission_error(*args, **kwargs):
+        raise PermissionError(13, "Permission denied", str(path))
+
+    monkeypatch.setattr(Path, "open", raise_permission_error)
+    with pytest.raises(CycloptsError) as e:
+        _ = Toml(path).config
+    assert str(e.value) == f"PermissionError: [Errno 13] Permission denied: {str(path)!r}"
