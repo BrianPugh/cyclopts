@@ -33,7 +33,7 @@ def _generate_html_toc(
 
     for name, subapp in iterate_commands(app, include_hidden):
         display_name = f"{prefix}{name}" if prefix else name
-        full_path = f"{app_name}-{display_name.replace(' ', '-')}".lower()
+        full_path = generate_anchor(f"{app_name} {display_name}")
 
         indent = "  " * (depth + 1)
         lines.append(f'{indent}<li><a href="#{full_path}"><code>{name}</code></a>')
@@ -493,11 +493,7 @@ def generate_html_docs(
             # Generate subcommand documentation
             lines.append('<section class="command-section">')
             # Create anchor-friendly ID
-            anchor_id = (
-                f"{app_name}-{'-'.join(sub_command_chain[1:])}".lower()
-                if len(sub_command_chain) > 1
-                else f"{app_name}-{name}".lower()
-            )
+            anchor_id = generate_anchor(" ".join(sub_command_chain))
             effective_sub_level = min(sub_heading_level, max_heading_level)
             lines.append(
                 f'<h{effective_sub_level} id="{anchor_id}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{effective_sub_level}>'
