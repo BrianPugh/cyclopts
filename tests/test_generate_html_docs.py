@@ -557,3 +557,47 @@ def test_generate_html_docs_include_hidden_omits_builtin_flags():
     assert hrefs <= ids
     assert "<code>--help</code>" not in docs
     assert "<code>--version</code>" not in docs
+
+
+def test_generate_html_docs_colliding_anchor_ids_are_unique():
+    app = App(name="myapp")
+    files = App(name="files", help="File operations.")
+    app.command(files)
+
+    @files.command
+    def cp(src: str):
+        """Copy a file."""
+
+    @app.command(name="files-cp")
+    def files_cp(src: str):
+        """Copy files."""
+
+    @app.command(name="Build")
+    def build_upper():
+        """Build upper."""
+
+    @app.command(name="build")
+    def build_lower():
+        """Build lower."""
+
+    docs = app.generate_docs(output_format="html")
+
+    sections = re.findall(r'id="([^"]+)" class="command-title"><code>([^<]+)</code>', docs)
+    ids = [section_id for section_id, _ in sections]
+    assert len(ids) == len(set(ids))
+    title_by_id = dict(sections)
+    assert set(title_by_id.values()) == {
+        "myapp files",
+        "myapp files cp",
+        "myapp files-cp",
+        "myapp Build",
+        "myapp build",
+    }
+
+    links = re.findall(r'<a href="#([^"]+)"><code>([^<]+)</code></a>', docs)
+    assert links
+    for href, name in links:
+        assert title_by_id[href].split()[-1] == name
+
+    toc = docs.split('<div class="table-of-contents">', 1)[1].split("</div>", 1)[0]
+    assert sorted(re.findall(r'href="#([^"]+)"', toc)) == sorted(ids)
