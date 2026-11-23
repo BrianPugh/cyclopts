@@ -153,9 +153,6 @@ def test_generate_docs_non_recursive():
 
     actual = app.generate_docs(recursive=False)
 
-    # Note: In non-recursive mode, subcommands like 'migrate' don't get headings,
-    # so they appear in the ToC but the link is broken. This is a known limitation.
-    # The current implementation always collects ToC entries recursively.
     # Note: The 'db' subcommand doesn't show usage because it has no default_command.
     expected = dedent(
         """\
@@ -170,7 +167,6 @@ def test_generate_docs_non_recursive():
         ## Table of Contents
 
         - [`db`](#myapp-db)
-            - [`migrate`](#myapp-db-migrate)
 
         **Commands**:
 

@@ -522,3 +522,20 @@ def test_generate_html_docs_anchor_attributes_escaped():
     ids, hrefs = _parsed_ids_and_hrefs(docs)
     assert hrefs <= ids
     assert {'a"b<c-files', 'a"b<c-files-cp'} <= ids
+
+
+def test_generate_html_docs_non_recursive_toc_links_match_ids():
+    app = App(name="t")
+    s = App(name="s")
+    app.command(s)
+
+    @s.command
+    def c():
+        """Do c."""
+
+    docs = app.generate_docs(output_format="html", recursive=False)
+
+    ids = set(re.findall(r'id="([^"]+)"', docs))
+    hrefs = set(re.findall(r'href="#([^"]+)"', docs))
+    assert hrefs <= ids
+    assert 'href="#t-s"' in docs
