@@ -416,3 +416,23 @@ def test_get_completion_action_abstract_collections():
     ]
     for hint in hints:
         assert get_completion_action(hint) == CompletionAction.FILES, hint
+
+
+@pytest.mark.parametrize("format", ["plaintext", "rich"])
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("Number of retries\nbefore giving up", "Number of retries before giving up"),
+        ("Number of retries\r\nbefore giving up", "Number of retries before giving up"),
+        ("Number of retries\tbefore giving up", "Number of retries before giving up"),
+        ("Number of retries\rbefore giving up", "Number of retries before giving up"),
+        ("Number of retries\fbefore giving up", "Number of retries before giving up"),
+        ("Number of retries\vbefore giving up", "Number of retries before giving up"),
+        ("Number of retries\x07before giving up", "Number of retriesbefore giving up"),
+    ],
+)
+def test_strip_markup_line_break_becomes_space(text, expected, format):
+    """Whitespace control characters separate words; other control characters are dropped."""
+    from cyclopts.completion._base import strip_markup
+
+    assert strip_markup(text, format=format) == expected
