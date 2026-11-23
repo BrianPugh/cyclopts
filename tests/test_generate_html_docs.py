@@ -539,3 +539,25 @@ def test_generate_html_docs_non_recursive_toc_links_match_ids():
     hrefs = set(re.findall(r'href="#([^"]+)"', docs))
     assert hrefs <= ids
     assert 'href="#t-s"' in docs
+
+
+def test_generate_html_docs_fragment_back_to_top_link_resolves():
+    from cyclopts.docs.html import generate_html_docs
+
+    app = App(name="My Tool")
+    files = App(name="files")
+    app.command(files)
+    remote = App(name="remote")
+    files.command(remote)
+
+    @remote.command
+    def sync():
+        """Sync files."""
+
+    docs = generate_html_docs(app, standalone=False)
+
+    assert 'class="back-to-top"' in docs
+    ids = re.findall(r'id="([^"]+)"', docs)
+    hrefs = set(re.findall(r'href="#([^"]+)"', docs))
+    assert hrefs <= set(ids)
+    assert len(ids) == len(set(ids))
