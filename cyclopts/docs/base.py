@@ -402,6 +402,34 @@ def generate_anchor(command_path: str) -> str:
     return anchor
 
 
+def unique_anchor(command_path: str, used: set[str]) -> str:
+    """Generate an anchor for ``command_path`` that is not yet in ``used``.
+
+    A colliding anchor gets the lowest free ``_N`` suffix (``N >= 1``).
+    The returned anchor is added to ``used``.
+
+    Parameters
+    ----------
+    command_path : str
+        Full command path (e.g., "myapp files cp").
+    used : set[str]
+        Anchors already assigned in the document; updated in place.
+
+    Returns
+    -------
+    str
+        Unique anchor string.
+    """
+    base = generate_anchor(command_path)
+    anchor = base
+    n = 0
+    while anchor in used:
+        n += 1
+        anchor = f"{base}_{n}"
+    used.add(anchor)
+    return anchor
+
+
 def should_skip_command(command_name: str, subapp: "App", parent_app: "App", include_hidden: bool) -> bool:
     """Check if a command should be skipped.
 

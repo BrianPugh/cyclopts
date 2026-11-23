@@ -26,8 +26,8 @@ class HtmlFormatter:
     command_chain : list[str]
         The current command chain for generating anchor IDs.
     anchors : dict[tuple[str, ...], str] | None
-        Mapping of command paths to de-duplicated anchor IDs.
-        Paths missing from it fall back to :func:`~cyclopts.docs.base.generate_anchor`.
+        Mapping of command paths to de-duplicated anchor IDs; must contain every linked command.
+        If None (default), anchors come from :func:`~cyclopts.docs.base.generate_anchor`.
     """
 
     def __init__(
@@ -42,7 +42,7 @@ class HtmlFormatter:
         self.include_hidden = include_hidden
         self.app_name = app_name
         self.command_chain = command_chain or []
-        self.anchors = anchors or {}
+        self.anchors = anchors
         self._output = io.StringIO()
 
     def reset(self) -> None:
@@ -123,7 +123,7 @@ class HtmlFormatter:
                 # Generate anchor link
                 primary_name, aliases = names[0], names[1:]
                 chain = (self.app_name, *self.command_chain[1:], primary_name)
-                anchor_id = self.anchors.get(chain) or generate_anchor(" ".join(chain))
+                anchor_id = generate_anchor(" ".join(chain)) if self.anchors is None else self.anchors[chain]
                 name_html = f'<a href="#{escape_html(anchor_id)}"><code>{escape_html(primary_name)}</code></a>'
                 if aliases:
                     aliases_str = ", ".join(escape_html(n) for n in aliases)

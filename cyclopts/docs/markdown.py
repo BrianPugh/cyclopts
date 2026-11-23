@@ -19,6 +19,7 @@ from cyclopts.docs.base import (
     should_include_command,
     should_show_commands_list,
     should_show_usage,
+    unique_anchor,
     usage_display_chain,
 )
 
@@ -94,20 +95,14 @@ def _generate_toc_entries(lines: list[str], commands: list[tuple[str, "App"]]) -
     commands : list[tuple[str, "App"]]
         List of (display_name, app) tuples.
     """
-    anchor_counts: dict[str, int] = {}
+    used_anchors: set[str] = set()
 
     for display_name, _app in commands:
         depth = display_name.count(" ") - 1
         indent = "    " * depth
 
         cmd_name = display_name.split()[-1]
-        anchor = generate_anchor(display_name)
-
-        if anchor in anchor_counts:
-            anchor_counts[anchor] += 1
-            anchor = f"{anchor}_{anchor_counts[anchor]}"
-        else:
-            anchor_counts[anchor] = 0
+        anchor = unique_anchor(display_name, used_anchors)
 
         lines.append(f"{indent}- [`{cmd_name}`](#{anchor})")
 

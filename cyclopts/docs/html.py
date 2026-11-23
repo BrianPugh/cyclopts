@@ -9,9 +9,9 @@ from cyclopts.docs.base import (
     extract_usage,
     filter_help_entries,
     format_usage_line,
-    generate_anchor,
     iterate_commands,
     resolve_doc_root_name,
+    unique_anchor,
     usage_display_chain,
 )
 
@@ -19,32 +19,28 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
-def _build_anchor_map(app: "App", include_hidden: bool, command_chain: list[str]) -> dict[tuple[str, ...], str]:
-    """Map each command path to a unique anchor id, in document order.
+def _build_anchor_map(
+    app: "App", include_hidden: bool, recursive: bool, command_chain: list[str]
+) -> dict[tuple[str, ...], str]:
+    """Map the path of each command section that will be rendered to a unique anchor id, in document order.
 
     Colliding anchors (e.g. ``files-cp`` vs ``files cp``) get ``_N`` suffixes.
     """
     anchors: dict[tuple[str, ...], str] = {}
-    anchor_counts: dict[str, int] = {}
-
-    def add(chain: tuple[str, ...]) -> None:
-        anchor = generate_anchor(" ".join(chain))
-        if anchor in anchor_counts:
-            anchor_counts[anchor] += 1
-            anchor = f"{anchor}_{anchor_counts[anchor]}"
-        else:
-            anchor_counts[anchor] = 0
-        anchors[chain] = anchor
+    used: set[str] = set()
 
     def walk(app: "App", chain: tuple[str, ...]) -> None:
         for name, subapp in iterate_commands(app, include_hidden):
             sub_chain = (*chain, name)
-            add(sub_chain)
-            walk(subapp, sub_chain)
+            anchors[sub_chain] = unique_anchor(" ".join(sub_chain), used)
+            if recursive:
+                walk(subapp, sub_chain)
 
-    root = tuple(command_chain)
-    if len(root) > 1:
-        add(root)
+    if command_chain:
+        root = tuple(command_chain)
+        anchors[root] = unique_anchor(" ".join(root), used)
+    else:
+        root = (resolve_doc_root_name(app),)
     walk(app, root)
     return anchors
 
@@ -368,7 +364,6 @@ def generate_html_docs(
     generate_toc: bool = True,
     flatten_commands: bool = False,
     usage_name: str | None = None,
-    anchors: dict[tuple[str, ...], str] | None = None,
 ) -> str:
     """Generate HTML documentation for a CLI application.
 
@@ -407,20 +402,47 @@ def generate_html_docs(
         Optional replacement for the root app name in every ``Usage:`` line
         (root and subcommands). Section headings and anchors continue to use
         ``app.name[0]``. Default is None.
-    anchors : dict[tuple[str, ...], str] | None
-        Internal parameter mapping each command path to its de-duplicated anchor id.
-        Default is None.
 
     Returns
     -------
     str
         The generated HTML documentation.
     """
-    from cyclopts.help.formatters.html import HtmlFormatter
-
-    # Initialize command chain if not provided
     if command_chain is None:
         command_chain = []
+    return _generate_html_docs(
+        app,
+        recursive=recursive,
+        include_hidden=include_hidden,
+        heading_level=heading_level,
+        max_heading_level=max_heading_level,
+        standalone=standalone,
+        custom_css=custom_css,
+        command_chain=command_chain,
+        generate_toc=generate_toc,
+        flatten_commands=flatten_commands,
+        usage_name=usage_name,
+        anchors=_build_anchor_map(app, include_hidden, recursive, command_chain),
+    )
+
+
+def _generate_html_docs(
+    app: "App",
+    *,
+    recursive: bool,
+    include_hidden: bool,
+    heading_level: int,
+    max_heading_level: int,
+    standalone: bool,
+    custom_css: str | None,
+    command_chain: list[str],
+    generate_toc: bool,
+    flatten_commands: bool,
+    usage_name: str | None,
+    anchors: dict[tuple[str, ...], str],
+) -> str:
+    """Recursive implementation of :func:`generate_html_docs` sharing one anchor map."""
+    from cyclopts.help.formatters.html import HtmlFormatter
 
     lines = []
 
@@ -436,7 +458,6 @@ def generate_html_docs(
         app_name = resolve_doc_root_name(app)
         full_command = app_name
         title = app_name
-        anchors = _build_anchor_map(app, include_hidden, [app_name])
         # Add title for all levels
         effective_level = min(heading_level, max_heading_level)
         lines.append(f'<h{effective_level} class="app-title">{title}</h{effective_level}>')
@@ -444,8 +465,6 @@ def generate_html_docs(
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
         full_command = " ".join(command_chain)
-        if anchors is None:
-            anchors = _build_anchor_map(app, include_hidden, command_chain)
         anchor_id = anchors[tuple(command_chain)]
         effective_level = min(heading_level, max_heading_level)
         lines.append('<section class="command-section">')
@@ -604,7 +623,7 @@ def generate_html_docs(
                         # Set up context for nested_app, then recurse
                         # The recursive call's app_stack([app]) will stack on top of this
                         with nested_app.app_stack([subapp, nested_app]):
-                            nested_docs = generate_html_docs(
+                            nested_docs = _generate_html_docs(
                                 nested_app,
                                 recursive=recursive,
                                 include_hidden=include_hidden,
