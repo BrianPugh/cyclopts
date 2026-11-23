@@ -295,11 +295,12 @@ def strip_markup(text: str, format: str = "markdown", max_length: int = 80) -> s
     from cyclopts._markup import extract_text
     from cyclopts.help.inline_text import InlineText
 
+    # rich.Text silently deletes \r \v \f, which would glue the words around them.
+    text = re.sub(r"[\r\v\f]", " ", text)
     inline = InlineText.from_format(text, format=format)
     text = extract_text(inline)
 
-    # Drop control characters, but keep \t \n \r so the next line turns them into spaces.
-    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+    text = re.sub(r"(?!\s)[\x00-\x1f\x7f]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
 
     if len(text) > max_length:
