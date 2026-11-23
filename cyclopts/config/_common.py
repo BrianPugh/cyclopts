@@ -2,7 +2,6 @@ import errno
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from contextlib import suppress
 from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -181,8 +180,8 @@ class ConfigFromFile(ConfigBase):
                     raise
                 except Exception as e:
                     msg = getattr(type(e), "__name__", "")
-                    with suppress(IndexError):
-                        exception_msg = e.args[0]
+                    exception_msg = str(e)
+                    if exception_msg:
                         if msg:
                             msg += ": "
                         msg += exception_msg
