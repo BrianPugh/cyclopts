@@ -105,6 +105,8 @@ class HtmlFormatter:
         if not entries:
             return
 
+        from cyclopts.docs.base import generate_anchor
+
         # Use list format instead of table
         self._output.write('<ul class="commands-list">\n')
 
@@ -115,11 +117,8 @@ class HtmlFormatter:
             elif self.app_name:
                 # Generate anchor link
                 primary_name, aliases = names[0], names[1:]
-                if self.command_chain:
-                    full_chain = self.command_chain + [primary_name]
-                    anchor_id = f"{self.app_name}-{'-'.join(full_chain[1:])}".lower()
-                else:
-                    anchor_id = f"{self.app_name}-{primary_name}".lower()
+                chain = [self.app_name, *self.command_chain[1:], primary_name]
+                anchor_id = generate_anchor(" ".join(chain))
                 name_html = f'<a href="#{anchor_id}"><code>{escape_html(primary_name)}</code></a>'
                 if aliases:
                     aliases_str = ", ".join(escape_html(n) for n in aliases)

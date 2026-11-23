@@ -1,5 +1,6 @@
 """Tests for HTML documentation generation."""
 
+import re
 import tempfile
 from pathlib import Path
 from textwrap import dedent
@@ -451,3 +452,22 @@ def test_generate_html_docs_unnamed_app_uses_module_name_not_argv(importable_tmp
     assert "sphinx-build" not in docs  # not in title, anchors, or the Usage line
     assert '<h1 class="app-title">htmltool</h1>' in docs
     assert 'id="htmltool-serve"' in docs
+
+
+def test_generate_html_docs_links_match_ids_with_spaced_app_name():
+    app = App(name="My Tool")
+    files = App(name="files", help="File operations.")
+    app.command(files)
+
+    @files.command
+    def cp(src: str):
+        """Copy a file."""
+
+    docs = app.generate_docs(output_format="html")
+
+    ids = set(re.findall(r'id="([^"]+)"', docs))
+    hrefs = set(re.findall(r'href="#([^"]+)"', docs))
+    assert hrefs <= ids
+    assert "my-tool-files" in ids
+    assert "my-tool-files-cp" in ids
+    assert not any(" " in i for i in ids)
