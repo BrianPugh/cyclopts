@@ -180,8 +180,7 @@ class ConfigFromFile(ConfigBase):
                     raise
                 except Exception as e:
                     msg = getattr(type(e), "__name__", "")
-                    # ``e.args[0]`` is not always a string (e.g. ``OSError`` carries an errno).
-                    exception_msg = e.args[0] if e.args and isinstance(e.args[0], str) else str(e)
+                    exception_msg = str(e)
                     if exception_msg:
                         if msg:
                             msg += ": "
