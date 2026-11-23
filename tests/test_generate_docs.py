@@ -947,6 +947,28 @@ def test_generate_docs_toc_anchor_collisions():
     assert "### myapp sub2 delete" in docs
 
 
+def test_generate_docs_toc_suffixed_anchors_do_not_collide():
+    app = App(name="myapp")
+
+    @app.command(name="build_1")
+    def build_one():
+        """Build one."""
+
+    @app.command(name="build")
+    def build_lower():
+        """Build lower."""
+
+    @app.command(name="Build")
+    def build_upper():
+        """Build upper."""
+
+    docs = app.generate_docs()
+
+    assert "- [`build_1`](#myapp-build_1)" in docs
+    assert "- [`build`](#myapp-build)" in docs
+    assert "- [`Build`](#myapp-build_2)" in docs
+
+
 def test_generate_docs_nested_command_list_hyperlinks():
     """Test that command list hyperlinks in nested apps use full command path.
 
