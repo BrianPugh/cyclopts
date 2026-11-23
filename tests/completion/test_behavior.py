@@ -425,6 +425,9 @@ def test_get_completion_action_abstract_collections():
         ("Number of retries\nbefore giving up", "Number of retries before giving up"),
         ("Number of retries\r\nbefore giving up", "Number of retries before giving up"),
         ("Number of retries\tbefore giving up", "Number of retries before giving up"),
+        ("Number of retries\rbefore giving up", "Number of retries before giving up"),
+        ("Number of retries\fbefore giving up", "Number of retries before giving up"),
+        ("Number of retries\vbefore giving up", "Number of retries before giving up"),
         ("Number of retries\x07before giving up", "Number of retriesbefore giving up"),
     ],
 )
