@@ -36,7 +36,7 @@ def _generate_html_toc(
         full_path = generate_anchor(f"{app_name} {display_name}")
 
         indent = "  " * (depth + 1)
-        lines.append(f'{indent}<li><a href="#{full_path}"><code>{name}</code></a>')
+        lines.append(f'{indent}<li><a href="#{escape_html(full_path)}"><code>{escape_html(name)}</code></a>')
 
         if subapp._commands:
             lines.append(f"{indent}  <ul>")
@@ -414,7 +414,7 @@ def generate_html_docs(
         effective_level = min(heading_level, max_heading_level)
         lines.append('<section class="command-section">')
         lines.append(
-            f'<h{effective_level} id="{anchor_id}" class="command-title"><code>{escape_html(full_command)}</code></h{effective_level}>'
+            f'<h{effective_level} id="{escape_html(anchor_id)}" class="command-title"><code>{escape_html(full_command)}</code></h{effective_level}>'
         )
 
     # Add application description
@@ -496,7 +496,7 @@ def generate_html_docs(
             anchor_id = generate_anchor(" ".join(sub_command_chain))
             effective_sub_level = min(sub_heading_level, max_heading_level)
             lines.append(
-                f'<h{effective_sub_level} id="{anchor_id}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{effective_sub_level}>'
+                f'<h{effective_sub_level} id="{escape_html(anchor_id)}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{effective_sub_level}>'
             )
 
             # Get subapp help

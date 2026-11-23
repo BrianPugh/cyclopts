@@ -375,7 +375,7 @@ def usage_display_chain(command_chain: list[str], usage_name: str | None, root_n
 def generate_anchor(command_path: str) -> str:
     """Generate a URL-friendly anchor from a command path.
 
-    Converts spaces to hyphens and lowercases the string to match
+    Converts whitespace runs to hyphens and lowercases the string to match
     how markdown/HTML processors generate anchors from headings.
     Strips leading dashes to match markdown processor behavior.
 
@@ -396,7 +396,7 @@ def generate_anchor(command_path: str) -> str:
     >>> generate_anchor("myapp --install-completion")
     'myapp-install-completion'
     """
-    anchor = command_path.lower().replace(" ", "-")
+    anchor = re.sub(r"\s+", "-", command_path.lower())
     # Collapse consecutive dashes to single dash (markdown processors do this)
     anchor = re.sub(r"-+", "-", anchor)
     return anchor

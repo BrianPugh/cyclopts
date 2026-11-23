@@ -119,7 +119,7 @@ class HtmlFormatter:
                 primary_name, aliases = names[0], names[1:]
                 chain = [self.app_name, *self.command_chain[1:], primary_name]
                 anchor_id = generate_anchor(" ".join(chain))
-                name_html = f'<a href="#{anchor_id}"><code>{escape_html(primary_name)}</code></a>'
+                name_html = f'<a href="#{escape_html(anchor_id)}"><code>{escape_html(primary_name)}</code></a>'
                 if aliases:
                     aliases_str = ", ".join(escape_html(n) for n in aliases)
                     name_html = f"{name_html} ({aliases_str})"
