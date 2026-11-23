@@ -468,9 +468,7 @@ def generate_html_docs(
     for group, panel in help_panels_with_groups:
         if not include_hidden and group and not group.show:
             continue
-        # Filter out entries based on include_hidden
-        if not include_hidden:
-            panel.entries = filter_help_entries(app, panel, include_hidden)
+        panel.entries = filter_help_entries(app, panel)
         if panel.entries:  # Only render non-empty panels
             formatter(None, None, panel)
 
@@ -549,8 +547,7 @@ def generate_html_docs(
                     for sub_group, sub_panel in sub_panels:
                         if not include_hidden and sub_group and not sub_group.show:
                             continue
-                        if not include_hidden:
-                            sub_panel.entries = filter_help_entries(subapp, sub_panel, include_hidden)
+                        sub_panel.entries = filter_help_entries(subapp, sub_panel)
                         if sub_panel.entries:
                             sub_formatter(None, None, sub_panel)
 
