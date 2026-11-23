@@ -19,12 +19,42 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
+def _build_anchor_map(app: "App", include_hidden: bool, command_chain: list[str]) -> dict[tuple[str, ...], str]:
+    """Map each command path to a unique anchor id, in document order.
+
+    Colliding anchors (e.g. ``files-cp`` vs ``files cp``) get ``_N`` suffixes.
+    """
+    anchors: dict[tuple[str, ...], str] = {}
+    anchor_counts: dict[str, int] = {}
+
+    def add(chain: tuple[str, ...]) -> None:
+        anchor = generate_anchor(" ".join(chain))
+        if anchor in anchor_counts:
+            anchor_counts[anchor] += 1
+            anchor = f"{anchor}_{anchor_counts[anchor]}"
+        else:
+            anchor_counts[anchor] = 0
+        anchors[chain] = anchor
+
+    def walk(app: "App", chain: tuple[str, ...]) -> None:
+        for name, subapp in iterate_commands(app, include_hidden):
+            sub_chain = (*chain, name)
+            add(sub_chain)
+            walk(subapp, sub_chain)
+
+    root = tuple(command_chain)
+    if len(root) > 1:
+        add(root)
+    walk(app, root)
+    return anchors
+
+
 def _generate_html_toc(
     lines: list[str],
     app: "App",
     include_hidden: bool,
-    app_name: str,
-    prefix: str,
+    anchors: dict[tuple[str, ...], str],
+    chain: tuple[str, ...],
     depth: int = 0,
     recursive: bool = True,
 ) -> None:
@@ -33,15 +63,14 @@ def _generate_html_toc(
         return
 
     for name, subapp in iterate_commands(app, include_hidden):
-        display_name = f"{prefix}{name}" if prefix else name
-        full_path = generate_anchor(f"{app_name} {display_name}")
+        sub_chain = (*chain, name)
 
         indent = "  " * (depth + 1)
-        lines.append(f'{indent}<li><a href="#{escape_html(full_path)}"><code>{escape_html(name)}</code></a>')
+        lines.append(f'{indent}<li><a href="#{escape_html(anchors[sub_chain])}"><code>{escape_html(name)}</code></a>')
 
         if recursive and subapp._commands:
             lines.append(f"{indent}  <ul>")
-            _generate_html_toc(lines, subapp, include_hidden, app_name, f"{display_name} ", depth + 1)
+            _generate_html_toc(lines, subapp, include_hidden, anchors, sub_chain, depth + 1)
             lines.append(f"{indent}  </ul>")
 
         lines.append(f"{indent}</li>")
@@ -339,6 +368,7 @@ def generate_html_docs(
     generate_toc: bool = True,
     flatten_commands: bool = False,
     usage_name: str | None = None,
+    anchors: dict[tuple[str, ...], str] | None = None,
 ) -> str:
     """Generate HTML documentation for a CLI application.
 
@@ -377,6 +407,9 @@ def generate_html_docs(
         Optional replacement for the root app name in every ``Usage:`` line
         (root and subcommands). Section headings and anchors continue to use
         ``app.name[0]``. Default is None.
+    anchors : dict[tuple[str, ...], str] | None
+        Internal parameter mapping each command path to its de-duplicated anchor id.
+        Default is None.
 
     Returns
     -------
@@ -403,6 +436,7 @@ def generate_html_docs(
         app_name = resolve_doc_root_name(app)
         full_command = app_name
         title = app_name
+        anchors = _build_anchor_map(app, include_hidden, [app_name])
         # Add title for all levels
         effective_level = min(heading_level, max_heading_level)
         lines.append(f'<h{effective_level} class="app-title">{title}</h{effective_level}>')
@@ -410,8 +444,9 @@ def generate_html_docs(
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
         full_command = " ".join(command_chain)
-        # Create anchor-friendly ID using shared logic
-        anchor_id = generate_anchor(full_command)
+        if anchors is None:
+            anchors = _build_anchor_map(app, include_hidden, command_chain)
+        anchor_id = anchors[tuple(command_chain)]
         effective_level = min(heading_level, max_heading_level)
         lines.append('<section class="command-section">')
         lines.append(
@@ -431,7 +466,7 @@ def generate_html_docs(
         lines.append('<div class="table-of-contents">')
         lines.append("<h2>Table of Contents</h2>")
         lines.append("<ul>")
-        _generate_html_toc(lines, app, include_hidden, app_name, "", 0, recursive=recursive)
+        _generate_html_toc(lines, app, include_hidden, anchors, (app_name,), 0, recursive=recursive)
         lines.append("</ul>")
         lines.append("</div>")
 
@@ -463,6 +498,7 @@ def generate_html_docs(
         include_hidden=include_hidden,
         app_name=app_name,
         command_chain=command_chain,
+        anchors=anchors,
     )
     formatter.reset()
     for group, panel in help_panels_with_groups:
@@ -491,8 +527,7 @@ def generate_html_docs(
 
             # Generate subcommand documentation
             lines.append('<section class="command-section">')
-            # Create anchor-friendly ID
-            anchor_id = generate_anchor(" ".join(sub_command_chain))
+            anchor_id = anchors[tuple(sub_command_chain)]
             effective_sub_level = min(sub_heading_level, max_heading_level)
             lines.append(
                 f'<h{effective_sub_level} id="{escape_html(anchor_id)}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{effective_sub_level}>'
@@ -543,6 +578,7 @@ def generate_html_docs(
                         include_hidden=include_hidden,
                         app_name=app_name,
                         command_chain=sub_command_chain,
+                        anchors=anchors,
                     )
                     for sub_group, sub_panel in sub_panels:
                         if not include_hidden and sub_group and not sub_group.show:
@@ -580,6 +616,7 @@ def generate_html_docs(
                                 generate_toc=False,  # No TOC for nested commands
                                 flatten_commands=flatten_commands,
                                 usage_name=usage_name,
+                                anchors=anchors,
                             )
                         lines.append(nested_docs)
 
