@@ -376,8 +376,8 @@ def generate_rst_docs(
 
     # Get help panels for the current app
     # Use app_stack context - if caller set up parent context, it will be stacked
-    with app.app_stack([app]):
-        help_panels_with_groups = app._assemble_help_panels([], help_format)
+    with app.app_stack(app.app_stack.current_frame):
+        help_panels_with_groups = app._assemble_help_panels([], help_format, command_prefix=command_chain[1:])
 
     # Set up command filtering
     normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -510,8 +510,8 @@ def generate_rst_docs(
                 and commands_filter[0].startswith(name + ".")
             )
 
-            # Push subapp onto app_stack - context will stack with recursive call's app_stack([app])
-            with subapp.app_stack([app, subapp]):
+            # Push subapp with all ancestors so root settings (e.g. config) resolve in the recursive call
+            with subapp.app_stack([*app.app_stack.current_frame, subapp]):
                 subdocs = generate_rst_docs(
                     subapp,
                     recursive=recursive,

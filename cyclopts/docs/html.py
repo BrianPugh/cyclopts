@@ -453,8 +453,8 @@ def generate_html_docs(
 
     # Get help panels for the current app
     # Use app_stack context - if caller set up parent context, it will be stacked
-    with app.app_stack([app]):
-        help_panels_with_groups = app._assemble_help_panels([], help_format)
+    with app.app_stack(app.app_stack.current_frame):
+        help_panels_with_groups = app._assemble_help_panels([], help_format, command_prefix=command_chain[1:])
 
     # Render panels
     formatter = HtmlFormatter(
@@ -501,7 +501,7 @@ def generate_html_docs(
 
             # Get subapp help
             # Include parent app in the stack so default_parameter is properly inherited
-            with subapp.app_stack([app, subapp]):
+            with subapp.app_stack([*app.app_stack.current_frame, subapp]):
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 sub_description = extract_description(subapp, sub_help_format)
                 if sub_description:
@@ -531,7 +531,7 @@ def generate_html_docs(
                 # Only show subcommand panels if we're in recursive mode
                 if recursive:
                     # Get help panels for subcommand
-                    sub_panels = subapp._assemble_help_panels([], sub_help_format)
+                    sub_panels = subapp._assemble_help_panels([], sub_help_format, command_prefix=sub_command_chain[1:])
 
                     # Render subcommand panels
                     if flatten_commands:
@@ -568,8 +568,8 @@ def generate_html_docs(
                         else:
                             nested_heading_level = heading_level + 2
                         # Set up context for nested_app, then recurse
-                        # The recursive call's app_stack([app]) will stack on top of this
-                        with nested_app.app_stack([subapp, nested_app]):
+                        # Include all ancestors so root settings (e.g. config) resolve for nested commands
+                        with nested_app.app_stack([*subapp.app_stack.current_frame, nested_app]):
                             nested_docs = generate_html_docs(
                                 nested_app,
                                 recursive=recursive,

@@ -34,6 +34,13 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 * `--cache-dir PATH`: Cache directory for intermediate files.
 * `--log-dir PATH`: Directory for log files. *[default: logs]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli data pipeline
 
 ```console
@@ -59,6 +66,13 @@ PathConfig and ProcessingConfig).
 * `--output-formats CHOICE..., --empty-output-formats`: List of output formats to generate. *[choices: json, yaml, table, csv]* *[default: [json]]*
 * `--dry-run, --no-dry-run`: If True, simulate execution without making changes. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli data validate
 
 ```console
@@ -76,3 +90,10 @@ Validate data files against schema.
 * `--strict, --no-strict`: Enable strict validation mode. *[default: False]*
 * `--schema-file PATH`: Custom schema file (must exist).
 * `--ignore-patterns STR..., --empty-ignore-patterns`: Patterns to ignore during validation.
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*

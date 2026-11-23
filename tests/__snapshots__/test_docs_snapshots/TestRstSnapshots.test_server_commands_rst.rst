@@ -50,6 +50,20 @@ Server management commands.
 ``stop``
     Stop the server.
 
+**Global Options:**
+
+``--verbose, -v``
+    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
+
+``--quiet, -q, --no-quiet``
+    Suppress non-essential output. [Default: ``False``]
+
+``--log-level CHOICE``
+    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
+
+``--no-color, --no-no-color``
+    Disable colored output [Default: ``False``]
+
 .. _cyclopts-complex-cli-server-start:
 
 start
@@ -92,6 +106,20 @@ Demonstrates Pydantic model support for CLI parameters.
 ``--auth.allowed-origins STR..., --auth.empty-allowed-origins``
     List of allowed CORS origins. [Default: ``['*']``]
 
+**Global Options:**
+
+``--verbose, -v``
+    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
+
+``--quiet, -q, --no-quiet``
+    Suppress non-essential output. [Default: ``False``]
+
+``--log-level CHOICE``
+    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
+
+``--no-color, --no-no-color``
+    Disable colored output [Default: ``False``]
+
 .. _cyclopts-complex-cli-server-stop:
 
 stop
@@ -114,6 +142,20 @@ Stop the server.
 ``--force, -f, --no-force``
     Force immediate shutdown. [Default: ``False``]
 
+**Global Options:**
+
+``--verbose, -v``
+    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
+
+``--quiet, -q, --no-quiet``
+    Suppress non-essential output. [Default: ``False``]
+
+``--log-level CHOICE``
+    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
+
+``--no-color, --no-no-color``
+    Disable colored output [Default: ``False``]
+
 .. _cyclopts-complex-cli-server-restart:
 
 restart
@@ -132,3 +174,17 @@ Restart the server.
 
 ``DELAY, --delay``
     Delay between worker restarts in seconds. [Default: ``5``]
+
+**Global Options:**
+
+``--verbose, -v``
+    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
+
+``--quiet, -q, --no-quiet``
+    Suppress non-essential output. [Default: ``False``]
+
+``--log-level CHOICE``
+    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
+
+``--no-color, --no-no-color``
+    Disable colored output [Default: ``False``]
