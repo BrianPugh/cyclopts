@@ -26,6 +26,7 @@ def _generate_html_toc(
     app_name: str,
     prefix: str,
     depth: int = 0,
+    recursive: bool = True,
 ) -> None:
     """Recursively generate HTML table of contents."""
     if not app._commands:
@@ -38,7 +39,7 @@ def _generate_html_toc(
         indent = "  " * (depth + 1)
         lines.append(f'{indent}<li><a href="#{escape_html(full_path)}"><code>{escape_html(name)}</code></a>')
 
-        if subapp._commands:
+        if recursive and subapp._commands:
             lines.append(f"{indent}  <ul>")
             _generate_html_toc(lines, subapp, include_hidden, app_name, f"{display_name} ", depth + 1)
             lines.append(f"{indent}  </ul>")
@@ -430,7 +431,7 @@ def generate_html_docs(
         lines.append('<div class="table-of-contents">')
         lines.append("<h2>Table of Contents</h2>")
         lines.append("<ul>")
-        _generate_html_toc(lines, app, include_hidden, app_name, "", 0)
+        _generate_html_toc(lines, app, include_hidden, app_name, "", 0, recursive=recursive)
         lines.append("</ul>")
         lines.append("</div>")
 
