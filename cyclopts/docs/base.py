@@ -433,8 +433,8 @@ def should_skip_command(command_name: str, subapp: "App", parent_app: "App", inc
     return False
 
 
-def filter_help_entries(app: "App", panel: "HelpPanel", include_hidden: bool) -> list[Any]:
-    """Filter help panel entries based on visibility settings.
+def filter_help_entries(app: "App", panel: "HelpPanel") -> list[Any]:
+    """Drop built-in help and version flags from panel entries.
 
     Parameters
     ----------
@@ -442,17 +442,12 @@ def filter_help_entries(app: "App", panel: "HelpPanel", include_hidden: bool) ->
         The App instance to check against.
     panel : HelpPanel
         The help panel to filter.
-    include_hidden : bool
-        Whether to include hidden entries.
 
     Returns
     -------
     List[Any]
         Filtered panel entries.
     """
-    if include_hidden:
-        return panel.entries
-
     return [e for e in panel.entries if not (e.names and is_all_builtin_flags(app, e.names))]
 
 
