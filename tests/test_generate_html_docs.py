@@ -141,7 +141,7 @@ def test_generate_html_docs_write_to_file():
         # Should be complete HTML document
         assert "<!DOCTYPE html>" in content
         assert "<html" in content
-        assert '<h1 class="app-title">myapp</h1>' in content
+        assert '<h1 id="myapp" class="app-title">myapp</h1>' in content
 
         # Content should match what we wrote
         assert docs == content
@@ -155,7 +155,7 @@ def test_generate_html_docs_format_explicit():
     docs_html = app.generate_docs(output_format="html")
     assert "<!DOCTYPE html>" in docs_html
     assert "<html" in docs_html
-    assert '<h1 class="app-title">myapp</h1>' in docs_html
+    assert '<h1 id="myapp" class="app-title">myapp</h1>' in docs_html
 
 
 def test_generate_html_docs_with_meta_app():
@@ -261,7 +261,7 @@ def test_generate_html_docs_standalone_false():
 
     # Should still have content
     assert '<div class="cli-documentation">' in docs
-    assert '<h1 class="app-title">myapp</h1>' in docs
+    assert '<h1 id="myapp" class="app-title">myapp</h1>' in docs
 
 
 def test_generate_html_docs_invalid_format():
@@ -307,7 +307,7 @@ def test_generate_html_docs_flatten_commands():
     docs_hierarchical = app.generate_docs(output_format="html", flatten_commands=False)
 
     # Main app should be h1
-    assert '<h1 class="app-title">myapp</h1>' in docs_hierarchical
+    assert '<h1 id="myapp" class="app-title">myapp</h1>' in docs_hierarchical
     # Subcommands should be h2
     assert '<h2 id="myapp-sub1" class="command-title">' in docs_hierarchical
     assert '<h2 id="myapp-sub2" class="command-title">' in docs_hierarchical
@@ -320,7 +320,7 @@ def test_generate_html_docs_flatten_commands():
     docs_flat = app.generate_docs(output_format="html", flatten_commands=True)
 
     # Main app should be h1
-    assert '<h1 class="app-title">myapp</h1>' in docs_flat
+    assert '<h1 id="myapp" class="app-title">myapp</h1>' in docs_flat
     # Subcommands should be h1 (flattened)
     assert '<h1 id="myapp-sub1" class="command-title">' in docs_flat
     assert '<h1 id="myapp-sub2" class="command-title">' in docs_flat
@@ -453,7 +453,7 @@ def test_generate_html_docs_unnamed_app_uses_module_name_not_argv(importable_tmp
     app = import_app("htmltool:app")
     docs = generate_html_docs(app)
     assert "sphinx-build" not in docs  # not in title, anchors, or the Usage line
-    assert '<h1 class="app-title">htmltool</h1>' in docs
+    assert '<h1 id="htmltool" class="app-title">htmltool</h1>' in docs
     assert 'id="htmltool-serve"' in docs
 
 
