@@ -406,7 +406,7 @@ def generate_html_docs(
         # Add title for all levels
         effective_level = min(heading_level, max_heading_level)
         lines.append(
-            f'<h{effective_level} id="{generate_anchor(app_name)}" class="app-title">{title}</h{effective_level}>'
+            f'<h{effective_level} id="{escape_html(generate_anchor(app_name))}" class="app-title">{escape_html(title)}</h{effective_level}>'
         )
     else:
         # Nested command - build full path
@@ -590,7 +590,7 @@ def generate_html_docs(
 
             # Add back to top link if we're in a nested section
             if command_chain:
-                lines.append(f'<a href="#{generate_anchor(app_name)}" class="back-to-top">↑ Back to top</a>')
+                lines.append(f'<a href="#{escape_html(generate_anchor(app_name))}" class="back-to-top">↑ Back to top</a>')
             lines.append("</section>")
 
     # Close section if nested command
