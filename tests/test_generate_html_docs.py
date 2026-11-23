@@ -539,3 +539,21 @@ def test_generate_html_docs_non_recursive_toc_links_match_ids():
     hrefs = set(re.findall(r'href="#([^"]+)"', docs))
     assert hrefs <= ids
     assert 'href="#t-s"' in docs
+
+
+def test_generate_html_docs_include_hidden_omits_builtin_flags():
+    app = App(name="t", version="1.0")
+    sub = App(name="sub")
+    app.command(sub)
+
+    @sub.command
+    def bar():
+        """Bar it."""
+
+    docs = app.generate_docs(output_format="html", include_hidden=True)
+
+    ids = set(re.findall(r'id="([^"]+)"', docs))
+    hrefs = set(re.findall(r'href="#([^"]+)"', docs))
+    assert hrefs <= ids
+    assert "<code>--help</code>" not in docs
+    assert "<code>--version</code>" not in docs
