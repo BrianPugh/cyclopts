@@ -2,9 +2,12 @@
 
 import re
 import tempfile
+from html.parser import HTMLParser
 from pathlib import Path
 from textwrap import dedent
 from typing import Annotated
+
+import pytest
 
 from cyclopts import App, Parameter
 
@@ -471,3 +474,51 @@ def test_generate_html_docs_links_match_ids_with_spaced_app_name():
     assert "my-tool-files" in ids
     assert "my-tool-files-cp" in ids
     assert not any(" " in i for i in ids)
+
+
+def _parsed_ids_and_hrefs(docs: str) -> tuple[set[str], set[str]]:
+    ids, hrefs = set(), set()
+
+    class Collector(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            for key, value in attrs:
+                if key == "id" and value is not None:
+                    ids.add(value)
+                elif key == "href" and value is not None and value.startswith("#"):
+                    hrefs.add(value[1:])
+
+    Collector().feed(docs)
+    return ids, hrefs
+
+
+def _app_with_files_cp(name: str) -> App:
+    app = App(name=name)
+    files = App(name="files", help="File operations.")
+    app.command(files)
+
+    @files.command
+    def cp(src: str):
+        """Copy a file."""
+
+    return app
+
+
+@pytest.mark.parametrize("name", ["My\tTool", "My Tool", "My \t Tool"])
+def test_generate_html_docs_anchor_ids_have_no_whitespace(name):
+    docs = _app_with_files_cp(name).generate_docs(output_format="html")
+
+    ids, hrefs = _parsed_ids_and_hrefs(docs)
+    assert hrefs <= ids
+    assert "my-tool-files" in ids
+    assert "my-tool-files-cp" in ids
+    assert not any(re.search(r"\s", i) for i in ids)
+
+
+def test_generate_html_docs_anchor_attributes_escaped():
+    docs = _app_with_files_cp('a"b<c').generate_docs(output_format="html")
+
+    assert 'id="a"b' not in docs
+    assert 'href="#a"b' not in docs
+    ids, hrefs = _parsed_ids_and_hrefs(docs)
+    assert hrefs <= ids
+    assert {'a"b<c-files', 'a"b<c-files-cp'} <= ids
