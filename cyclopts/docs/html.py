@@ -590,7 +590,9 @@ def generate_html_docs(
 
             # Add back to top link if we're in a nested section
             if command_chain:
-                lines.append(f'<a href="#{escape_html(generate_anchor(app_name))}" class="back-to-top">↑ Back to top</a>')
+                lines.append(
+                    f'<a href="#{escape_html(generate_anchor(app_name))}" class="back-to-top">↑ Back to top</a>'
+                )
             lines.append("</section>")
 
     # Close section if nested command
