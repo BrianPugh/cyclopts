@@ -34,6 +34,7 @@ def _collect_commands_for_toc(
     exclude_commands: list[str] | None = None,
     parent_path: list[str] | None = None,
     skip_filtered_command: bool = False,
+    recursive: bool = True,
 ) -> list[tuple[str, "App"]]:
     """Recursively collect all commands for table of contents.
 
@@ -61,6 +62,9 @@ def _collect_commands_for_toc(
         if not skip_this_command:
             display_name = f"{prefix}{name}" if prefix else name
             commands.append((display_name, subapp))
+
+        if not recursive:
+            continue
 
         # Collect nested commands
         nested_path = parent_path + [name]
@@ -214,6 +218,7 @@ def _render_toc(
     exclude_commands: list[str] | None,
     skip_filtered_command: bool,
     lines: list[str],
+    recursive: bool = True,
 ) -> None:
     """Generate and render table of contents.
 
@@ -233,8 +238,9 @@ def _render_toc(
         Whether to skip the single filtered command in TOC.
     lines : list[str]
         List to append TOC to.
+    recursive : bool
+        Whether nested subcommands get their own sections, and so TOC entries.
     """
-    # Collect all commands recursively for TOC
     toc_commands = _collect_commands_for_toc(
         app,
         include_hidden=include_hidden,
@@ -242,6 +248,7 @@ def _render_toc(
         commands_filter=commands_filter,
         exclude_commands=exclude_commands,
         skip_filtered_command=skip_filtered_command,
+        recursive=recursive,
     )
     if toc_commands:
         lines.append("## Table of Contents")
@@ -433,7 +440,16 @@ def generate_markdown_docs(
 
     # Generate table of contents if this is the root level and has commands
     if generate_toc and not command_chain and app._commands:
-        _render_toc(app, app_name, include_hidden, commands_filter, exclude_commands, skip_current_level, lines)
+        _render_toc(
+            app,
+            app_name,
+            include_hidden,
+            commands_filter,
+            exclude_commands,
+            skip_current_level,
+            lines,
+            recursive=recursive,
+        )
 
     # Get help panels for the current app (skip if skipping current level)
     # Use app_stack context - if caller set up parent context, it will be stacked
