@@ -330,7 +330,7 @@ def _email_validator(type_: Any, value: Any):
     if _email_validator.regex is None:  # pyright: ignore[reportFunctionMemberAccess]
         import re
 
-        _email_validator.regex = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")  # pyright: ignore[reportFunctionMemberAccess]
+        _email_validator.regex = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\Z")  # pyright: ignore[reportFunctionMemberAccess]
 
     if not _email_validator.regex.match(value):  # pyright: ignore[reportFunctionMemberAccess]
         raise ValueError(f"Invalid email: {value}")
@@ -355,7 +355,7 @@ def _url_validator(type_: Any, value: Any):
             r"localhost|"  # localhost
             r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"  # IP
             r"(?::\d+)?"  # port
-            r"(?:\/\S*)?$",  # path, query string, fragment
+            r"(?:\/\S*)?\Z",  # path, query string, fragment
             re.IGNORECASE,
         )
 
