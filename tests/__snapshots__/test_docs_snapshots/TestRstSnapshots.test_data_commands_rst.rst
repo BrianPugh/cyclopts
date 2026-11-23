@@ -50,6 +50,20 @@ Data processing commands.
 ``validate``
     Validate data files against schema.
 
+**Global Options:**
+
+``--verbose, -v``
+    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
+
+``--quiet, -q, --no-quiet``
+    Suppress non-essential output. [Default: ``False``]
+
+``--log-level CHOICE``
+    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
+
+``--no-color, --no-no-color``
+    Disable colored output [Default: ``False``]
+
 .. _cyclopts-complex-cli-data-process:
 
 process
@@ -97,6 +111,20 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 
 ``--log-dir PATH``
     Directory for log files. [Default: ``logs``]
+
+**Global Options:**
+
+``--verbose, -v``
+    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
+
+``--quiet, -q, --no-quiet``
+    Suppress non-essential output. [Default: ``False``]
+
+``--log-level CHOICE``
+    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
+
+``--no-color, --no-no-color``
+    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-data-pipeline:
 
@@ -147,6 +175,20 @@ PathConfig and ProcessingConfig).
 ``--dry-run, --no-dry-run``
     If True, simulate execution without making changes. [Default: ``False``]
 
+**Global Options:**
+
+``--verbose, -v``
+    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
+
+``--quiet, -q, --no-quiet``
+    Suppress non-essential output. [Default: ``False``]
+
+``--log-level CHOICE``
+    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
+
+``--no-color, --no-no-color``
+    Disable colored output [Default: ``False``]
+
 .. _cyclopts-complex-cli-data-validate:
 
 validate
@@ -173,3 +215,17 @@ Validate data files against schema.
 
 ``--ignore-patterns STR..., --empty-ignore-patterns``
     Patterns to ignore during validation.
+
+**Global Options:**
+
+``--verbose, -v``
+    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
+
+``--quiet, -q, --no-quiet``
+    Suppress non-essential output. [Default: ``False``]
+
+``--log-level CHOICE``
+    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
+
+``--no-color, --no-no-color``
+    Disable colored output [Default: ``False``]

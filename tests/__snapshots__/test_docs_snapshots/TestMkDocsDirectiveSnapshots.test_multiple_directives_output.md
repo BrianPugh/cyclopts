@@ -38,6 +38,13 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 * `--cache-dir PATH`: Cache directory for intermediate files.
 * `--log-dir PATH`: Directory for log files. *[default: logs]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli data pipeline
 
 ```console
@@ -63,6 +70,13 @@ PathConfig and ProcessingConfig).
 * `--output-formats CHOICE..., --empty-output-formats`: List of output formats to generate. *[choices: json, yaml, table, csv]* *[default: [json]]*
 * `--dry-run, --no-dry-run`: If True, simulate execution without making changes. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli data validate
 
 ```console
@@ -80,6 +94,13 @@ Validate data files against schema.
 * `--strict, --no-strict`: Enable strict validation mode. *[default: False]*
 * `--schema-file PATH`: Custom schema file (must exist).
 * `--ignore-patterns STR..., --empty-ignore-patterns`: Patterns to ignore during validation.
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ## Server Commands
 
@@ -114,6 +135,13 @@ Demonstrates Pydantic model support for CLI parameters.
 * `--auth.refresh-enabled, --auth.no-refresh-enabled`: Enable token refresh. *[default: True]*
 * `--auth.allowed-origins STR..., --auth.empty-allowed-origins`: List of allowed CORS origins. *[default: ['*']]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli server stop
 
 ```console
@@ -128,6 +156,13 @@ Stop the server.
 * `--timeout INT`: Shutdown timeout in seconds. *[default: 30]*
 * `--force, -f, --no-force`: Force immediate shutdown. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli server restart
 
 ```console
@@ -140,3 +175,10 @@ Restart the server.
 
 * `ROLLING, --rolling, --no-rolling`: Perform rolling restart (zero downtime). *[default: False]*
 * `DELAY, --delay`: Delay between worker restarts in seconds. *[default: 5]*
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*

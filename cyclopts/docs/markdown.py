@@ -449,8 +449,8 @@ def generate_markdown_docs(
     # Get help panels for the current app (skip if skipping current level)
     # Use app_stack context - if caller set up parent context, it will be stacked
     if not skip_current_level:
-        with app.app_stack([app]):
-            help_panels_with_groups = app._assemble_help_panels([], help_format)
+        with app.app_stack(app.app_stack.current_frame):
+            help_panels_with_groups = app._assemble_help_panels([], help_format, command_prefix=command_chain[1:])
 
         # Set up command filtering (used for command panels only)
         normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -572,7 +572,7 @@ def generate_markdown_docs(
             skip_this_preamble = skip_target_preamble or skip_intermediate
 
             # Include parent app in the stack so default_parameter is properly inherited
-            with subapp.app_stack([app, subapp]):
+            with subapp.app_stack([*app.app_stack.current_frame, subapp]):
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 # Preserve markup when sub_help_format matches output format (markdown)
                 preserve_sub = sub_help_format in ("markdown", "md")
@@ -586,7 +586,7 @@ def generate_markdown_docs(
                 # (Otherwise we just show the basic info about this command)
                 if recursive:
                     # Get help panels for subcommand (already sorted)
-                    sub_panels = subapp._assemble_help_panels([], sub_help_format)
+                    sub_panels = subapp._assemble_help_panels([], sub_help_format, command_prefix=sub_command_chain[1:])
 
                     # Set up command filtering for this subcommand
                     sub_commands_filter_for_panel, sub_exclude_commands_for_panel = adjust_filters_for_subcommand(
@@ -758,8 +758,8 @@ def generate_markdown_docs(
                         )
 
                         # Set up context for nested_app, then recurse
-                        # The recursive call's app_stack([app]) will stack on top of this
-                        with nested_app.app_stack([subapp, nested_app]):
+                        # Include all ancestors so root settings (e.g. config) resolve for nested commands
+                        with nested_app.app_stack([*subapp.app_stack.current_frame, nested_app]):
                             nested_docs = generate_markdown_docs(
                                 nested_app,
                                 recursive=recursive,
