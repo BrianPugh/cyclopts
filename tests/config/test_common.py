@@ -311,6 +311,28 @@ def test_config_exception_during_load_config_msg(tmp_path):
     assert str(e.value) == "ValueError: My exception's message."
 
 
+@pytest.mark.parametrize(
+    "exc, expected",
+    [
+        (ValueError(42), "ValueError: 42"),
+        (
+            UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"),
+            "UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte",
+        ),
+    ],
+)
+def test_config_exception_during_load_config_non_str_arg(tmp_path, exc, expected):
+    class DummyErrorConfig(ConfigFromFile):
+        def _load_config(self, path: Path) -> dict[str, Any]:
+            raise exc
+
+    path = tmp_path / "config"
+    path.touch()
+    with pytest.raises(CycloptsError) as e:
+        _ = DummyErrorConfig(path).config
+    assert str(e.value) == expected
+
+
 class DummyEmptyDocument(ConfigFromFile):
     def _load_config(self, path: Path) -> dict[str, Any]:
         return None  # pyright: ignore[reportReturnType]
