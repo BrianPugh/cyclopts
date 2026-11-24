@@ -299,6 +299,7 @@ _converters: dict[Any, Callable] = {
     timedelta: _timedelta,
     NoneType: _none,
     slice: _slice,
+    Any: str,
 }
 
 
