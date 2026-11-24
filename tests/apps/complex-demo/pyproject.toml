@@ -23,4 +23,4 @@ all = [
 ]
 
 [project.scripts]
-complex-cli = "complex_app:app"
+complex-cli = "complex_app:app.meta"
