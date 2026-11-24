@@ -25,20 +25,6 @@ Show version information.
 
 Displays the application version and system information.
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-info:
 
 
@@ -56,20 +42,6 @@ Show application information.
 ``FORMAT, --format``
     Output format for the information. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``table``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin:
 
 
@@ -85,20 +57,6 @@ Administrative commands for system management.
 
 ``users``
     User management commands.
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-status:
 
@@ -121,20 +79,6 @@ Show system status.
 
 ``--interval INT``
     Refresh interval in seconds when watching. [Default: ``5``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-config-cmd:
 
@@ -167,20 +111,6 @@ Configure database settings.
 ``--pool-size INT``
     Connection pool size. [Default: ``10``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin-users:
 
 users
@@ -201,20 +131,6 @@ User management commands.
 
 ``permissions``
     Permission management for users.
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-list-users:
 
@@ -240,20 +156,6 @@ List all users.
 
 ``FORMAT, --format``
     Output format. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``table``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-create:
 
@@ -297,20 +199,6 @@ Create a new user.
 ``--send-welcome``
     Send welcome email after creation. [Default: ``True``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin-users-delete:
 
 delete
@@ -335,20 +223,6 @@ Delete a user.
 ``--backup``
     Create backup before deletion. [Default: ``True``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin-users-permissions:
 
 permissions
@@ -369,20 +243,6 @@ Permission management for users.
 
 ``roles``
     Role template management.
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-permissions-grant:
 
@@ -411,20 +271,6 @@ Grant permissions to a user.
 ``--expires STR``
     Expiration date (ISO format).
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin-users-permissions-revoke:
 
 revoke
@@ -443,20 +289,6 @@ Revoke permissions from a user.
 
 ``PERMISSION``
     Permission flags to revoke. [**Required**, Choices: ``none``, ``read``, ``write``, ``execute``, ``admin``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-permissions-audit:
 
@@ -480,20 +312,6 @@ Audit permission changes.
 ``FORMAT, --format``
     Output format for audit report. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``table``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin-users-permissions-roles:
 
 roles
@@ -508,20 +326,6 @@ Role template management.
 
 ``list-roles``
     List all role templates.
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-permissions-roles-list-roles:
 
@@ -538,20 +342,6 @@ List all role templates.
 
 ``INCLUDE-SYSTEM, --include-system``
     Include built-in system roles. [Default: ``False``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-permissions-roles-create-role:
 
@@ -589,20 +379,6 @@ Create a new role template.
 ``--description STR``
     Role description. [Default: ``""``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-data:
 
 
@@ -618,20 +394,6 @@ Data processing commands.
 
 ``validate``
     Validate data files against schema.
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-data-process:
 
@@ -680,20 +442,6 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 
 ``--log-dir PATH``
     Directory for log files. [Default: ``logs``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-data-pipeline:
 
@@ -744,20 +492,6 @@ PathConfig and ProcessingConfig).
 ``--dry-run, --no-dry-run``
     If True, simulate execution without making changes. [Default: ``False``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-data-validate:
 
 validate
@@ -785,20 +519,6 @@ Validate data files against schema.
 ``--ignore-patterns STR..., --empty-ignore-patterns``
     Patterns to ignore during validation.
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-server:
 
 
@@ -814,20 +534,6 @@ Server management commands.
 
 ``stop``
     Stop the server.
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-server-start:
 
@@ -871,20 +577,6 @@ Demonstrates Pydantic model support for CLI parameters.
 ``--auth.allowed-origins STR..., --auth.empty-allowed-origins``
     List of allowed CORS origins. [Default: ``['*']``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-server-stop:
 
 stop
@@ -907,20 +599,6 @@ Stop the server.
 ``--force, -f, --no-force``
     Force immediate shutdown. [Default: ``False``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-server-restart:
 
 restart
@@ -940,20 +618,6 @@ Restart the server.
 ``DELAY, --delay``
     Delay between worker restarts in seconds. [Default: ``5``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-cache:
 
 
@@ -969,20 +633,6 @@ Cache management commands.
 
 ``stats``
     Show cache statistics.
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-cache-configure:
 
@@ -1011,20 +661,6 @@ Demonstrates attrs class support for CLI parameters.
 ``--config.compression, --config.no-compression``
     Enable compression. [Default: ``False``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-cache-clear:
 
 clear
@@ -1044,20 +680,6 @@ Clear cache entries.
 ``DRY-RUN, --dry-run, --no-dry-run``
     Show what would be cleared without actually clearing. [Default: ``False``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-cache-stats:
 
 stats
@@ -1076,20 +698,6 @@ Show cache statistics.
 
 ``FORMAT, --format``
     Output format. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``table``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-complex-types:
 
@@ -1123,20 +731,6 @@ documentation system needs to handle correctly.
 ``CONFIG-PATH, --config-path``
     Optional config file path (must exist if provided).
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-numpy-style:
 
 
@@ -1157,20 +751,6 @@ default for cyclopts.
 ``COUNT, --count``
     The count parameter, by default 1. [Default: ``1``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-google-style:
 
 
@@ -1189,20 +769,6 @@ This command demonstrates Google docstring format.
 
 ``COUNT, --count``
     The count parameter. Defaults to 1. [Default: ``1``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-sphinx-style:
 
@@ -1223,20 +789,6 @@ This command demonstrates Sphinx/reST docstring format.
 ``COUNT, --count``
     The count parameter. [Default: ``1``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-secret-feature:
 
 
@@ -1252,17 +804,3 @@ This command has a hidden parameter.
 
 ``ENABLE, --enable, --no-enable``
     Enable the secret feature. [Default: ``False``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]

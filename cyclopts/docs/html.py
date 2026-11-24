@@ -482,7 +482,9 @@ def _generate_html_docs(
         lines.append("</div>")
 
     # Get help panels for the current app
-    help_panels_with_groups = root._assemble_help_panels(command_path, execution_path, help_format)
+    help_panels_with_groups = root._assemble_help_panels(
+        command_path, execution_path, help_format, include_launcher=False
+    )
 
     # Render panels
     formatter = HtmlFormatter(
@@ -561,7 +563,9 @@ def _generate_html_docs(
                 # Only show subcommand panels if we're in recursive mode
                 if recursive:
                     # Get help panels for subcommand
-                    sub_panels = root._assemble_help_panels(sub_command_path, sub_execution_path, sub_help_format)
+                    sub_panels = root._assemble_help_panels(
+                        sub_command_path, sub_execution_path, sub_help_format, include_launcher=False
+                    )
 
                     # Render subcommand panels
                     if flatten_commands:

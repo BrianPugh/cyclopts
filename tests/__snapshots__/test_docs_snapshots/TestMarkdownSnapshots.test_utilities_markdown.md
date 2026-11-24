@@ -30,13 +30,6 @@ Show version information.
 
 Displays the application version and system information.
 
-**Global Options**:
-
-* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
-* `--no-color, --no-no-color`: Disable colored output *[default: False]*
-
 ### complex-cli info
 
 ```console
@@ -50,23 +43,9 @@ Show application information.
 * `DETAILED, --detailed, --no-detailed`: Show detailed information including dependencies. *[default: False]*
 * `FORMAT, --format`: Output format for the information. *[choices: json, yaml, table, csv]* *[default: table]*
 
-**Global Options**:
-
-* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
-* `--no-color, --no-no-color`: Disable colored output *[default: False]*
-
 ### complex-cli cache
 
 Cache management commands.
-
-**Global Options**:
-
-* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
-* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 #### complex-cli cache configure
 
@@ -85,13 +64,6 @@ Demonstrates attrs class support for CLI parameters.
 * `--config.max-size INT`: Maximum cache size in MB. *[default: 1024]*
 * `--config.compression, --config.no-compression`: Enable compression. *[default: False]*
 
-**Global Options**:
-
-* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
-* `--no-color, --no-no-color`: Disable colored output *[default: False]*
-
 #### complex-cli cache clear
 
 ```console
@@ -105,13 +77,6 @@ Clear cache entries.
 * `PATTERN, --pattern`: Pattern to match cache keys. *[default: *]*
 * `DRY-RUN, --dry-run, --no-dry-run`: Show what would be cleared without actually clearing. *[default: False]*
 
-**Global Options**:
-
-* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
-* `--no-color, --no-no-color`: Disable colored output *[default: False]*
-
 #### complex-cli cache stats
 
 ```console
@@ -124,13 +89,6 @@ Show cache statistics.
 
 * `DETAILED, --detailed, --no-detailed`: Show detailed statistics. *[default: False]*
 * `FORMAT, --format`: Output format. *[choices: json, yaml, table, csv]* *[default: table]*
-
-**Global Options**:
-
-* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
-* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ### complex-cli complex-types
 
@@ -151,10 +109,3 @@ documentation system needs to handle correctly.
 * `FORMATS, --formats, --empty-formats`: List of output formats. *[choices: json, yaml, table, csv]* *[default: [json]]*
 * `THRESHOLDS, --thresholds, --empty-thresholds`: Threshold values or "default" for defaults. *[choices: default]* *[default: default]*
 * `CONFIG-PATH, --config-path`: Optional config file path (must exist if provided).
-
-**Global Options**:
-
-* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
-* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
-* `--no-color, --no-no-color`: Disable colored output *[default: False]*
