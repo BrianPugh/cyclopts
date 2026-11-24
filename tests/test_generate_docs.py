@@ -1263,6 +1263,15 @@ def test_generate_docs_launcher_options_documented_once_when_filtered():
     assert actual.index("--verbose") < actual.index("demo db migrate")
 
 
+def test_generate_rst_docs_launcher_options_documented_once_without_root_panels():
+    """A title-less root with ``skip_preamble`` hands the launcher's options to its first section only."""
+    from cyclopts.docs.rst import generate_rst_docs
+
+    actual = generate_rst_docs(_launcher_app(), no_root_title=True, skip_preamble=True)
+    assert actual.count("--verbose") == 1
+    assert actual.index("--verbose") < actual.index("demo db migrate")
+
+
 def test_help_subcommand_lists_launcher_options(console):
     """Unlike docs, each ``--help`` page stands alone, so it lists the launcher's options."""
     app = _launcher_app()

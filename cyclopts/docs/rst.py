@@ -579,6 +579,7 @@ def _generate_rst_docs(
                     anchor_suffix=anchor_suffix,
                     include_launcher=launcher_pending,
                 )
+            launcher_pending = False
             lines.append(subdocs)
 
     # Join and normalize multiple consecutive blank lines to a single blank line
