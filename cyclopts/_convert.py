@@ -299,6 +299,7 @@ _converters: dict[Any, Callable] = {
     timedelta: _timedelta,
     NoneType: _none,
     slice: _slice,
+    Any: str,
 }
 
 
@@ -835,7 +836,7 @@ def _convert(
                         # ``CoercionError`` appends the pydantic reason from ``__cause__``.
                         raise CoercionError(token=token, target_type=type_) from e
                 elif converter is None:
-                    out = _converters.get(type_, str if type_ is Any else type_)(token.value)  # pyright: ignore[reportOptionalCall]
+                    out = _converters.get(type_, type_)(token.value)  # pyright: ignore[reportOptionalCall]
                 elif converter_needs_token:
                     out = converter(type_, token)  # pyright: ignore[reportArgumentType]
                 else:
