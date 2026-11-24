@@ -335,11 +335,9 @@ def generate_html_docs(
     max_heading_level: int = 6,
     standalone: bool = True,
     custom_css: str | None = None,
-    command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
     usage_name: str | None = None,
-    _root_app: "App | None" = None,
 ) -> str:
     """Generate HTML documentation for a CLI application.
 
@@ -365,9 +363,6 @@ def generate_html_docs(
         If False, generate only the body content. Default is True.
     custom_css : str
         Custom CSS to use instead of the default styles.
-    command_chain : list[str]
-        Internal parameter to track command hierarchy.
-        Default is None.
     generate_toc : bool
         If True, generate a table of contents for multi-command apps.
         Default is True.
@@ -384,13 +379,43 @@ def generate_html_docs(
     str
         The generated HTML documentation.
     """
+    with command_context(app, ()) as execution_path:
+        return _generate_html_docs(
+            app,
+            (),
+            execution_path,
+            recursive=recursive,
+            include_hidden=include_hidden,
+            heading_level=heading_level,
+            max_heading_level=max_heading_level,
+            standalone=standalone,
+            custom_css=custom_css,
+            generate_toc=generate_toc,
+            flatten_commands=flatten_commands,
+            usage_name=usage_name,
+        )
+
+
+def _generate_html_docs(
+    root: "App",
+    command_path: tuple[str, ...],
+    execution_path: tuple["App", ...],
+    *,
+    recursive: bool,
+    include_hidden: bool,
+    heading_level: int,
+    max_heading_level: int,
+    standalone: bool,
+    custom_css: str | None,
+    generate_toc: bool,
+    flatten_commands: bool,
+    usage_name: str | None,
+) -> str:
+    """Render the command at ``command_path``; must be called inside :func:`command_context`."""
     from cyclopts.help.formatters.html import HtmlFormatter
 
-    # Initialize command chain if not provided
-    root = app if _root_app is None else _root_app
-
-    if command_chain is None:
-        command_chain = []
+    app = execution_path[-1]
+    command_chain = [resolve_doc_root_name(root), *command_path] if command_path else []
 
     lines = []
 
@@ -439,7 +464,7 @@ def generate_html_docs(
         lines.append("</div>")
 
     # Add usage section if not suppressed
-    usage = extract_usage(app)
+    usage = extract_usage(root, command_path, execution_path)
     if usage:
         usage_level = min(heading_level + 1, max_heading_level)
         lines.append(f"<h{usage_level}>Usage</h{usage_level}>")
@@ -451,13 +476,14 @@ def generate_html_docs(
         # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
         root_name = app_name if app.usage is None else None
         display_chain = usage_display_chain(command_chain, usage_name, root_name)
-        usage_text = format_usage_line(usage_text, display_chain, prefix="$")
+        # A generated usage names the command with the root's name and ``command_path``.
+        command_words = 1 if app.usage is not None else 1 + len(command_path)
+        usage_text = format_usage_line(usage_text, display_chain, prefix="$", command_words=command_words)
         lines.append(f'<pre class="usage">{escape_html(usage_text)}</pre>')
         lines.append("</div>")
 
     # Get help panels for the current app
-    with command_context(root, command_chain):
-        help_panels_with_groups = root._assemble_help_panels(command_chain[1:], help_format)
+    help_panels_with_groups = root._assemble_help_panels(command_path, execution_path, help_format)
 
     # Render panels
     formatter = HtmlFormatter(
@@ -503,7 +529,8 @@ def generate_html_docs(
             )
 
             # Get subapp help
-            with command_context(root, sub_command_chain):
+            sub_command_path = (*command_path, name)
+            with command_context(root, sub_command_path) as sub_execution_path:
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 sub_description = extract_description(subapp, sub_help_format)
                 if sub_description:
@@ -512,7 +539,7 @@ def generate_html_docs(
                         lines.append(f'<div class="command-description">{escape_html(sub_desc_text)}</div>')
 
                 # Generate usage for subcommand
-                sub_usage = extract_usage(subapp)
+                sub_usage = extract_usage(root, sub_command_path, sub_execution_path)
                 if sub_usage:
                     if flatten_commands:
                         usage_heading_level = heading_level + 1
@@ -526,14 +553,17 @@ def generate_html_docs(
                     else:
                         sub_usage_text = extract_text(sub_usage, None)
                     sub_display_chain = usage_display_chain(sub_command_chain, usage_name)
-                    sub_usage_text = format_usage_line(sub_usage_text, sub_display_chain, prefix="$")
+                    sub_command_words = 1 if subapp.usage is not None else 1 + len(sub_command_path)
+                    sub_usage_text = format_usage_line(
+                        sub_usage_text, sub_display_chain, prefix="$", command_words=sub_command_words
+                    )
                     lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")
 
                 # Only show subcommand panels if we're in recursive mode
                 if recursive:
                     # Get help panels for subcommand
-                    sub_panels = root._assemble_help_panels(sub_command_chain[1:], sub_help_format)
+                    sub_panels = root._assemble_help_panels(sub_command_path, sub_execution_path, sub_help_format)
 
                     # Render subcommand panels
                     if flatten_commands:
@@ -561,29 +591,28 @@ def generate_html_docs(
 
                 # Recursively handle nested subcommands
                 if recursive and subapp._commands:
-                    for nested_name, nested_app in iterate_commands(subapp, include_hidden):
-                        # Build nested command chain
-                        nested_chain = build_command_chain(sub_command_chain, nested_name, app_name)
+                    for nested_name, _ in iterate_commands(subapp, include_hidden):
+                        nested_command_path = (*sub_command_path, nested_name)
                         # Determine heading level for nested commands
                         if flatten_commands:
                             nested_heading_level = heading_level
                         else:
                             nested_heading_level = heading_level + 2
                         # Set up context for nested_app, then recurse
-                        with command_context(root, nested_chain):
-                            nested_docs = generate_html_docs(
-                                nested_app,
+                        with command_context(root, nested_command_path) as nested_execution_path:
+                            nested_docs = _generate_html_docs(
+                                root,
+                                nested_command_path,
+                                nested_execution_path,
                                 recursive=recursive,
                                 include_hidden=include_hidden,
                                 heading_level=nested_heading_level,
                                 max_heading_level=max_heading_level,
                                 standalone=False,  # Not standalone for nested
                                 custom_css=None,
-                                command_chain=nested_chain,  # Pass the command chain
                                 generate_toc=False,  # No TOC for nested commands
                                 flatten_commands=flatten_commands,
                                 usage_name=usage_name,
-                                _root_app=root,
                             )
                         lines.append(nested_docs)
 

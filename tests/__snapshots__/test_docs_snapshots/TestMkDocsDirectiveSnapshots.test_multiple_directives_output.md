@@ -166,7 +166,7 @@ Stop the server.
 ### complex-cli server restart
 
 ```console
-complex-cli server restart [ARGS]
+complex-cli server restart [OPTIONS] [ARGS]
 ```
 
 Restart the server.

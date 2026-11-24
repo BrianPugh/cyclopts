@@ -19,7 +19,7 @@ Complex CLI application for comprehensive documentation testing.
 
 ::
 
-    complex-cli version
+    complex-cli version [OPTIONS]
 
 Show version information.
 
@@ -44,7 +44,7 @@ Displays the application version and system information.
 
 ::
 
-    complex-cli info [ARGS]
+    complex-cli info [OPTIONS] [ARGS]
 
 Show application information.
 
@@ -223,7 +223,7 @@ list-users
 
 ::
 
-    complex-cli admin users list-users [ARGS]
+    complex-cli admin users list-users [OPTIONS] [ARGS]
 
 List all users.
 
@@ -432,7 +432,7 @@ revoke
 
 ::
 
-    complex-cli admin users permissions revoke USERNAME PERMISSION
+    complex-cli admin users permissions revoke [OPTIONS] USERNAME PERMISSION
 
 Revoke permissions from a user.
 
@@ -465,7 +465,7 @@ audit
 
 ::
 
-    complex-cli admin users permissions audit [ARGS]
+    complex-cli admin users permissions audit [OPTIONS] [ARGS]
 
 Audit permission changes.
 
@@ -530,7 +530,7 @@ list-roles
 
 ::
 
-    complex-cli admin users permissions roles list-roles [ARGS]
+    complex-cli admin users permissions roles list-roles [OPTIONS] [ARGS]
 
 List all role templates.
 
@@ -928,7 +928,7 @@ restart
 
 ::
 
-    complex-cli server restart [ARGS]
+    complex-cli server restart [OPTIONS] [ARGS]
 
 Restart the server.
 
@@ -1032,7 +1032,7 @@ clear
 
 ::
 
-    complex-cli cache clear [ARGS]
+    complex-cli cache clear [OPTIONS] [ARGS]
 
 Clear cache entries.
 
@@ -1065,7 +1065,7 @@ stats
 
 ::
 
-    complex-cli cache stats [ARGS]
+    complex-cli cache stats [OPTIONS] [ARGS]
 
 Show cache statistics.
 
@@ -1096,7 +1096,7 @@ Show cache statistics.
 
 ::
 
-    complex-cli complex-types [ARGS]
+    complex-cli complex-types [OPTIONS] [ARGS]
 
 Demonstrate complex type annotations.
 
@@ -1142,7 +1142,7 @@ documentation system needs to handle correctly.
 
 ::
 
-    complex-cli numpy-style NAME [ARGS]
+    complex-cli numpy-style [OPTIONS] NAME [ARGS]
 
 Command with NumPy-style docstring.
 
@@ -1176,7 +1176,7 @@ default for cyclopts.
 
 ::
 
-    complex-cli google-style NAME [ARGS]
+    complex-cli google-style [OPTIONS] NAME [ARGS]
 
 Command with Google-style docstring.
 
@@ -1209,7 +1209,7 @@ This command demonstrates Google docstring format.
 
 ::
 
-    complex-cli sphinx-style NAME [ARGS]
+    complex-cli sphinx-style [OPTIONS] NAME [ARGS]
 
 Command with Sphinx-style docstring.
 
@@ -1242,7 +1242,7 @@ This command demonstrates Sphinx/reST docstring format.
 
 ::
 
-    complex-cli secret-feature [ARGS]
+    complex-cli secret-feature [OPTIONS] [ARGS]
 
 Secret feature command.
 

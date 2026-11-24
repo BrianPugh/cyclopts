@@ -32,7 +32,7 @@ Complex CLI application for comprehensive documentation testing.
 ## complex-cli version
 
 ```console
-complex-cli version
+complex-cli version [OPTIONS]
 ```
 
 Show version information.
@@ -42,7 +42,7 @@ Displays the application version and system information.
 ## complex-cli info
 
 ```console
-complex-cli info [ARGS]
+complex-cli info [OPTIONS] [ARGS]
 ```
 
 Show application information.
@@ -66,7 +66,7 @@ Cache management commands.
 ## complex-cli complex-types
 
 ```console
-complex-cli complex-types [ARGS]
+complex-cli complex-types [OPTIONS] [ARGS]
 ```
 
 Demonstrate complex type annotations.
@@ -77,7 +77,7 @@ documentation system needs to handle correctly.
 ## complex-cli numpy-style
 
 ```console
-complex-cli numpy-style NAME [ARGS]
+complex-cli numpy-style [OPTIONS] NAME [ARGS]
 ```
 
 Command with NumPy-style docstring.
@@ -88,7 +88,7 @@ default for cyclopts.
 ## complex-cli google-style
 
 ```console
-complex-cli google-style NAME [ARGS]
+complex-cli google-style [OPTIONS] NAME [ARGS]
 ```
 
 Command with Google-style docstring.
@@ -98,7 +98,7 @@ This command demonstrates Google docstring format.
 ## complex-cli sphinx-style
 
 ```console
-complex-cli sphinx-style NAME [ARGS]
+complex-cli sphinx-style [OPTIONS] NAME [ARGS]
 ```
 
 Command with Sphinx-style docstring.
@@ -108,7 +108,7 @@ This command demonstrates Sphinx/reST docstring format.
 ## complex-cli secret-feature
 
 ```console
-complex-cli secret-feature [ARGS]
+complex-cli secret-feature [OPTIONS] [ARGS]
 ```
 
 Secret feature command.

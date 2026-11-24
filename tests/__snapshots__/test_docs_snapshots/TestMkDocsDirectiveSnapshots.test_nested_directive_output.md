@@ -56,7 +56,7 @@ Role template management.
 ###### complex-cli admin users permissions roles list-roles
 
 ```console
-complex-cli admin users permissions roles list-roles [ARGS]
+complex-cli admin users permissions roles list-roles [OPTIONS] [ARGS]
 ```
 
 List all role templates.

@@ -13,6 +13,7 @@ from cyclopts.docs.base import (
     is_all_builtin_flags,
     iterate_commands,
     normalize_command_filters,
+    resolve_doc_root_name,
     should_include_command,
     should_show_usage,
     usage_display_chain,
@@ -163,7 +164,6 @@ def generate_rst_docs(
     include_hidden: bool = False,
     heading_level: int = 1,
     max_heading_level: int = 6,
-    command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
     commands_filter: list[str] | None = None,
@@ -174,7 +174,6 @@ def generate_rst_docs(
     usage_name: str | None = None,
     anchor_prefix: str = "",
     anchor_suffix: str = "",
-    _root_app: "App | None" = None,
 ) -> str:
     """Generate reStructuredText documentation for a CLI application.
 
@@ -195,9 +194,6 @@ def generate_rst_docs(
         Maximum heading level to use. Headings deeper than this will be capped
         at this level. RST uses different underline characters for each level.
         Default is 6.
-    command_chain : list[str]
-        Internal parameter to track command hierarchy.
-        Default is None.
     generate_toc : bool
         If True, generate a table of contents for multi-command apps.
         Default is True.
@@ -242,14 +238,55 @@ def generate_rst_docs(
     str
         The generated RST documentation.
     """
+    with command_context(app, ()) as execution_path:
+        return _generate_rst_docs(
+            app,
+            (),
+            execution_path,
+            recursive=recursive,
+            include_hidden=include_hidden,
+            heading_level=heading_level,
+            max_heading_level=max_heading_level,
+            generate_toc=generate_toc,
+            flatten_commands=flatten_commands,
+            commands_filter=commands_filter,
+            exclude_commands=exclude_commands,
+            no_root_title=no_root_title,
+            code_block_title=code_block_title,
+            skip_preamble=skip_preamble,
+            usage_name=usage_name,
+            anchor_prefix=anchor_prefix,
+            anchor_suffix=anchor_suffix,
+        )
+
+
+def _generate_rst_docs(
+    root: "App",
+    command_path: tuple[str, ...],
+    execution_path: tuple["App", ...],
+    *,
+    recursive: bool,
+    include_hidden: bool,
+    heading_level: int,
+    max_heading_level: int,
+    generate_toc: bool,
+    flatten_commands: bool,
+    commands_filter: list[str] | None,
+    exclude_commands: list[str] | None,
+    no_root_title: bool,
+    code_block_title: bool,
+    skip_preamble: bool,
+    usage_name: str | None,
+    anchor_prefix: str,
+    anchor_suffix: str,
+) -> str:
+    """Render the command at ``command_path``; must be called inside :func:`command_context`."""
     from cyclopts.help.formatters.rst import RstFormatter
 
     lines = []
 
-    root = app if _root_app is None else _root_app
-
-    if command_chain is None:
-        command_chain = []
+    app = execution_path[-1]
+    command_chain = [resolve_doc_root_name(root), *command_path] if command_path else []
 
     app_name, full_command, base_title = get_app_info(app, command_chain)
     # Title logic: match markdown behavior for consistency
@@ -323,7 +360,7 @@ def generate_rst_docs(
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
 
     # Add usage section first if appropriate (skip if skip_preamble is True)
-    if not skip_preamble and should_show_usage(app):
+    if not skip_preamble and should_show_usage(app, command_path):
         # Generate usage line - only if we're documenting a specific command.
         # When no_root_title is set at the root (e.g., in Sphinx contexts), the
         # root Usage: line is normally suppressed; usage_name still applies to
@@ -333,7 +370,7 @@ def generate_rst_docs(
         # nowhere else. See #923.
         suppressed_root = no_root_title and not command_chain
         if not suppressed_root or app.default_command is not None:
-            usage = extract_usage(app)
+            usage = extract_usage(root, command_path, execution_path)
             usage_text = None
             if usage:
                 if isinstance(usage, str):
@@ -347,9 +384,11 @@ def generate_rst_docs(
 
                 # Format usage with the display chain when one is present
                 if display_chain:
-                    parts = usage_text.split(None, 1)
-                    if len(parts) > 1:
-                        usage_text = f"{' '.join(display_chain)} {parts[1]}"
+                    # A generated usage names the command with the root's name and ``command_path``.
+                    command_words = 1 if app.usage is not None else 1 + len(command_path)
+                    parts = usage_text.split(None, command_words)
+                    if len(parts) > command_words:
+                        usage_text = f"{' '.join(display_chain)} {parts[-1]}"
                     else:
                         usage_text = " ".join(display_chain)
 
@@ -379,8 +418,7 @@ def generate_rst_docs(
         _generate_toc(lines)
 
     # Get help panels for the current app
-    with command_context(root, command_chain):
-        help_panels_with_groups = root._assemble_help_panels(command_chain[1:], help_format)
+    help_panels_with_groups = root._assemble_help_panels(command_path, execution_path, help_format)
 
     # Set up command filtering
     normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -483,7 +521,6 @@ def generate_rst_docs(
 
             lines.append("")
 
-            subcommand_chain = command_chain + [name] if command_chain else [app_name, name]
             if flatten_commands:
                 next_heading_level = heading_level
             elif no_root_title and not command_chain:
@@ -513,14 +550,16 @@ def generate_rst_docs(
                 and commands_filter[0].startswith(name + ".")
             )
 
-            with command_context(root, subcommand_chain):
-                subdocs = generate_rst_docs(
-                    subapp,
+            subcommand_path = (*command_path, name)
+            with command_context(root, subcommand_path) as subcommand_execution_path:
+                subdocs = _generate_rst_docs(
+                    root,
+                    subcommand_path,
+                    subcommand_execution_path,
                     recursive=recursive,
                     include_hidden=include_hidden,
                     heading_level=next_heading_level,
                     max_heading_level=max_heading_level,
-                    command_chain=subcommand_chain,
                     generate_toc=False,  # Only generate TOC at root level
                     flatten_commands=flatten_commands,
                     commands_filter=sub_commands_filter,
@@ -531,7 +570,6 @@ def generate_rst_docs(
                     usage_name=usage_name,
                     anchor_prefix=anchor_prefix,
                     anchor_suffix=anchor_suffix,
-                    _root_app=root,
                 )
             lines.append(subdocs)
 

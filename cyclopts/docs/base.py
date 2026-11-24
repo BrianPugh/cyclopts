@@ -13,36 +13,26 @@ from cyclopts.command_spec import CommandSpec
 from cyclopts.help import format_doc, format_usage
 
 
-def should_show_usage(app: "App") -> bool:
+def should_show_usage(app: "App", command_path: Sequence[str]) -> bool:
     """Determine if usage should be shown for an app.
 
     Root apps always show usage (even without default_command, showing "app COMMAND").
     Subcommands only show usage if they have a default_command.
     This skips usage for command groups that can't be invoked directly.
 
-    The determination is made by checking the app_stack depth:
-    - Stack length of 1 means root app (just the initial frame)
-    - Stack length > 1 means we're in a subcommand context (frames were pushed)
-
     Parameters
     ----------
     app : App
         The App instance to check.
+    command_path : Sequence[str]
+        Command tokens leading from the root app to ``app``.
 
     Returns
     -------
     bool
         True if usage should be shown.
     """
-    # Check if we're in a subcommand context by examining the stack depth
-    is_root = len(app.app_stack.stack) == 1
-
-    if is_root:
-        # Root app: always show usage
-        return True
-    else:
-        # Subcommand: only show if it has a default_command
-        return app.default_command is not None
+    return not command_path or app.default_command is not None
 
 
 def should_show_commands_list(app: "App") -> bool:
@@ -476,27 +466,35 @@ def extract_description(app: "App", help_format: str) -> Any | None:
     return description
 
 
-def extract_usage(app: "App") -> Any | None:
-    """Extract usage string.
+def extract_usage(root: "App", command_path: Sequence[str], execution_path: Sequence["App"]) -> Any | None:
+    """Extract the usage of the command at ``command_path``.
+
+    Must be called inside ``root.app_stack(execution_path)``.
 
     Parameters
     ----------
-    app : App
-        The App instance.
+    root : App
+        The root application.
+    command_path : Sequence[str]
+        Command tokens leading from ``root`` to the command.
+    execution_path : Sequence[App]
+        The execution path for ``command_path``.
 
     Returns
     -------
     Optional[Any]
-        The extracted usage object, or None.
+        The extracted usage object, or None. A generated usage starts with the
+        root's name followed by ``command_path``; a custom ``App.usage`` is returned as-is.
     """
+    app = execution_path[-1]
     if app.usage is not None:
         return app.usage if app.usage else None
 
     # The docs formatters always render row metavars, so the usage line must too.
-    return format_usage(app, [], show_metavar=True)
+    return format_usage(root, command_path, execution_path, show_metavar=True)
 
 
-def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "") -> str:
+def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "", command_words: int = 1) -> str:
     """Format usage line with proper command path.
 
     Parameters
@@ -507,6 +505,9 @@ def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "
         Command chain for the app.
     prefix : str
         Optional prefix for the usage line (e.g., "$").
+    command_words : int
+        Number of leading words of ``usage_text`` that name the command; they are
+        replaced by ``command_chain``.
 
     Returns
     -------
@@ -521,9 +522,9 @@ def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "
 
     full_command = " ".join(command_chain) if command_chain else ""
 
-    parts = usage_text.split(None, 1)
-    if len(parts) > 1 and command_chain:
-        usage_line = f"{prefix} {full_command} {parts[1]}" if prefix else f"{full_command} {parts[1]}"
+    parts = usage_text.split(None, command_words)
+    if len(parts) > command_words and command_chain:
+        usage_line = f"{prefix} {full_command} {parts[-1]}" if prefix else f"{full_command} {parts[-1]}"
     elif command_chain:
         usage_line = f"{prefix} {full_command}" if prefix else full_command
     else:
@@ -591,8 +592,8 @@ def iterate_commands(app: "App", include_hidden: bool = False, resolve_lazy: boo
 
 
 @contextmanager
-def command_context(root: "App", command_chain: Sequence[str]) -> Iterator[None]:
-    """Push the app stack for the command at ``command_chain``, the same way ``--help`` does.
+def command_context(root: "App", command_path: Sequence[str]) -> Iterator[tuple["App", ...]]:
+    """Resolve ``command_path`` from ``root`` and push its app stack, the same way ``--help`` does.
 
     Every app on the command path receives the frame of its ancestors, so settings inherited
     from the root and intermediate apps (e.g. ``config``, ``default_parameter``, meta apps) resolve.
@@ -601,9 +602,14 @@ def command_context(root: "App", command_chain: Sequence[str]) -> Iterator[None]
     ----------
     root : App
         The root application.
-    command_chain : Sequence[str]
-        The documented command chain. The first element is the root application's name.
+    command_path : Sequence[str]
+        Command tokens leading from ``root`` to the command.
+
+    Yields
+    ------
+    tuple[App, ...]
+        The execution path for ``command_path``.
     """
-    _, apps, _ = root.parse_commands(command_chain[1:])
-    with root.app_stack(apps):
-        yield
+    _, execution_path, _ = root.parse_commands(list(command_path))
+    with root.app_stack(execution_path):
+        yield execution_path

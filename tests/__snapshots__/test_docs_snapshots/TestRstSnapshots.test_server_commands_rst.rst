@@ -163,7 +163,7 @@ restart
 
 ::
 
-    complex-cli server restart [ARGS]
+    complex-cli server restart [OPTIONS] [ARGS]
 
 Restart the server.
 

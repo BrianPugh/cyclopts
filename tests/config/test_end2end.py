@@ -1,7 +1,7 @@
 from textwrap import dedent
 from typing import Annotated
 
-from cyclopts import Parameter
+from cyclopts import App, Parameter
 from cyclopts.config import Env, Toml
 
 
@@ -78,3 +78,28 @@ def test_config_env_help(app, assert_parse_args, console):
         """
     )
     assert actual == expected
+
+
+def test_config_env_help_meta_option(app, console, monkeypatch):
+    """A meta app's option reads its ``Env`` variable without the subcommand's command segments."""
+    app.config = Env("DEMO_")
+    db = App(name="db")
+    app.command(db)
+
+    @db.command
+    def migrate(steps: int = 1):
+        return steps
+
+    @app.meta.default
+    def meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], verbose: bool = False):
+        return verbose, app(tokens)
+
+    with console.capture() as capture:
+        app.meta(["db", "migrate", "--help"], console=console)
+    actual = capture.get()
+    assert "DEMO_VERBOSE" in actual
+    assert "DEMO_DB_MIGRATE_VERBOSE" not in actual
+    assert "DEMO_DB_MIGRATE_STEPS" in actual
+
+    monkeypatch.setenv("DEMO_VERBOSE", "true")
+    assert app.meta(["db", "migrate"]) == (True, 1)

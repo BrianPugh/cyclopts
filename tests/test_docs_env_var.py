@@ -61,3 +61,19 @@ def test_generate_docs_env_var_matches_runtime(monkeypatch):
 
     monkeypatch.setenv("DEMO_SERVE_PORT", "2222")
     assert app(["serve"]) == 2222
+
+
+@pytest.mark.parametrize("output_format", FORMATS)
+def test_generate_docs_env_var_meta_option(output_format):
+    app = _make_app()
+
+    @app.meta.default
+    def meta(*tokens: str, quiet: bool = False):
+        pass
+
+    docs = app.generate_docs(output_format=output_format)
+
+    assert "DEMO_QUIET" in docs
+    # A meta app runs before command dispatch, so its names never include command segments.
+    assert "DEMO_SERVE_QUIET" not in docs
+    assert "DEMO_DB_MIGRATE_QUIET" not in docs

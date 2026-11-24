@@ -172,8 +172,9 @@ def _render_description_section(app: "App", help_format: str, lines: list[str]) 
 
 
 def _render_usage_section(
-    app: "App",
-    command_chain: list[str],
+    root: "App",
+    command_path: tuple[str, ...],
+    execution_path: tuple["App", ...],
     lines: list[str],
     usage_name: str | None = None,
 ) -> None:
@@ -181,17 +182,20 @@ def _render_usage_section(
 
     Parameters
     ----------
-    app : App
-        The app to extract usage from.
-    command_chain : list[str]
-        Command chain for usage line.
+    root : App
+        The root application.
+    command_path : tuple[str, ...]
+        Command tokens leading from ``root`` to the command.
+    execution_path : tuple[App, ...]
+        The execution path for ``command_path``.
     lines : list[str]
         List to append usage to.
     usage_name : str | None
         Optional replacement for the chain's root in Usage: lines only.
     """
-    if should_show_usage(app):
-        usage = extract_usage(app)
+    app = execution_path[-1]
+    if should_show_usage(app, command_path):
+        usage = extract_usage(root, command_path, execution_path)
         if usage:
             lines.append("```console")
             if isinstance(usage, str):
@@ -199,9 +203,12 @@ def _render_usage_section(
             else:
                 usage_text = extract_text(usage, None, preserve_markup=False)
             # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
-            root_name = resolve_doc_root_name(app) if app.usage is None else None
-            display_chain = usage_display_chain(command_chain, usage_name, root_name)
-            usage_line = format_usage_line(usage_text, display_chain)
+            root_name = resolve_doc_root_name(root)
+            command_chain = [root_name, *command_path] if command_path else []
+            display_chain = usage_display_chain(command_chain, usage_name, root_name if app.usage is None else None)
+            # A generated usage names the command with the root's name and ``command_path``.
+            command_words = 1 if app.usage is not None else 1 + len(command_path)
+            usage_line = format_usage_line(usage_text, display_chain, command_words=command_words)
             lines.append(usage_line)
             lines.append("```")
             lines.append("")
@@ -326,7 +333,6 @@ def generate_markdown_docs(
     include_hidden: bool = False,
     heading_level: int = 1,
     max_heading_level: int = 6,
-    command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
     commands_filter: list[str] | None = None,
@@ -335,7 +341,6 @@ def generate_markdown_docs(
     code_block_title: bool = False,
     skip_preamble: bool = False,
     usage_name: str | None = None,
-    _root_app: "App | None" = None,
 ) -> str:
     """Generate markdown documentation for a CLI application.
 
@@ -356,9 +361,6 @@ def generate_markdown_docs(
         Maximum heading level to use. Headings deeper than this will be capped
         at this level. Standard Markdown supports levels 1-6.
         Default is 6.
-    command_chain : list[str]
-        Internal parameter to track command hierarchy.
-        Default is None.
     generate_toc : bool
         If True, generate a table of contents for multi-command apps.
         Default is True.
@@ -391,17 +393,52 @@ def generate_markdown_docs(
     str
         The generated markdown documentation.
     """
+    with command_context(app, ()) as execution_path:
+        return _generate_markdown_docs(
+            app,
+            (),
+            execution_path,
+            recursive=recursive,
+            include_hidden=include_hidden,
+            heading_level=heading_level,
+            max_heading_level=max_heading_level,
+            generate_toc=generate_toc,
+            flatten_commands=flatten_commands,
+            commands_filter=commands_filter,
+            exclude_commands=exclude_commands,
+            no_root_title=no_root_title,
+            code_block_title=code_block_title,
+            skip_preamble=skip_preamble,
+            usage_name=usage_name,
+        )
+
+
+def _generate_markdown_docs(
+    root: "App",
+    command_path: tuple[str, ...],
+    execution_path: tuple["App", ...],
+    *,
+    recursive: bool,
+    include_hidden: bool,
+    heading_level: int,
+    max_heading_level: int,
+    generate_toc: bool,
+    flatten_commands: bool,
+    commands_filter: list[str] | None,
+    exclude_commands: list[str] | None,
+    no_root_title: bool,
+    code_block_title: bool,
+    skip_preamble: bool,
+    usage_name: str | None,
+) -> str:
+    """Render the command at ``command_path``; must be called inside :func:`command_context`."""
     from cyclopts.help.formatters.markdown import MarkdownFormatter
 
     lines = []
 
-    root = app if _root_app is None else _root_app
-
-    if command_chain is None:
-        command_chain = []
-        is_root = True
-    else:
-        is_root = False
+    app = execution_path[-1]
+    command_chain = [resolve_doc_root_name(root), *command_path] if command_path else []
+    is_root = not command_path
 
     # Determine if we should skip the current level's content
     # When filtering to a single command, skip the root app content
@@ -429,7 +466,7 @@ def generate_markdown_docs(
 
     # Add usage section first (skip if skipping current level or skip_preamble is True)
     if not skip_current_level and not skip_preamble:
-        _render_usage_section(app, command_chain, lines, usage_name=usage_name)
+        _render_usage_section(root, command_path, execution_path, lines, usage_name=usage_name)
 
     # Add application description (skip if skipping current level or skip_preamble is True)
     if not skip_current_level and not skip_preamble:
@@ -441,8 +478,7 @@ def generate_markdown_docs(
 
     # Get help panels for the current app (skip if skipping current level)
     if not skip_current_level:
-        with command_context(root, command_chain):
-            help_panels_with_groups = root._assemble_help_panels(command_chain[1:], help_format)
+        help_panels_with_groups = root._assemble_help_panels(command_path, execution_path, help_format)
 
         # Set up command filtering (used for command panels only)
         normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -563,21 +599,22 @@ def generate_markdown_docs(
             # - or this is an intermediate command on the path to a nested target
             skip_this_preamble = skip_target_preamble or skip_intermediate
 
-            with command_context(root, sub_command_chain):
+            sub_command_path = (*command_path, name)
+            with command_context(root, sub_command_path) as sub_execution_path:
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 # Preserve markup when sub_help_format matches output format (markdown)
                 preserve_sub = sub_help_format in ("markdown", "md")
 
                 if not skip_this_preamble:
                     # Generate usage first for subcommand
-                    _render_usage_section(subapp, sub_command_chain, lines, usage_name=usage_name)
+                    _render_usage_section(root, sub_command_path, sub_execution_path, lines, usage_name=usage_name)
                     _render_description_section(subapp, sub_help_format, lines)
 
                 # Only show subcommand panels if we're in recursive mode
                 # (Otherwise we just show the basic info about this command)
                 if recursive:
                     # Get help panels for subcommand (already sorted)
-                    sub_panels = root._assemble_help_panels(sub_command_chain[1:], sub_help_format)
+                    sub_panels = root._assemble_help_panels(sub_command_path, sub_execution_path, sub_help_format)
 
                     # Set up command filtering for this subcommand
                     sub_commands_filter_for_panel, sub_exclude_commands_for_panel = adjust_filters_for_subcommand(
@@ -713,8 +750,7 @@ def generate_markdown_docs(
                         ):
                             continue
 
-                        # Build nested command chain (always use full path for correct usage)
-                        nested_command_chain = build_command_chain(sub_command_chain, nested_name, app_name)
+                        nested_command_path = (*sub_command_path, nested_name)
                         # Determine heading level for nested commands
                         if flatten_commands:
                             nested_heading_level = heading_level
@@ -749,14 +785,15 @@ def generate_markdown_docs(
                         )
 
                         # Set up context for nested_app, then recurse
-                        with command_context(root, nested_command_chain):
-                            nested_docs = generate_markdown_docs(
-                                nested_app,
+                        with command_context(root, nested_command_path) as nested_execution_path:
+                            nested_docs = _generate_markdown_docs(
+                                root,
+                                nested_command_path,
+                                nested_execution_path,
                                 recursive=recursive,
                                 include_hidden=include_hidden,
                                 heading_level=nested_heading_level,
                                 max_heading_level=max_heading_level,
-                                command_chain=nested_command_chain,
                                 generate_toc=False,  # Don't generate TOC for nested commands
                                 flatten_commands=flatten_commands,
                                 commands_filter=nested_commands_filter,
@@ -765,7 +802,6 @@ def generate_markdown_docs(
                                 code_block_title=code_block_title,
                                 skip_preamble=nested_is_target or nested_is_intermediate,
                                 usage_name=usage_name,
-                                _root_app=root,
                             )
                         # Just append the generated docs - no title replacement
                         lines.append(nested_docs)

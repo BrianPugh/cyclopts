@@ -13,7 +13,10 @@ from cyclopts import App, Parameter
 def _parameter_entries(app: App):
     """All ``HelpEntry`` from ``app``'s parameter panels, in display order."""
     out = []
-    for _, panel in app._assemble_help_panels((), "restructuredtext"):
+    command_chain, execution_path, _ = app.parse_commands([])
+    with app.app_stack(execution_path):
+        panels = app._assemble_help_panels(command_chain, execution_path, "restructuredtext")
+    for _, panel in panels:
         if panel.format == "parameter":
             out.extend(panel.entries)
     return out

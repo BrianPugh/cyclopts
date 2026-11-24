@@ -167,7 +167,7 @@ revoke
 
 ::
 
-    complex-cli admin users permissions revoke USERNAME PERMISSION
+    complex-cli admin users permissions revoke [OPTIONS] USERNAME PERMISSION
 
 Revoke permissions from a user.
 
@@ -200,7 +200,7 @@ audit
 
 ::
 
-    complex-cli admin users permissions audit [ARGS]
+    complex-cli admin users permissions audit [OPTIONS] [ARGS]
 
 Audit permission changes.
 
@@ -265,7 +265,7 @@ list-roles
 
 ::
 
-    complex-cli admin users permissions roles list-roles [ARGS]
+    complex-cli admin users permissions roles list-roles [OPTIONS] [ARGS]
 
 List all role templates.
 

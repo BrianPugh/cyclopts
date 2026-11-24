@@ -73,7 +73,7 @@ User management commands.
 #### complex-cli admin users list-users
 
 ```console
-complex-cli admin users list-users [ARGS]
+complex-cli admin users list-users [OPTIONS] [ARGS]
 ```
 
 List all users.
@@ -185,7 +185,7 @@ Grant permissions to a user.
 ##### complex-cli admin users permissions revoke
 
 ```console
-complex-cli admin users permissions revoke USERNAME PERMISSION
+complex-cli admin users permissions revoke [OPTIONS] USERNAME PERMISSION
 ```
 
 Revoke permissions from a user.
@@ -205,7 +205,7 @@ Revoke permissions from a user.
 ##### complex-cli admin users permissions audit
 
 ```console
-complex-cli admin users permissions audit [ARGS]
+complex-cli admin users permissions audit [OPTIONS] [ARGS]
 ```
 
 Audit permission changes.
@@ -242,7 +242,7 @@ Role template management.
 ###### complex-cli admin users permissions roles list-roles
 
 ```console
-complex-cli admin users permissions roles list-roles [ARGS]
+complex-cli admin users permissions roles list-roles [OPTIONS] [ARGS]
 ```
 
 List all role templates.

@@ -23,7 +23,7 @@ Complex CLI application for comprehensive documentation testing.
 ### complex-cli version
 
 ```console
-complex-cli version
+complex-cli version [OPTIONS]
 ```
 
 Show version information.
@@ -40,7 +40,7 @@ Displays the application version and system information.
 ### complex-cli info
 
 ```console
-complex-cli info [ARGS]
+complex-cli info [OPTIONS] [ARGS]
 ```
 
 Show application information.
@@ -95,7 +95,7 @@ Demonstrates attrs class support for CLI parameters.
 #### complex-cli cache clear
 
 ```console
-complex-cli cache clear [ARGS]
+complex-cli cache clear [OPTIONS] [ARGS]
 ```
 
 Clear cache entries.
@@ -115,7 +115,7 @@ Clear cache entries.
 #### complex-cli cache stats
 
 ```console
-complex-cli cache stats [ARGS]
+complex-cli cache stats [OPTIONS] [ARGS]
 ```
 
 Show cache statistics.
@@ -135,7 +135,7 @@ Show cache statistics.
 ### complex-cli complex-types
 
 ```console
-complex-cli complex-types [ARGS]
+complex-cli complex-types [OPTIONS] [ARGS]
 ```
 
 Demonstrate complex type annotations.

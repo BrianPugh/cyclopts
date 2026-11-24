@@ -68,7 +68,7 @@ Complex CLI application for comprehensive documentation testing.
 ## complex-cli version
 
 ```console
-complex-cli version
+complex-cli version [OPTIONS]
 ```
 
 Show version information.
@@ -85,7 +85,7 @@ Displays the application version and system information.
 ## complex-cli info
 
 ```console
-complex-cli info [ARGS]
+complex-cli info [OPTIONS] [ARGS]
 ```
 
 Show application information.
@@ -179,7 +179,7 @@ User management commands.
 #### complex-cli admin users list-users
 
 ```console
-complex-cli admin users list-users [ARGS]
+complex-cli admin users list-users [OPTIONS] [ARGS]
 ```
 
 List all users.
@@ -291,7 +291,7 @@ Grant permissions to a user.
 ##### complex-cli admin users permissions revoke
 
 ```console
-complex-cli admin users permissions revoke USERNAME PERMISSION
+complex-cli admin users permissions revoke [OPTIONS] USERNAME PERMISSION
 ```
 
 Revoke permissions from a user.
@@ -311,7 +311,7 @@ Revoke permissions from a user.
 ##### complex-cli admin users permissions audit
 
 ```console
-complex-cli admin users permissions audit [ARGS]
+complex-cli admin users permissions audit [OPTIONS] [ARGS]
 ```
 
 Audit permission changes.
@@ -348,7 +348,7 @@ Role template management.
 ###### complex-cli admin users permissions roles list-roles
 
 ```console
-complex-cli admin users permissions roles list-roles [ARGS]
+complex-cli admin users permissions roles list-roles [OPTIONS] [ARGS]
 ```
 
 List all role templates.
@@ -558,7 +558,7 @@ Stop the server.
 ### complex-cli server restart
 
 ```console
-complex-cli server restart [ARGS]
+complex-cli server restart [OPTIONS] [ARGS]
 ```
 
 Restart the server.
@@ -613,7 +613,7 @@ Demonstrates attrs class support for CLI parameters.
 ### complex-cli cache clear
 
 ```console
-complex-cli cache clear [ARGS]
+complex-cli cache clear [OPTIONS] [ARGS]
 ```
 
 Clear cache entries.
@@ -633,7 +633,7 @@ Clear cache entries.
 ### complex-cli cache stats
 
 ```console
-complex-cli cache stats [ARGS]
+complex-cli cache stats [OPTIONS] [ARGS]
 ```
 
 Show cache statistics.
@@ -653,7 +653,7 @@ Show cache statistics.
 ## complex-cli complex-types
 
 ```console
-complex-cli complex-types [ARGS]
+complex-cli complex-types [OPTIONS] [ARGS]
 ```
 
 Demonstrate complex type annotations.
@@ -680,7 +680,7 @@ documentation system needs to handle correctly.
 ## complex-cli numpy-style
 
 ```console
-complex-cli numpy-style NAME [ARGS]
+complex-cli numpy-style [OPTIONS] NAME [ARGS]
 ```
 
 Command with NumPy-style docstring.
@@ -703,7 +703,7 @@ default for cyclopts.
 ## complex-cli google-style
 
 ```console
-complex-cli google-style NAME [ARGS]
+complex-cli google-style [OPTIONS] NAME [ARGS]
 ```
 
 Command with Google-style docstring.
@@ -725,7 +725,7 @@ This command demonstrates Google docstring format.
 ## complex-cli sphinx-style
 
 ```console
-complex-cli sphinx-style NAME [ARGS]
+complex-cli sphinx-style [OPTIONS] NAME [ARGS]
 ```
 
 Command with Sphinx-style docstring.
@@ -747,7 +747,7 @@ This command demonstrates Sphinx/reST docstring format.
 ## complex-cli secret-feature
 
 ```console
-complex-cli secret-feature [ARGS]
+complex-cli secret-feature [OPTIONS] [ARGS]
 ```
 
 Secret feature command.
