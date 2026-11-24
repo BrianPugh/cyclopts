@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from cyclopts._markup import extract_text
 from cyclopts.docs.base import (
     adjust_filters_for_subcommand,
+    command_context,
     extract_description,
     extract_usage,
     generate_anchor,
@@ -173,6 +174,7 @@ def generate_rst_docs(
     usage_name: str | None = None,
     anchor_prefix: str = "",
     anchor_suffix: str = "",
+    _root_app: "App | None" = None,
 ) -> str:
     """Generate reStructuredText documentation for a CLI application.
 
@@ -243,6 +245,8 @@ def generate_rst_docs(
     from cyclopts.help.formatters.rst import RstFormatter
 
     lines = []
+
+    root = app if _root_app is None else _root_app
 
     if command_chain is None:
         command_chain = []
@@ -375,9 +379,8 @@ def generate_rst_docs(
         _generate_toc(lines)
 
     # Get help panels for the current app
-    # Use app_stack context - if caller set up parent context, it will be stacked
-    with app.app_stack(app.app_stack.current_frame):
-        help_panels_with_groups = app._assemble_help_panels([], help_format, command_prefix=command_chain[1:])
+    with command_context(root, command_chain):
+        help_panels_with_groups = root._assemble_help_panels(command_chain[1:], help_format)
 
     # Set up command filtering
     normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -510,8 +513,7 @@ def generate_rst_docs(
                 and commands_filter[0].startswith(name + ".")
             )
 
-            # Push subapp with all ancestors so root settings (e.g. config) resolve in the recursive call
-            with subapp.app_stack([*app.app_stack.current_frame, subapp]):
+            with command_context(root, subcommand_chain):
                 subdocs = generate_rst_docs(
                     subapp,
                     recursive=recursive,
@@ -529,6 +531,7 @@ def generate_rst_docs(
                     usage_name=usage_name,
                     anchor_prefix=anchor_prefix,
                     anchor_suffix=anchor_suffix,
+                    _root_app=root,
                 )
             lines.append(subdocs)
 

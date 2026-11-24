@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from cyclopts._markup import escape_html, extract_text
 from cyclopts.docs.base import (
     build_command_chain,
+    command_context,
     extract_description,
     extract_usage,
     filter_help_entries,
@@ -338,6 +339,7 @@ def generate_html_docs(
     generate_toc: bool = True,
     flatten_commands: bool = False,
     usage_name: str | None = None,
+    _root_app: "App | None" = None,
 ) -> str:
     """Generate HTML documentation for a CLI application.
 
@@ -385,6 +387,8 @@ def generate_html_docs(
     from cyclopts.help.formatters.html import HtmlFormatter
 
     # Initialize command chain if not provided
+    root = app if _root_app is None else _root_app
+
     if command_chain is None:
         command_chain = []
 
@@ -452,9 +456,8 @@ def generate_html_docs(
         lines.append("</div>")
 
     # Get help panels for the current app
-    # Use app_stack context - if caller set up parent context, it will be stacked
-    with app.app_stack(app.app_stack.current_frame):
-        help_panels_with_groups = app._assemble_help_panels([], help_format, command_prefix=command_chain[1:])
+    with command_context(root, command_chain):
+        help_panels_with_groups = root._assemble_help_panels(command_chain[1:], help_format)
 
     # Render panels
     formatter = HtmlFormatter(
@@ -500,8 +503,7 @@ def generate_html_docs(
             )
 
             # Get subapp help
-            # Include parent app in the stack so default_parameter is properly inherited
-            with subapp.app_stack([*app.app_stack.current_frame, subapp]):
+            with command_context(root, sub_command_chain):
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 sub_description = extract_description(subapp, sub_help_format)
                 if sub_description:
@@ -531,7 +533,7 @@ def generate_html_docs(
                 # Only show subcommand panels if we're in recursive mode
                 if recursive:
                     # Get help panels for subcommand
-                    sub_panels = subapp._assemble_help_panels([], sub_help_format, command_prefix=sub_command_chain[1:])
+                    sub_panels = root._assemble_help_panels(sub_command_chain[1:], sub_help_format)
 
                     # Render subcommand panels
                     if flatten_commands:
@@ -568,8 +570,7 @@ def generate_html_docs(
                         else:
                             nested_heading_level = heading_level + 2
                         # Set up context for nested_app, then recurse
-                        # Include all ancestors so root settings (e.g. config) resolve for nested commands
-                        with nested_app.app_stack([*subapp.app_stack.current_frame, nested_app]):
+                        with command_context(root, nested_chain):
                             nested_docs = generate_html_docs(
                                 nested_app,
                                 recursive=recursive,
@@ -582,6 +583,7 @@ def generate_html_docs(
                                 generate_toc=False,  # No TOC for nested commands
                                 flatten_commands=flatten_commands,
                                 usage_name=usage_name,
+                                _root_app=root,
                             )
                         lines.append(nested_docs)
 

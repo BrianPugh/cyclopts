@@ -7,6 +7,7 @@ from cyclopts.core import DEFAULT_FORMAT
 from cyclopts.docs.base import (
     adjust_filters_for_subcommand,
     build_command_chain,
+    command_context,
     extract_description,
     extract_usage,
     format_usage_line,
@@ -334,6 +335,7 @@ def generate_markdown_docs(
     code_block_title: bool = False,
     skip_preamble: bool = False,
     usage_name: str | None = None,
+    _root_app: "App | None" = None,
 ) -> str:
     """Generate markdown documentation for a CLI application.
 
@@ -393,6 +395,8 @@ def generate_markdown_docs(
 
     lines = []
 
+    root = app if _root_app is None else _root_app
+
     if command_chain is None:
         command_chain = []
         is_root = True
@@ -436,10 +440,9 @@ def generate_markdown_docs(
         _render_toc(app, app_name, include_hidden, commands_filter, exclude_commands, skip_current_level, lines)
 
     # Get help panels for the current app (skip if skipping current level)
-    # Use app_stack context - if caller set up parent context, it will be stacked
     if not skip_current_level:
-        with app.app_stack(app.app_stack.current_frame):
-            help_panels_with_groups = app._assemble_help_panels([], help_format, command_prefix=command_chain[1:])
+        with command_context(root, command_chain):
+            help_panels_with_groups = root._assemble_help_panels(command_chain[1:], help_format)
 
         # Set up command filtering (used for command panels only)
         normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -560,8 +563,7 @@ def generate_markdown_docs(
             # - or this is an intermediate command on the path to a nested target
             skip_this_preamble = skip_target_preamble or skip_intermediate
 
-            # Include parent app in the stack so default_parameter is properly inherited
-            with subapp.app_stack([*app.app_stack.current_frame, subapp]):
+            with command_context(root, sub_command_chain):
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 # Preserve markup when sub_help_format matches output format (markdown)
                 preserve_sub = sub_help_format in ("markdown", "md")
@@ -575,7 +577,7 @@ def generate_markdown_docs(
                 # (Otherwise we just show the basic info about this command)
                 if recursive:
                     # Get help panels for subcommand (already sorted)
-                    sub_panels = subapp._assemble_help_panels([], sub_help_format, command_prefix=sub_command_chain[1:])
+                    sub_panels = root._assemble_help_panels(sub_command_chain[1:], sub_help_format)
 
                     # Set up command filtering for this subcommand
                     sub_commands_filter_for_panel, sub_exclude_commands_for_panel = adjust_filters_for_subcommand(
@@ -747,8 +749,7 @@ def generate_markdown_docs(
                         )
 
                         # Set up context for nested_app, then recurse
-                        # Include all ancestors so root settings (e.g. config) resolve for nested commands
-                        with nested_app.app_stack([*subapp.app_stack.current_frame, nested_app]):
+                        with command_context(root, nested_command_chain):
                             nested_docs = generate_markdown_docs(
                                 nested_app,
                                 recursive=recursive,
@@ -764,6 +765,7 @@ def generate_markdown_docs(
                                 code_block_title=code_block_title,
                                 skip_preamble=nested_is_target or nested_is_intermediate,
                                 usage_name=usage_name,
+                                _root_app=root,
                             )
                         # Just append the generated docs - no title replacement
                         lines.append(nested_docs)

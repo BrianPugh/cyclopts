@@ -1,7 +1,8 @@
 """Base utilities for documentation generation."""
 
 import re
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -587,3 +588,22 @@ def iterate_commands(app: "App", include_hidden: bool = False, resolve_lazy: boo
         seen.add(app_id)
 
         yield name, subapp
+
+
+@contextmanager
+def command_context(root: "App", command_chain: Sequence[str]) -> Iterator[None]:
+    """Push the app stack for the command at ``command_chain``, the same way ``--help`` does.
+
+    Every app on the command path receives the frame of its ancestors, so settings inherited
+    from the root and intermediate apps (e.g. ``config``, ``default_parameter``, meta apps) resolve.
+
+    Parameters
+    ----------
+    root : App
+        The root application.
+    command_chain : Sequence[str]
+        The documented command chain. The first element is the root application's name.
+    """
+    _, apps, _ = root.parse_commands(command_chain[1:])
+    with root.app_stack(apps):
+        yield

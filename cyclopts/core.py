@@ -2504,22 +2504,7 @@ class App:
         self,
         tokens: None | str | Iterable[str],
         help_format,
-        *,
-        command_prefix: Sequence[str] = (),
     ) -> list[tuple[Optional["Group"], "HelpPanel"]]:
-        """Assemble the help panels for the command selected by ``tokens``.
-
-        Parameters
-        ----------
-        tokens: None | str | Iterable[str]
-            Command tokens, relative to this app.
-        help_format
-            Help format to fall back on.
-        command_prefix: Sequence[str]
-            Commands leading from the root app to this app. Used to build
-            :class:`~cyclopts.config.Env` variable names when this app is not
-            the root, e.g. when generating documentation for a subcommand.
-        """
         from rich.console import Group as RichGroup
         from rich.console import NewLine
 
@@ -2579,7 +2564,7 @@ class App:
             env_configs = tuple(x for x in configs if isinstance(x, Env) and x.show)
             for argument in argument_collection:
                 for env_config in env_configs:
-                    env_var = env_config._convert_argument((*command_prefix, *command_chain), argument)
+                    env_var = env_config._convert_argument(command_chain, argument)
                     assert isinstance(argument.parameter.env_var, tuple)
                     argument.parameter = Parameter.combine(
                         argument.parameter,
