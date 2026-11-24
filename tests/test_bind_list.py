@@ -479,3 +479,20 @@ def test_list_of_forward_ref(app, assert_parse_args):
         pass
 
     assert_parse_args(foo, "1 2", [Point(1), Point(2)])
+
+
+@pytest.mark.parametrize(
+    "hint, cmd, expected",
+    [
+        (list[typing.Any], "foo 1 2", ["1", "2"]),
+        (set[typing.Any], "foo 1 1", {"1"}),
+        (tuple[typing.Any, ...], "foo 1 2", ("1", "2")),
+        (tuple[typing.Any, int], "foo 1 2", ("1", 2)),
+    ],
+)
+def test_any_element_type(app, assert_parse_args, hint, cmd, expected):
+    @app.command
+    def foo(a: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(foo, cmd, expected)
