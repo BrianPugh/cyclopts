@@ -411,6 +411,7 @@ def generate_markdown_docs(
             code_block_title=code_block_title,
             skip_preamble=skip_preamble,
             usage_name=usage_name,
+            include_launcher=True,
         )
 
 
@@ -431,8 +432,13 @@ def _generate_markdown_docs(
     code_block_title: bool,
     skip_preamble: bool,
     usage_name: str | None,
+    include_launcher: bool,
 ) -> str:
-    """Render the command at ``command_path``; must be called inside :func:`command_context`."""
+    """Render the command at ``command_path``; must be called inside :func:`command_context`.
+
+    ``include_launcher`` is True until a section has documented the root's meta-app (launcher)
+    parameters; sections below that one omit them.
+    """
     from cyclopts.help.formatters.markdown import MarkdownFormatter
 
     lines = []
@@ -488,7 +494,9 @@ def _generate_markdown_docs(
 
     # Get help panels for the current app (skip if skipping current level)
     if not skip_current_level:
-        help_panels_with_groups = root._assemble_help_panels(command_path, execution_path, help_format)
+        help_panels_with_groups = root._assemble_help_panels(
+            command_path, execution_path, help_format, include_launcher=include_launcher
+        )
 
         # Set up command filtering (used for command panels only)
         normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -624,7 +632,13 @@ def _generate_markdown_docs(
                 # (Otherwise we just show the basic info about this command)
                 if recursive:
                     # Get help panels for subcommand (already sorted)
-                    sub_panels = root._assemble_help_panels(sub_command_path, sub_execution_path, sub_help_format)
+                    # Only a skipped root level leaves the launcher undocumented for its subcommands.
+                    sub_panels = root._assemble_help_panels(
+                        sub_command_path,
+                        sub_execution_path,
+                        sub_help_format,
+                        include_launcher=include_launcher and skip_current_level,
+                    )
 
                     # Set up command filtering for this subcommand
                     sub_commands_filter_for_panel, sub_exclude_commands_for_panel = adjust_filters_for_subcommand(
@@ -812,6 +826,7 @@ def _generate_markdown_docs(
                                 code_block_title=code_block_title,
                                 skip_preamble=nested_is_target or nested_is_intermediate,
                                 usage_name=usage_name,
+                                include_launcher=False,
                             )
                         # Just append the generated docs - no title replacement
                         lines.append(nested_docs)

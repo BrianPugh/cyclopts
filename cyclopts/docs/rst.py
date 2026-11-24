@@ -258,6 +258,7 @@ def generate_rst_docs(
             usage_name=usage_name,
             anchor_prefix=anchor_prefix,
             anchor_suffix=anchor_suffix,
+            include_launcher=True,
         )
 
 
@@ -280,8 +281,13 @@ def _generate_rst_docs(
     usage_name: str | None,
     anchor_prefix: str,
     anchor_suffix: str,
+    include_launcher: bool,
 ) -> str:
-    """Render the command at ``command_path``; must be called inside :func:`command_context`."""
+    """Render the command at ``command_path``; must be called inside :func:`command_context`.
+
+    ``include_launcher`` is True until a section has documented the root's meta-app (launcher)
+    parameters; sections below that one omit them.
+    """
     from cyclopts.help.formatters.rst import RstFormatter
 
     lines = []
@@ -415,7 +421,11 @@ def _generate_rst_docs(
         _generate_toc(lines)
 
     # Get help panels for the current app
-    help_panels_with_groups = root._assemble_help_panels(command_path, execution_path, help_format)
+    help_panels_with_groups = root._assemble_help_panels(
+        command_path, execution_path, help_format, include_launcher=include_launcher
+    )
+    # A title-less root with ``skip_preamble`` skips its parameter panels (see below).
+    launcher_pending = include_launcher and no_root_title and skip_preamble and not command_path
 
     # Set up command filtering
     normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -567,7 +577,9 @@ def _generate_rst_docs(
                     usage_name=usage_name,
                     anchor_prefix=anchor_prefix,
                     anchor_suffix=anchor_suffix,
+                    include_launcher=launcher_pending,
                 )
+            launcher_pending = False
             lines.append(subdocs)
 
     # Join and normalize multiple consecutive blank lines to a single blank line

@@ -2526,6 +2526,8 @@ class App:
         command_chain: Sequence[str],
         execution_path: Sequence["App"],
         help_format,
+        *,
+        include_launcher: bool = True,
     ) -> list[tuple[Optional["Group"], "HelpPanel"]]:
         """Assemble the help panels for a command.
 
@@ -2539,6 +2541,9 @@ class App:
             The execution path for ``command_chain``, from :meth:`parse_commands`.
         help_format
             Help format to fall back on.
+        include_launcher: bool
+            Include the parameters of this app's meta apps (the launcher) in a subcommand's
+            panels. Generated docs document them once, with this app.
         """
         from rich.console import Group as RichGroup
         from rich.console import NewLine
@@ -2590,7 +2595,10 @@ class App:
 
         # Handle Arguments/Parameters
         # We have to combine all the help-pages of the command-app and it's meta apps.
+        launcher = [] if include_launcher or command_app is self else list(_walk_metas(self))[:-1]
         for subapp, argument_collection in _iter_resolution_argument_collections(execution_path, parse_docstring=True):
+            if any(subapp is x for x in launcher):
+                continue
             # Special-case: add config.Env values to Parameter(env_var=)
             from cyclopts.config._env import Env
 

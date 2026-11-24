@@ -1225,3 +1225,56 @@ def test_generate_docs_multi_word_root_name_usage(fmt):
     assert "python -m demo serve --port INT" in actual
     assert "-m demo -m demo" not in actual
     assert "serve demo serve" not in actual
+
+
+def _launcher_app():
+    app = App(name="demo")
+    db = App(name="db")
+    app.command(db)
+
+    @app.command
+    def serve(port: int = 8080):
+        pass
+
+    @db.command
+    def migrate(steps: int = 1):
+        pass
+
+    @app.meta.default
+    def meta(*tokens: Annotated[str, Parameter(show=False)], verbose: bool = False):
+        pass
+
+    return app
+
+
+@pytest.mark.parametrize("fmt", ["markdown", "rst", "html"])
+def test_generate_docs_launcher_options_documented_once(fmt):
+    """The root meta app's options apply to every command, so they are documented once."""
+    actual = _launcher_app().generate_docs(output_format=fmt)
+    assert actual.count("--verbose") == 1
+
+
+def test_generate_docs_launcher_options_documented_once_when_filtered():
+    """With the root section skipped, the launcher's options move to the first rendered section."""
+    from cyclopts.docs.markdown import generate_markdown_docs
+
+    actual = generate_markdown_docs(_launcher_app(), commands_filter=["db"])
+    assert actual.count("--verbose") == 1
+    assert actual.index("--verbose") < actual.index("demo db migrate")
+
+
+def test_generate_rst_docs_launcher_options_documented_once_without_root_panels():
+    """A title-less root with ``skip_preamble`` hands the launcher's options to its first section only."""
+    from cyclopts.docs.rst import generate_rst_docs
+
+    actual = generate_rst_docs(_launcher_app(), no_root_title=True, skip_preamble=True)
+    assert actual.count("--verbose") == 1
+    assert actual.index("--verbose") < actual.index("demo db migrate")
+
+
+def test_help_subcommand_lists_launcher_options(console):
+    """Unlike docs, each ``--help`` page stands alone, so it lists the launcher's options."""
+    app = _launcher_app()
+    with console.capture() as capture:
+        app.meta.help_print(["db", "migrate"], console=console)
+    assert "--verbose" in capture.get()

@@ -26,20 +26,6 @@ Administrative commands for system management.
 ``users``
     User management commands.
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin-users:
 
 users
@@ -51,20 +37,6 @@ User management commands.
 
 ``permissions``
     Permission management for users.
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-permissions:
 
@@ -86,20 +58,6 @@ Permission management for users.
 
 ``roles``
     Role template management.
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-permissions-grant:
 
@@ -124,20 +82,6 @@ Grant permissions to a user.
 ``--expires STR``
     Expiration date (ISO format).
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin-users-permissions-revoke:
 
 revoke
@@ -152,20 +96,6 @@ Revoke permissions from a user.
 
 ``PERMISSION``
     Permission flags to revoke. [**Required**, Choices: ``none``, ``read``, ``write``, ``execute``, ``admin``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-permissions-audit:
 
@@ -185,20 +115,6 @@ Audit permission changes.
 ``FORMAT, --format``
     Output format for audit report. [Choices: ``json``, ``yaml``, ``table``, ``csv``, Default: ``table``]
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin-users-permissions-roles:
 
 roles
@@ -214,20 +130,6 @@ Role template management.
 ``list-roles``
     List all role templates.
 
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
-
 .. _cyclopts-complex-cli-admin-users-permissions-roles-list-roles:
 
 list-roles
@@ -239,20 +141,6 @@ List all role templates.
 
 ``INCLUDE-SYSTEM, --include-system``
     Include built-in system roles. [Default: ``False``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
 
 .. _cyclopts-complex-cli-admin-users-permissions-roles-create-role:
 
@@ -285,17 +173,3 @@ Create a new role template.
 
 ``--description STR``
     Role description. [Default: ``""``]
-
-**Global Options:**
-
-``--verbose, -v``
-    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
-
-``--quiet, -q, --no-quiet``
-    Suppress non-essential output. [Default: ``False``]
-
-``--log-level CHOICE``
-    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
-
-``--no-color, --no-no-color``
-    Disable colored output [Default: ``False``]
