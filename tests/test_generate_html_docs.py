@@ -522,3 +522,143 @@ def test_generate_html_docs_anchor_attributes_escaped():
     ids, hrefs = _parsed_ids_and_hrefs(docs)
     assert hrefs <= ids
     assert {'a"b<c-files', 'a"b<c-files-cp'} <= ids
+
+
+def test_generate_html_docs_non_recursive_toc_links_match_ids():
+    app = App(name="t")
+    s = App(name="s")
+    app.command(s)
+
+    @s.command
+    def c():
+        """Do c."""
+
+    docs = app.generate_docs(output_format="html", recursive=False)
+
+    ids = set(re.findall(r'id="([^"]+)"', docs))
+    hrefs = set(re.findall(r'href="#([^"]+)"', docs))
+    assert hrefs <= ids
+    assert 'href="#t-s"' in docs
+
+
+def test_generate_html_docs_include_hidden_omits_builtin_flags():
+    app = App(name="t", version="1.0")
+    sub = App(name="sub")
+    app.command(sub)
+
+    @sub.command
+    def bar():
+        """Bar it."""
+
+    docs = app.generate_docs(output_format="html", include_hidden=True)
+
+    ids = set(re.findall(r'id="([^"]+)"', docs))
+    hrefs = set(re.findall(r'href="#([^"]+)"', docs))
+    assert hrefs <= ids
+    assert "<code>--help</code>" not in docs
+    assert "<code>--version</code>" not in docs
+
+
+def test_generate_html_docs_colliding_anchor_ids_are_unique():
+    app = App(name="myapp")
+    files = App(name="files", help="File operations.")
+    app.command(files)
+
+    @files.command
+    def cp(src: str):
+        """Copy a file."""
+
+    @app.command(name="files-cp")
+    def files_cp(src: str):
+        """Copy files."""
+
+    @app.command(name="Build")
+    def build_upper():
+        """Build upper."""
+
+    @app.command(name="build")
+    def build_lower():
+        """Build lower."""
+
+    docs = app.generate_docs(output_format="html")
+
+    sections = re.findall(r'id="([^"]+)" class="command-title"><code>([^<]+)</code>', docs)
+    ids = [section_id for section_id, _ in sections]
+    assert len(ids) == len(set(ids))
+    title_by_id = dict(sections)
+    assert set(title_by_id.values()) == {
+        "myapp files",
+        "myapp files cp",
+        "myapp files-cp",
+        "myapp Build",
+        "myapp build",
+    }
+
+    links = re.findall(r'<a href="#([^"]+)"><code>([^<]+)</code></a>', docs)
+    assert links
+    for href, name in links:
+        assert title_by_id[href].split()[-1] == name
+
+    toc = docs.split('<div class="table-of-contents">', 1)[1].split("</div>", 1)[0]
+    assert sorted(re.findall(r'href="#([^"]+)"', toc)) == sorted(ids)
+
+
+def test_generate_html_docs_suffixed_anchor_ids_do_not_collide():
+    app = App(name="myapp")
+
+    @app.command(name="build_1")
+    def build_one():
+        """Build one."""
+
+    @app.command(name="build")
+    def build_lower():
+        """Build lower."""
+
+    @app.command(name="Build")
+    def build_upper():
+        """Build upper."""
+
+    docs = app.generate_docs(output_format="html")
+
+    ids = re.findall(r'id="([^"]+)" class="command-title"', docs)
+    assert len(ids) == 3
+    assert len(ids) == len(set(ids))
+    hrefs = set(re.findall(r'href="#([^"]+)"', docs)) - {"top"}
+    assert hrefs == set(ids)
+
+
+def test_generate_html_docs_non_recursive_ids_ignore_unrendered_sections():
+    app = App(name="myapp")
+    files = App(name="files")
+    app.command(files)
+
+    @files.command
+    def cp():
+        """Copy."""
+
+    @app.command(name="files-cp")
+    def files_cp():
+        """Copy files."""
+
+    docs = app.generate_docs(output_format="html", recursive=False)
+
+    assert 'id="myapp-files-cp" class="command-title"><code>myapp files-cp</code>' in docs
+    ids = set(re.findall(r'id="([^"]+)"', docs))
+    hrefs = set(re.findall(r'href="#([^"]+)"', docs)) - {"top"}
+    assert hrefs <= ids
+
+
+def test_generate_html_docs_non_recursive_does_not_import_nested_lazy_commands():
+    from cyclopts.command_spec import CommandSpec
+
+    app = App(name="myapp")
+    files = App(name="files")
+    app.command(files)
+    files.command("cyclopts_nonexistent_module_for_docs_test:func", name="lazy")
+
+    docs = app.generate_docs(output_format="html", recursive=False)
+
+    assert 'id="myapp-files"' in docs
+    spec = files._commands["lazy"]
+    assert isinstance(spec, CommandSpec)
+    assert not spec.is_resolved

@@ -10,9 +10,9 @@ from cyclopts.docs.base import (
     extract_usage,
     filter_help_entries,
     format_usage_line,
-    generate_anchor,
     iterate_commands,
     resolve_doc_root_name,
+    unique_anchor,
     usage_display_chain,
 )
 
@@ -20,28 +20,47 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
+def _build_anchor_map(app: "App", include_hidden: bool, recursive: bool) -> dict[tuple[str, ...], str]:
+    """Map the path of each command section that will be rendered to a unique anchor id, in document order.
+
+    Colliding anchors (e.g. ``files-cp`` vs ``files cp``) get ``_N`` suffixes.
+    """
+    anchors: dict[tuple[str, ...], str] = {}
+    used: set[str] = set()
+
+    def walk(app: "App", chain: tuple[str, ...]) -> None:
+        for name, subapp in iterate_commands(app, include_hidden):
+            sub_chain = (*chain, name)
+            anchors[sub_chain] = unique_anchor(" ".join(sub_chain), used)
+            if recursive:
+                walk(subapp, sub_chain)
+
+    walk(app, (resolve_doc_root_name(app),))
+    return anchors
+
+
 def _generate_html_toc(
     lines: list[str],
     app: "App",
     include_hidden: bool,
-    app_name: str,
-    prefix: str,
+    anchors: dict[tuple[str, ...], str],
+    chain: tuple[str, ...],
     depth: int = 0,
+    recursive: bool = True,
 ) -> None:
     """Recursively generate HTML table of contents."""
     if not app._commands:
         return
 
     for name, subapp in iterate_commands(app, include_hidden):
-        display_name = f"{prefix}{name}" if prefix else name
-        full_path = generate_anchor(f"{app_name} {display_name}")
+        sub_chain = (*chain, name)
 
         indent = "  " * (depth + 1)
-        lines.append(f'{indent}<li><a href="#{escape_html(full_path)}"><code>{escape_html(name)}</code></a>')
+        lines.append(f'{indent}<li><a href="#{escape_html(anchors[sub_chain])}"><code>{escape_html(name)}</code></a>')
 
-        if subapp._commands:
+        if recursive and subapp._commands:
             lines.append(f"{indent}  <ul>")
-            _generate_html_toc(lines, subapp, include_hidden, app_name, f"{display_name} ", depth + 1)
+            _generate_html_toc(lines, subapp, include_hidden, anchors, sub_chain, depth + 1)
             lines.append(f"{indent}  </ul>")
 
         lines.append(f"{indent}</li>")
@@ -394,6 +413,7 @@ def generate_html_docs(
             generate_toc=generate_toc,
             flatten_commands=flatten_commands,
             usage_name=usage_name,
+            anchors=_build_anchor_map(app, include_hidden, recursive),
         )
 
 
@@ -411,8 +431,12 @@ def _generate_html_docs(
     generate_toc: bool,
     flatten_commands: bool,
     usage_name: str | None,
+    anchors: dict[tuple[str, ...], str],
 ) -> str:
-    """Render the command at ``command_path``; must be called inside :func:`command_context`."""
+    """Render the command at ``command_path``; must be called inside :func:`command_context`.
+
+    ``anchors`` is the one anchor map shared by every section of the document.
+    """
     from cyclopts.help.formatters.html import HtmlFormatter
 
     app = execution_path[-1]
@@ -439,8 +463,7 @@ def _generate_html_docs(
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
         full_command = " ".join(command_chain)
-        # Create anchor-friendly ID using shared logic
-        anchor_id = generate_anchor(full_command)
+        anchor_id = anchors[tuple(command_chain)]
         effective_level = min(heading_level, max_heading_level)
         lines.append('<section class="command-section">')
         lines.append(
@@ -460,7 +483,7 @@ def _generate_html_docs(
         lines.append('<div class="table-of-contents">')
         lines.append("<h2>Table of Contents</h2>")
         lines.append("<ul>")
-        _generate_html_toc(lines, app, include_hidden, app_name, "", 0)
+        _generate_html_toc(lines, app, include_hidden, anchors, (app_name,), 0, recursive=recursive)
         lines.append("</ul>")
         lines.append("</div>")
 
@@ -490,14 +513,13 @@ def _generate_html_docs(
         include_hidden=include_hidden,
         app_name=app_name,
         command_chain=command_chain,
+        anchors=anchors,
     )
     formatter.reset()
     for group, panel in help_panels_with_groups:
         if not include_hidden and group and not group.show:
             continue
-        # Filter out entries based on include_hidden
-        if not include_hidden:
-            panel.entries = filter_help_entries(app, panel, include_hidden)
+        panel.entries = filter_help_entries(app, panel)
         if panel.entries:  # Only render non-empty panels
             formatter(None, None, panel)
 
@@ -520,8 +542,7 @@ def _generate_html_docs(
 
             # Generate subcommand documentation
             lines.append('<section class="command-section">')
-            # Create anchor-friendly ID
-            anchor_id = generate_anchor(" ".join(sub_command_chain))
+            anchor_id = anchors[tuple(sub_command_chain)]
             effective_sub_level = min(sub_heading_level, max_heading_level)
             lines.append(
                 f'<h{effective_sub_level} id="{escape_html(anchor_id)}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{effective_sub_level}>'
@@ -574,12 +595,12 @@ def _generate_html_docs(
                         include_hidden=include_hidden,
                         app_name=app_name,
                         command_chain=sub_command_chain,
+                        anchors=anchors,
                     )
                     for sub_group, sub_panel in sub_panels:
                         if not include_hidden and sub_group and not sub_group.show:
                             continue
-                        if not include_hidden:
-                            sub_panel.entries = filter_help_entries(subapp, sub_panel, include_hidden)
+                        sub_panel.entries = filter_help_entries(subapp, sub_panel)
                         if sub_panel.entries:
                             sub_formatter(None, None, sub_panel)
 
@@ -596,7 +617,7 @@ def _generate_html_docs(
                             nested_heading_level = heading_level
                         else:
                             nested_heading_level = heading_level + 2
-                        # Set up context for nested_app, then recurse
+                        # Set up context for the nested command, then recurse
                         with command_context(root, nested_command_path) as nested_execution_path:
                             nested_docs = _generate_html_docs(
                                 root,
@@ -611,6 +632,7 @@ def _generate_html_docs(
                                 generate_toc=False,  # No TOC for nested commands
                                 flatten_commands=flatten_commands,
                                 usage_name=usage_name,
+                                anchors=anchors,
                             )
                         lines.append(nested_docs)
 

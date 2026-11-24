@@ -153,9 +153,6 @@ def test_generate_docs_non_recursive():
 
     actual = app.generate_docs(recursive=False)
 
-    # Note: In non-recursive mode, subcommands like 'migrate' don't get headings,
-    # so they appear in the ToC but the link is broken. This is a known limitation.
-    # The current implementation always collects ToC entries recursively.
     # Note: The 'db' subcommand doesn't show usage because it has no default_command.
     expected = dedent(
         """\
@@ -170,7 +167,6 @@ def test_generate_docs_non_recursive():
         ## Table of Contents
 
         - [`db`](#myapp-db)
-            - [`migrate`](#myapp-db-migrate)
 
         **Commands**:
 
@@ -949,6 +945,28 @@ def test_generate_docs_toc_anchor_collisions():
     assert "### myapp sub1 delete" in docs
     assert "### myapp sub2 create" in docs
     assert "### myapp sub2 delete" in docs
+
+
+def test_generate_docs_toc_suffixed_anchors_do_not_collide():
+    app = App(name="myapp")
+
+    @app.command(name="build_1")
+    def build_one():
+        """Build one."""
+
+    @app.command(name="build")
+    def build_lower():
+        """Build lower."""
+
+    @app.command(name="Build")
+    def build_upper():
+        """Build upper."""
+
+    docs = app.generate_docs()
+
+    assert "- [`build_1`](#myapp-build_1)" in docs
+    assert "- [`build`](#myapp-build)" in docs
+    assert "- [`Build`](#myapp-build_2)" in docs
 
 
 def test_generate_docs_nested_command_list_hyperlinks():
