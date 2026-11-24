@@ -246,6 +246,23 @@ def _combined_meta_command_mapping(
     return command_mapping
 
 
+def _env_command_chain(app: "App", command_chain: Sequence[str], execution_path: Sequence["App"]) -> tuple[str, ...]:
+    """Command chain that ``config.Env`` sees when ``app`` runs.
+
+    A meta app runs before command dispatch, so it sees only the commands leading to the
+    app it wraps. ``execution_path`` holds one non-meta app per ``command_chain`` prefix:
+    the entry app, then the app of each command.
+    """
+    owner = app
+    while owner._meta_parent is not None:
+        owner = owner._meta_parent
+    command_apps = [x for x in execution_path if x._meta_parent is None]
+    for depth, command_app in enumerate(command_apps):
+        if command_app is owner:
+            return tuple(command_chain[:depth])
+    return tuple(command_chain)
+
+
 def _walk_metas(app: "App"):
     """Typically the result looks like [app] or [meta_app, app].
 
@@ -1294,23 +1311,27 @@ class App:
         """
         apps = []
 
-        # For the last app in execution path, include it and its meta
         if execution_path:
             last_app = execution_path[-1]
-            # Include all metas from walk_metas (includes the app itself)
+            frame = last_app.app_stack.stack[-1] if last_app.app_stack.stack else [last_app]
+            entry_app = frame[0]
+
+            # A meta app contributes only if it runs: it is on the execution path (e.g. a meta
+            # registered as a command), or it is the entry app's meta (the launcher). Command
+            # dispatch never runs the meta of an intermediate or final command app.
+            def runs(meta: "App") -> bool:
+                return meta._meta_parent is entry_app or any(meta is x for x in execution_path)
+
             for app in _walk_metas(last_app):
-                if app not in apps:
+                if (app is last_app or last_app is entry_app or runs(app)) and app not in apps:
                     apps.append(app)
 
-            # Include parent metas from the stack if they exist
-            if last_app.app_stack.stack:
-                for app in last_app.app_stack.stack[-1]:
-                    # Include the app's meta if it exists and isn't already in the list
-                    if app._meta and app._meta not in apps:
-                        # Check if last_app is a command from the meta app
-                        is_meta_command = last_app in app._meta._commands.values()
-                        if not is_meta_command:
-                            apps.append(app._meta)
+            for app in frame:
+                if app._meta and app._meta not in apps and runs(app._meta):
+                    # Check if last_app is a command from the meta app
+                    is_meta_command = last_app in app._meta._commands.values()
+                    if not is_meta_command:
+                        apps.append(app._meta)
 
             if last_app.app_stack.resolve("parse_mode") == "strict":
                 # Meta apps whose _meta_parent is the command itself are retained.
@@ -2461,7 +2482,7 @@ class App:
             description = format_doc(executing_app, help_format)
 
             # Prepare panels with their associated groups
-            help_panels_with_groups = self._assemble_help_panels(tokens, help_format)
+            help_panels_with_groups = self._assemble_help_panels(command_chain, apps, help_format)
 
             # Render prologue
             if help_prologue := executing_app.app_stack.resolve("help_prologue"):
@@ -2502,9 +2523,23 @@ class App:
 
     def _assemble_help_panels(
         self,
-        tokens: None | str | Iterable[str],
+        command_chain: Sequence[str],
+        execution_path: Sequence["App"],
         help_format,
     ) -> list[tuple[Optional["Group"], "HelpPanel"]]:
+        """Assemble the help panels for a command.
+
+        Must be called inside ``self.app_stack(execution_path)``.
+
+        Parameters
+        ----------
+        command_chain: Sequence[str]
+            Command tokens leading from this app to the command, from :meth:`parse_commands`.
+        execution_path: Sequence[App]
+            The execution path for ``command_chain``, from :meth:`parse_commands`.
+        help_format
+            Help format to fall back on.
+        """
         from rich.console import Group as RichGroup
         from rich.console import NewLine
 
@@ -2515,7 +2550,6 @@ class App:
             format_command_entries,
         )
 
-        command_chain, execution_path, _ = self.parse_commands(tokens)
         command_app = execution_path[-1]
 
         help_format = command_app.app_stack.resolve("help_format", help_format, DEFAULT_FORMAT)
@@ -2564,7 +2598,9 @@ class App:
             env_configs = tuple(x for x in configs if isinstance(x, Env) and x.show)
             for argument in argument_collection:
                 for env_config in env_configs:
-                    env_var = env_config._convert_argument(command_chain, argument)
+                    env_var = env_config._convert_argument(
+                        _env_command_chain(subapp, command_chain, execution_path), argument
+                    )
                     assert isinstance(argument.parameter.env_var, tuple)
                     argument.parameter = Parameter.combine(
                         argument.parameter,

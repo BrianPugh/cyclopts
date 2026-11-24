@@ -1189,3 +1189,39 @@ def test_generate_docs_unnamed_app_uses_module_name_not_argv(importable_tmp_path
     md = app.generate_docs(output_format="markdown")
     assert "sphinx-build" not in md
     assert "docstool COMMAND" in md
+
+
+@pytest.mark.parametrize("fmt", ["markdown", "rst", "html"])
+def test_generate_docs_omits_intermediate_meta_options(fmt):
+    """Command dispatch never runs an intermediate app's meta, so its options are not documented."""
+    app = App(name="demo")
+    db = App(name="db")
+    app.command(db)
+
+    @db.command
+    def migrate(steps: int = 1):
+        pass
+
+    @db.meta.default
+    def db_meta(*tokens: Annotated[str, Parameter(show=False)], url: str = ""):
+        pass
+
+    actual = app.generate_docs(output_format=fmt)
+    assert "migrate" in actual
+    assert "--url" not in actual
+
+
+@pytest.mark.parametrize("fmt", ["markdown", "rst", "html"])
+def test_generate_docs_multi_word_root_name_usage(fmt):
+    """A root name with spaces appears once at the start of every usage line."""
+    app = App(name="python -m demo")
+
+    @app.command
+    def serve(*, port: int):
+        pass
+
+    actual = app.generate_docs(output_format=fmt)
+    assert "python -m demo COMMAND" in actual
+    assert "python -m demo serve --port INT" in actual
+    assert "-m demo -m demo" not in actual
+    assert "serve demo serve" not in actual

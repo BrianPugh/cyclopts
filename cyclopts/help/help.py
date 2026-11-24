@@ -334,6 +334,7 @@ def format_usage(
     execution_path: Sequence["App"] | None = None,
     *,
     show_metavar: bool | None = None,
+    name: str | None = None,
 ):
     """Build the ``Usage:`` line.
 
@@ -343,6 +344,9 @@ def format_usage(
         Force value placeholders on or off. :obj:`None` follows each parameter's
         rendering formatter (its group's ``help_formatter``, else the app's), so the
         usage line agrees with the panel rows.
+    name : str | None
+        Program name to start the line with, in place of the app's name.
+        An empty string omits it.
     """
     from rich.text import Text
 
@@ -350,13 +354,16 @@ def format_usage(
 
     # If we're at the root level (no command chain), the app has a default_command,
     # and no explicit name was set, derive the name of the running program
-    if not command_chain and app.default_command and not app._name:
+    if name is not None:
+        app_name = name
+    elif not command_chain and app.default_command and not app._name:
         # Use the same logic as in App.name property for apps without default_command
         app_name = _default_app_name()
     else:
         app_name = app.name[0]
 
-    usage.append(app_name)
+    if app_name:
+        usage.append(app_name)
     usage.extend(command_chain)
 
     for command in command_chain:

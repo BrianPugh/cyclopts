@@ -627,21 +627,6 @@ def test_generate_html_docs_suffixed_anchor_ids_do_not_collide():
     assert hrefs == set(ids)
 
 
-def test_generate_html_docs_explicit_root_command_chain():
-    from cyclopts.docs.html import generate_html_docs
-
-    app = App(name="myapp")
-
-    @app.command
-    def foo():
-        """Foo it."""
-
-    docs = generate_html_docs(app, command_chain=["myapp"])
-
-    assert 'id="myapp" class="command-title"' in docs
-    assert 'id="myapp-foo" class="command-title"' in docs
-
-
 def test_generate_html_docs_non_recursive_ids_ignore_unrendered_sections():
     app = App(name="myapp")
     files = App(name="files")

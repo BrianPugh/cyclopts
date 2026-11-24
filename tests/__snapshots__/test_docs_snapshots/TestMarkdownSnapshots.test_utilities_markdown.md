@@ -23,7 +23,7 @@ Complex CLI application for comprehensive documentation testing.
 ### complex-cli version
 
 ```console
-complex-cli version
+complex-cli version [OPTIONS]
 ```
 
 Show version information.
@@ -40,7 +40,7 @@ Displays the application version and system information.
 ### complex-cli info
 
 ```console
-complex-cli info [ARGS]
+complex-cli info [OPTIONS] [ARGS]
 ```
 
 Show application information.
@@ -85,10 +85,17 @@ Demonstrates attrs class support for CLI parameters.
 * `--config.max-size INT`: Maximum cache size in MB. *[default: 1024]*
 * `--config.compression, --config.no-compression`: Enable compression. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 #### complex-cli cache clear
 
 ```console
-complex-cli cache clear [ARGS]
+complex-cli cache clear [OPTIONS] [ARGS]
 ```
 
 Clear cache entries.
@@ -98,10 +105,17 @@ Clear cache entries.
 * `PATTERN, --pattern`: Pattern to match cache keys. *[default: *]*
 * `DRY-RUN, --dry-run, --no-dry-run`: Show what would be cleared without actually clearing. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 #### complex-cli cache stats
 
 ```console
-complex-cli cache stats [ARGS]
+complex-cli cache stats [OPTIONS] [ARGS]
 ```
 
 Show cache statistics.
@@ -111,10 +125,17 @@ Show cache statistics.
 * `DETAILED, --detailed, --no-detailed`: Show detailed statistics. *[default: False]*
 * `FORMAT, --format`: Output format. *[choices: json, yaml, table, csv]* *[default: table]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli complex-types
 
 ```console
-complex-cli complex-types [ARGS]
+complex-cli complex-types [OPTIONS] [ARGS]
 ```
 
 Demonstrate complex type annotations.

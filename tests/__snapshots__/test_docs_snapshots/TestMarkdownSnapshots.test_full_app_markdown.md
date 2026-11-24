@@ -68,7 +68,7 @@ Complex CLI application for comprehensive documentation testing.
 ## complex-cli version
 
 ```console
-complex-cli version
+complex-cli version [OPTIONS]
 ```
 
 Show version information.
@@ -85,7 +85,7 @@ Displays the application version and system information.
 ## complex-cli info
 
 ```console
-complex-cli info [ARGS]
+complex-cli info [OPTIONS] [ARGS]
 ```
 
 Show application information.
@@ -127,6 +127,13 @@ Show system status.
 * `--watch, -w`: Continuously watch status. *[default: False]*
 * `--interval INT`: Refresh interval in seconds when watching. *[default: 5]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli admin config-cmd
 
 ```console
@@ -144,6 +151,13 @@ Configure database settings.
 * `--ssl-mode CHOICE`: SSL connection mode. *[choices: disable, prefer, require, verify-full]* *[default: prefer]*
 * `--pool-size INT`: Connection pool size. *[default: 10]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli admin users
 
 User management commands.
@@ -155,20 +169,34 @@ User management commands.
 * [`list-users`](#complex-cli-admin-users-list-users): List all users.
 * [`permissions`](#complex-cli-admin-users-permissions): Permission management for users.
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 #### complex-cli admin users list-users
 
 ```console
-complex-cli admin users list-users [ARGS]
+complex-cli admin users list-users [OPTIONS] [ARGS]
 ```
 
 List all users.
 
 **Parameters**:
 
-* `ACTIVE-ONLY, --active-only, --no-active-only`: Show only active users. *[default: False]*
+* `ACTIVE-ONLY, --active-only`: Show only active users. *[default: False]*
 * `ROLE, --role`: Filter by user role. *[choices: admin, user, guest]*
 * `LIMIT, --limit`: Maximum number of users to display. *[default: 100]*
 * `FORMAT, --format`: Output format. *[choices: json, yaml, table, csv]* *[default: table]*
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 #### complex-cli admin users create
 
@@ -186,12 +214,19 @@ Create a new user.
 **Parameters**:
 
 * `--role CHOICE`: User role assignment. *[choices: admin, user, guest]* *[default: user]*
-* `--permissions.none, --permissions.no-none`: Initial permission flags. *[default: False]*
-* `--permissions.read, --permissions.no-read`: Initial permission flags. *[default: False]*
-* `--permissions.write, --permissions.no-write`: Initial permission flags. *[default: False]*
-* `--permissions.execute, --permissions.no-execute`: Initial permission flags. *[default: False]*
-* `--permissions.admin, --permissions.no-admin`: Initial permission flags. *[default: False]*
-* `--send-welcome, --no-send-welcome`: Send welcome email after creation. *[default: True]*
+* `--permissions.none`: Initial permission flags. *[default: False]*
+* `--permissions.read`: Initial permission flags. *[default: False]*
+* `--permissions.write`: Initial permission flags. *[default: False]*
+* `--permissions.execute`: Initial permission flags. *[default: False]*
+* `--permissions.admin`: Initial permission flags. *[default: False]*
+* `--send-welcome`: Send welcome email after creation. *[default: True]*
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 #### complex-cli admin users delete
 
@@ -207,12 +242,26 @@ Delete a user.
 
 **Parameters**:
 
-* `--force, -f, --no-force`: Skip confirmation prompt. *[default: False]*
-* `--backup, --no-backup`: Create backup before deletion. *[default: True]*
+* `--force, -f`: Skip confirmation prompt. *[default: False]*
+* `--backup`: Create backup before deletion. *[default: True]*
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 #### complex-cli admin users permissions
 
 Permission management for users.
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ##### complex-cli admin users permissions grant
 
@@ -232,10 +281,17 @@ Grant permissions to a user.
 * `--resource STR`: Specific resource to grant access to.
 * `--expires STR`: Expiration date (ISO format).
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ##### complex-cli admin users permissions revoke
 
 ```console
-complex-cli admin users permissions revoke USERNAME PERMISSION
+complex-cli admin users permissions revoke [OPTIONS] USERNAME PERMISSION
 ```
 
 Revoke permissions from a user.
@@ -245,10 +301,17 @@ Revoke permissions from a user.
 * `USERNAME`: Target username. **[required]**
 * `PERMISSION`: Permission flags to revoke. **[required]** *[choices: none, read, write, execute, admin]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ##### complex-cli admin users permissions audit
 
 ```console
-complex-cli admin users permissions audit [ARGS]
+complex-cli admin users permissions audit [OPTIONS] [ARGS]
 ```
 
 Audit permission changes.
@@ -259,6 +322,13 @@ Audit permission changes.
 * `DAYS, --days`: Number of days to look back. *[default: 30]*
 * `FORMAT, --format`: Output format for audit report. *[choices: json, yaml, table, csv]* *[default: table]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ##### complex-cli admin users permissions roles
 
 Role template management.
@@ -268,17 +338,31 @@ Role template management.
 * [`create-role`](#complex-cli-admin-users-permissions-roles-create-role): Create a new role template.
 * [`list-roles`](#complex-cli-admin-users-permissions-roles-list-roles): List all role templates.
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ###### complex-cli admin users permissions roles list-roles
 
 ```console
-complex-cli admin users permissions roles list-roles [ARGS]
+complex-cli admin users permissions roles list-roles [OPTIONS] [ARGS]
 ```
 
 List all role templates.
 
 **Parameters**:
 
-* `INCLUDE-SYSTEM, --include-system, --no-include-system`: Include built-in system roles. *[default: False]*
+* `INCLUDE-SYSTEM, --include-system`: Include built-in system roles. *[default: False]*
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ###### complex-cli admin users permissions roles create-role
 
@@ -294,12 +378,19 @@ Create a new role template.
 
 **Parameters**:
 
-* `--permissions.none, --permissions.no-none`: Default permissions for this role. *[default: False]*
-* `--permissions.read, --permissions.no-read`: Default permissions for this role. *[default: False]*
-* `--permissions.write, --permissions.no-write`: Default permissions for this role. *[default: False]*
-* `--permissions.execute, --permissions.no-execute`: Default permissions for this role. *[default: False]*
-* `--permissions.admin, --permissions.no-admin`: Default permissions for this role. *[default: False]*
+* `--permissions.none`: Default permissions for this role. *[default: False]*
+* `--permissions.read`: Default permissions for this role. *[default: False]*
+* `--permissions.write`: Default permissions for this role. *[default: False]*
+* `--permissions.execute`: Default permissions for this role. *[default: False]*
+* `--permissions.admin`: Default permissions for this role. *[default: False]*
 * `--description STR`: Role description. *[default: ""]*
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ## complex-cli data
 
@@ -339,6 +430,13 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 * `--cache-dir PATH`: Cache directory for intermediate files.
 * `--log-dir PATH`: Directory for log files. *[default: logs]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli data pipeline
 
 ```console
@@ -364,6 +462,13 @@ PathConfig and ProcessingConfig).
 * `--output-formats CHOICE..., --empty-output-formats`: List of output formats to generate. *[choices: json, yaml, table, csv]* *[default: [json]]*
 * `--dry-run, --no-dry-run`: If True, simulate execution without making changes. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli data validate
 
 ```console
@@ -381,6 +486,13 @@ Validate data files against schema.
 * `--strict, --no-strict`: Enable strict validation mode. *[default: False]*
 * `--schema-file PATH`: Custom schema file (must exist).
 * `--ignore-patterns STR..., --empty-ignore-patterns`: Patterns to ignore during validation.
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ## complex-cli server
 
@@ -415,6 +527,13 @@ Demonstrates Pydantic model support for CLI parameters.
 * `--auth.refresh-enabled, --auth.no-refresh-enabled`: Enable token refresh. *[default: True]*
 * `--auth.allowed-origins STR..., --auth.empty-allowed-origins`: List of allowed CORS origins. *[default: ['*']]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli server stop
 
 ```console
@@ -429,10 +548,17 @@ Stop the server.
 * `--timeout INT`: Shutdown timeout in seconds. *[default: 30]*
 * `--force, -f, --no-force`: Force immediate shutdown. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli server restart
 
 ```console
-complex-cli server restart [ARGS]
+complex-cli server restart [OPTIONS] [ARGS]
 ```
 
 Restart the server.
@@ -441,6 +567,13 @@ Restart the server.
 
 * `ROLLING, --rolling, --no-rolling`: Perform rolling restart (zero downtime). *[default: False]*
 * `DELAY, --delay`: Delay between worker restarts in seconds. *[default: 5]*
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ## complex-cli cache
 
@@ -470,10 +603,17 @@ Demonstrates attrs class support for CLI parameters.
 * `--config.max-size INT`: Maximum cache size in MB. *[default: 1024]*
 * `--config.compression, --config.no-compression`: Enable compression. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli cache clear
 
 ```console
-complex-cli cache clear [ARGS]
+complex-cli cache clear [OPTIONS] [ARGS]
 ```
 
 Clear cache entries.
@@ -483,10 +623,17 @@ Clear cache entries.
 * `PATTERN, --pattern`: Pattern to match cache keys. *[default: *]*
 * `DRY-RUN, --dry-run, --no-dry-run`: Show what would be cleared without actually clearing. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli cache stats
 
 ```console
-complex-cli cache stats [ARGS]
+complex-cli cache stats [OPTIONS] [ARGS]
 ```
 
 Show cache statistics.
@@ -496,10 +643,17 @@ Show cache statistics.
 * `DETAILED, --detailed, --no-detailed`: Show detailed statistics. *[default: False]*
 * `FORMAT, --format`: Output format. *[choices: json, yaml, table, csv]* *[default: table]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ## complex-cli complex-types
 
 ```console
-complex-cli complex-types [ARGS]
+complex-cli complex-types [OPTIONS] [ARGS]
 ```
 
 Demonstrate complex type annotations.
@@ -526,7 +680,7 @@ documentation system needs to handle correctly.
 ## complex-cli numpy-style
 
 ```console
-complex-cli numpy-style NAME [ARGS]
+complex-cli numpy-style [OPTIONS] NAME [ARGS]
 ```
 
 Command with NumPy-style docstring.
@@ -549,7 +703,7 @@ default for cyclopts.
 ## complex-cli google-style
 
 ```console
-complex-cli google-style NAME [ARGS]
+complex-cli google-style [OPTIONS] NAME [ARGS]
 ```
 
 Command with Google-style docstring.
@@ -571,7 +725,7 @@ This command demonstrates Google docstring format.
 ## complex-cli sphinx-style
 
 ```console
-complex-cli sphinx-style NAME [ARGS]
+complex-cli sphinx-style [OPTIONS] NAME [ARGS]
 ```
 
 Command with Sphinx-style docstring.
@@ -593,7 +747,7 @@ This command demonstrates Sphinx/reST docstring format.
 ## complex-cli secret-feature
 
 ```console
-complex-cli secret-feature [ARGS]
+complex-cli secret-feature [OPTIONS] [ARGS]
 ```
 
 Secret feature command.

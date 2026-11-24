@@ -977,4 +977,4 @@ def secret_feature(
 
 
 if __name__ == "__main__":
-    app()
+    app.meta()

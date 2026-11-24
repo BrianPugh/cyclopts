@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from cyclopts._markup import escape_html, extract_text
 from cyclopts.docs.base import (
     build_command_chain,
+    command_context,
     extract_description,
     extract_usage,
     filter_help_entries,
@@ -19,9 +20,7 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
-def _build_anchor_map(
-    app: "App", include_hidden: bool, recursive: bool, command_chain: list[str]
-) -> dict[tuple[str, ...], str]:
+def _build_anchor_map(app: "App", include_hidden: bool, recursive: bool) -> dict[tuple[str, ...], str]:
     """Map the path of each command section that will be rendered to a unique anchor id, in document order.
 
     Colliding anchors (e.g. ``files-cp`` vs ``files cp``) get ``_N`` suffixes.
@@ -36,12 +35,7 @@ def _build_anchor_map(
             if recursive:
                 walk(subapp, sub_chain)
 
-    if command_chain:
-        root = tuple(command_chain)
-        anchors[root] = unique_anchor(" ".join(root), used)
-    else:
-        root = (resolve_doc_root_name(app),)
-    walk(app, root)
+    walk(app, (resolve_doc_root_name(app),))
     return anchors
 
 
@@ -354,13 +348,13 @@ a:hover {
 
 def generate_html_docs(
     app: "App",
+    *,
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
     max_heading_level: int = 6,
     standalone: bool = True,
     custom_css: str | None = None,
-    command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
     usage_name: str | None = None,
@@ -389,9 +383,6 @@ def generate_html_docs(
         If False, generate only the body content. Default is True.
     custom_css : str
         Custom CSS to use instead of the default styles.
-    command_chain : list[str]
-        Internal parameter to track command hierarchy.
-        Default is None.
     generate_toc : bool
         If True, generate a table of contents for multi-command apps.
         Default is True.
@@ -408,26 +399,28 @@ def generate_html_docs(
     str
         The generated HTML documentation.
     """
-    if command_chain is None:
-        command_chain = []
-    return _generate_html_docs(
-        app,
-        recursive=recursive,
-        include_hidden=include_hidden,
-        heading_level=heading_level,
-        max_heading_level=max_heading_level,
-        standalone=standalone,
-        custom_css=custom_css,
-        command_chain=command_chain,
-        generate_toc=generate_toc,
-        flatten_commands=flatten_commands,
-        usage_name=usage_name,
-        anchors=_build_anchor_map(app, include_hidden, recursive, command_chain),
-    )
+    with command_context(app, ()) as execution_path:
+        return _generate_html_docs(
+            app,
+            (),
+            execution_path,
+            recursive=recursive,
+            include_hidden=include_hidden,
+            heading_level=heading_level,
+            max_heading_level=max_heading_level,
+            standalone=standalone,
+            custom_css=custom_css,
+            generate_toc=generate_toc,
+            flatten_commands=flatten_commands,
+            usage_name=usage_name,
+            anchors=_build_anchor_map(app, include_hidden, recursive),
+        )
 
 
 def _generate_html_docs(
-    app: "App",
+    root: "App",
+    command_path: tuple[str, ...],
+    execution_path: tuple["App", ...],
     *,
     recursive: bool,
     include_hidden: bool,
@@ -435,14 +428,19 @@ def _generate_html_docs(
     max_heading_level: int,
     standalone: bool,
     custom_css: str | None,
-    command_chain: list[str],
     generate_toc: bool,
     flatten_commands: bool,
     usage_name: str | None,
     anchors: dict[tuple[str, ...], str],
 ) -> str:
-    """Recursive implementation of :func:`generate_html_docs` sharing one anchor map."""
+    """Render the command at ``command_path``; must be called inside :func:`command_context`.
+
+    ``anchors`` is the one anchor map shared by every section of the document.
+    """
     from cyclopts.help.formatters.html import HtmlFormatter
+
+    app = execution_path[-1]
+    command_chain = [resolve_doc_root_name(root), *command_path] if command_path else []
 
     lines = []
 
@@ -490,7 +488,7 @@ def _generate_html_docs(
         lines.append("</div>")
 
     # Add usage section if not suppressed
-    usage = extract_usage(app)
+    usage = extract_usage(root, command_path, execution_path, usage_name)
     if usage:
         usage_level = min(heading_level + 1, max_heading_level)
         lines.append(f"<h{usage_level}>Usage</h{usage_level}>")
@@ -499,17 +497,15 @@ def _generate_html_docs(
             usage_text = usage
         else:
             usage_text = extract_text(usage, None)
-        # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
-        root_name = app_name if app.usage is None else None
-        display_chain = usage_display_chain(command_chain, usage_name, root_name)
+        # A generated usage already names the command; a custom ``app.usage`` gets its
+        # first word replaced by the command chain.
+        display_chain = [] if app.usage is None else usage_display_chain(command_chain, usage_name)
         usage_text = format_usage_line(usage_text, display_chain, prefix="$")
         lines.append(f'<pre class="usage">{escape_html(usage_text)}</pre>')
         lines.append("</div>")
 
     # Get help panels for the current app
-    # Use app_stack context - if caller set up parent context, it will be stacked
-    with app.app_stack([app]):
-        help_panels_with_groups = app._assemble_help_panels([], help_format)
+    help_panels_with_groups = root._assemble_help_panels(command_path, execution_path, help_format)
 
     # Render panels
     formatter = HtmlFormatter(
@@ -553,8 +549,8 @@ def _generate_html_docs(
             )
 
             # Get subapp help
-            # Include parent app in the stack so default_parameter is properly inherited
-            with subapp.app_stack([app, subapp]):
+            sub_command_path = (*command_path, name)
+            with command_context(root, sub_command_path) as sub_execution_path:
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 sub_description = extract_description(subapp, sub_help_format)
                 if sub_description:
@@ -563,7 +559,7 @@ def _generate_html_docs(
                         lines.append(f'<div class="command-description">{escape_html(sub_desc_text)}</div>')
 
                 # Generate usage for subcommand
-                sub_usage = extract_usage(subapp)
+                sub_usage = extract_usage(root, sub_command_path, sub_execution_path, usage_name)
                 if sub_usage:
                     if flatten_commands:
                         usage_heading_level = heading_level + 1
@@ -576,7 +572,9 @@ def _generate_html_docs(
                         sub_usage_text = sub_usage
                     else:
                         sub_usage_text = extract_text(sub_usage, None)
-                    sub_display_chain = usage_display_chain(sub_command_chain, usage_name)
+                    sub_display_chain = (
+                        [] if subapp.usage is None else usage_display_chain(sub_command_chain, usage_name)
+                    )
                     sub_usage_text = format_usage_line(sub_usage_text, sub_display_chain, prefix="$")
                     lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")
@@ -584,7 +582,7 @@ def _generate_html_docs(
                 # Only show subcommand panels if we're in recursive mode
                 if recursive:
                     # Get help panels for subcommand
-                    sub_panels = subapp._assemble_help_panels([], sub_help_format)
+                    sub_panels = root._assemble_help_panels(sub_command_path, sub_execution_path, sub_help_format)
 
                     # Render subcommand panels
                     if flatten_commands:
@@ -612,26 +610,25 @@ def _generate_html_docs(
 
                 # Recursively handle nested subcommands
                 if recursive and subapp._commands:
-                    for nested_name, nested_app in iterate_commands(subapp, include_hidden):
-                        # Build nested command chain
-                        nested_chain = build_command_chain(sub_command_chain, nested_name, app_name)
+                    for nested_name, _ in iterate_commands(subapp, include_hidden):
+                        nested_command_path = (*sub_command_path, nested_name)
                         # Determine heading level for nested commands
                         if flatten_commands:
                             nested_heading_level = heading_level
                         else:
                             nested_heading_level = heading_level + 2
-                        # Set up context for nested_app, then recurse
-                        # The recursive call's app_stack([app]) will stack on top of this
-                        with nested_app.app_stack([subapp, nested_app]):
+                        # Set up context for the nested command, then recurse
+                        with command_context(root, nested_command_path) as nested_execution_path:
                             nested_docs = _generate_html_docs(
-                                nested_app,
+                                root,
+                                nested_command_path,
+                                nested_execution_path,
                                 recursive=recursive,
                                 include_hidden=include_hidden,
                                 heading_level=nested_heading_level,
                                 max_heading_level=max_heading_level,
                                 standalone=False,  # Not standalone for nested
                                 custom_css=None,
-                                command_chain=nested_chain,  # Pass the command chain
                                 generate_toc=False,  # No TOC for nested commands
                                 flatten_commands=flatten_commands,
                                 usage_name=usage_name,
