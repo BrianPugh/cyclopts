@@ -318,20 +318,12 @@ def build_command_chain(command_chain: list[str] | None, command_name: str, app_
         return [app_name, command_name]
 
 
-def usage_display_chain(command_chain: list[str], usage_name: str | None, root_name: str | None = None) -> list[str]:
-    """Return the display command chain for a ``Usage:`` line.
+def usage_display_chain(command_chain: list[str], usage_name: str | None) -> list[str]:
+    """Return the display command chain for a custom ``App.usage`` line.
 
-    Applies, in order of precedence:
-
-    - an explicit ``usage_name`` override (replaces the root token; an empty
-      string drops it entirely so downstream formatters never see an empty
-      element, which would render as stray whitespace);
-    - otherwise, at the root (empty ``command_chain``) with no override,
-      ``root_name`` substituted for the app-name token that ``format_usage``
-      embedded. That token comes from ``App.name``, which may be the
-      ``Path(sys.argv[0]).name`` fallback (e.g. ``sphinx-build`` during a docs
-      build); pass the :func:`resolve_doc_root_name` result so the Usage line
-      matches the title and anchors. See #910.
+    An explicit ``usage_name`` replaces the root token; an empty string drops it
+    entirely so downstream formatters never see an empty element, which would
+    render as stray whitespace.
 
     Parameters
     ----------
@@ -340,12 +332,6 @@ def usage_display_chain(command_chain: list[str], usage_name: str | None, root_n
     usage_name : str | None
         Explicit Usage: line root override, or ``None`` for the default.
         An empty string drops the root token entirely.
-    root_name : str | None
-        The resolved documentation name to substitute at the root when there is
-        no ``usage_name`` override. Defaults to ``None``, which leaves the root
-        usage text untouched -- required for a user-provided custom ``app.usage``
-        string (whose first token is not necessarily the app name and must not be
-        rewritten) and for subcommand chains (which have no root token to fix up).
 
     Returns
     -------
@@ -353,8 +339,6 @@ def usage_display_chain(command_chain: list[str], usage_name: str | None, root_n
         The display chain to feed to the Usage: line formatter.
     """
     if usage_name is None:
-        if not command_chain and root_name is not None:
-            return [root_name]
         return command_chain
     if usage_name == "":
         return command_chain[1:]
@@ -466,7 +450,9 @@ def extract_description(app: "App", help_format: str) -> Any | None:
     return description
 
 
-def extract_usage(root: "App", command_path: Sequence[str], execution_path: Sequence["App"]) -> Any | None:
+def extract_usage(
+    root: "App", command_path: Sequence[str], execution_path: Sequence["App"], usage_name: str | None = None
+) -> Any | None:
     """Extract the usage of the command at ``command_path``.
 
     Must be called inside ``root.app_stack(execution_path)``.
@@ -479,22 +465,26 @@ def extract_usage(root: "App", command_path: Sequence[str], execution_path: Sequ
         Command tokens leading from ``root`` to the command.
     execution_path : Sequence[App]
         The execution path for ``command_path``.
+    usage_name : str | None
+        Program name for a generated usage, in place of the root's documentation name.
+        An empty string omits it.
 
     Returns
     -------
     Optional[Any]
-        The extracted usage object, or None. A generated usage starts with the
-        root's name followed by ``command_path``; a custom ``App.usage`` is returned as-is.
+        The extracted usage object, or None. A generated usage is complete; a custom
+        ``App.usage`` is returned as-is.
     """
     app = execution_path[-1]
     if app.usage is not None:
         return app.usage if app.usage else None
 
     # The docs formatters always render row metavars, so the usage line must too.
-    return format_usage(root, command_path, execution_path, show_metavar=True)
+    name = resolve_doc_root_name(root) if usage_name is None else usage_name
+    return format_usage(root, command_path, execution_path, show_metavar=True, name=name)
 
 
-def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "", command_words: int = 1) -> str:
+def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "") -> str:
     """Format usage line with proper command path.
 
     Parameters
@@ -505,9 +495,6 @@ def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "
         Command chain for the app.
     prefix : str
         Optional prefix for the usage line (e.g., "$").
-    command_words : int
-        Number of leading words of ``usage_text`` that name the command; they are
-        replaced by ``command_chain``.
 
     Returns
     -------
@@ -522,9 +509,9 @@ def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "
 
     full_command = " ".join(command_chain) if command_chain else ""
 
-    parts = usage_text.split(None, command_words)
-    if len(parts) > command_words and command_chain:
-        usage_line = f"{prefix} {full_command} {parts[-1]}" if prefix else f"{full_command} {parts[-1]}"
+    parts = usage_text.split(None, 1)
+    if len(parts) > 1 and command_chain:
+        usage_line = f"{prefix} {full_command} {parts[1]}" if prefix else f"{full_command} {parts[1]}"
     elif command_chain:
         usage_line = f"{prefix} {full_command}" if prefix else full_command
     else:

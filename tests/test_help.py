@@ -3993,3 +3993,58 @@ def test_help_union_bool_flag_enum(app, console):
     actual = capture.get()
     assert "--x --no-x" in actual
     assert "--x.read --x.no-read" in actual
+
+
+def _meta_db_app():
+    app = App(name="demo")
+    db = App(name="db")
+    app.command(db)
+
+    @db.command
+    def migrate(steps: int = 1):
+        pass
+
+    @app.meta.default
+    def root_meta(*tokens: Annotated[str, Parameter(show=False)], verbose: bool = False):
+        pass
+
+    @db.meta.default
+    def db_meta(*tokens: Annotated[str, Parameter(show=False)], url: str = ""):
+        pass
+
+    return app, db
+
+
+def _help_text(entry, tokens, console) -> str:
+    with console.capture() as capture:
+        entry.help_print(tokens, console=console)
+    return capture.get()
+
+
+def test_help_omits_intermediate_meta_options(console):
+    """Command dispatch never runs an intermediate app's meta, so its options are not listed."""
+    app, db = _meta_db_app()
+
+    assert "--verbose" in _help_text(app.meta, ["db", "migrate"], console)
+    assert "--url" not in _help_text(app.meta, ["db", "migrate"], console)
+    assert "--url" not in _help_text(app.meta, ["db"], console)
+    # Entered through ``db.meta``, that meta launches the command.
+    assert "--url" in _help_text(db.meta, ["migrate"], console)
+
+
+def test_help_lists_meta_registered_as_command(console):
+    """A meta app registered as the command runs during dispatch, so its options are listed."""
+    app = App(name="demo")
+    db = App(name="db")
+
+    @db.command
+    def migrate(steps: int = 1):
+        pass
+
+    @db.meta.default
+    def db_meta(*tokens: Annotated[str, Parameter(show=False)], url: str = ""):
+        pass
+
+    app.command(db.meta, name="db")
+
+    assert "--url" in _help_text(app, ["db", "migrate"], console)

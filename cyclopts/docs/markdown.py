@@ -195,20 +195,18 @@ def _render_usage_section(
     """
     app = execution_path[-1]
     if should_show_usage(app, command_path):
-        usage = extract_usage(root, command_path, execution_path)
+        usage = extract_usage(root, command_path, execution_path, usage_name)
         if usage:
             lines.append("```console")
             if isinstance(usage, str):
                 usage_text = usage
             else:
                 usage_text = extract_text(usage, None, preserve_markup=False)
-            # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
-            root_name = resolve_doc_root_name(root)
-            command_chain = [root_name, *command_path] if command_path else []
-            display_chain = usage_display_chain(command_chain, usage_name, root_name if app.usage is None else None)
-            # A generated usage names the command with the root's name and ``command_path``.
-            command_words = 1 if app.usage is not None else 1 + len(command_path)
-            usage_line = format_usage_line(usage_text, display_chain, command_words=command_words)
+            # A generated usage already names the command; a custom ``app.usage`` gets its
+            # first word replaced by the command chain.
+            command_chain = [resolve_doc_root_name(root), *command_path] if command_path else []
+            display_chain = [] if app.usage is None else usage_display_chain(command_chain, usage_name)
+            usage_line = format_usage_line(usage_text, display_chain)
             lines.append(usage_line)
             lines.append("```")
             lines.append("")
@@ -329,6 +327,7 @@ def _filter_command_entries(
 
 def generate_markdown_docs(
     app: "App",
+    *,
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,

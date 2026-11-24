@@ -329,6 +329,7 @@ a:hover {
 
 def generate_html_docs(
     app: "App",
+    *,
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
@@ -464,7 +465,7 @@ def _generate_html_docs(
         lines.append("</div>")
 
     # Add usage section if not suppressed
-    usage = extract_usage(root, command_path, execution_path)
+    usage = extract_usage(root, command_path, execution_path, usage_name)
     if usage:
         usage_level = min(heading_level + 1, max_heading_level)
         lines.append(f"<h{usage_level}>Usage</h{usage_level}>")
@@ -473,12 +474,10 @@ def _generate_html_docs(
             usage_text = usage
         else:
             usage_text = extract_text(usage, None)
-        # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
-        root_name = app_name if app.usage is None else None
-        display_chain = usage_display_chain(command_chain, usage_name, root_name)
-        # A generated usage names the command with the root's name and ``command_path``.
-        command_words = 1 if app.usage is not None else 1 + len(command_path)
-        usage_text = format_usage_line(usage_text, display_chain, prefix="$", command_words=command_words)
+        # A generated usage already names the command; a custom ``app.usage`` gets its
+        # first word replaced by the command chain.
+        display_chain = [] if app.usage is None else usage_display_chain(command_chain, usage_name)
+        usage_text = format_usage_line(usage_text, display_chain, prefix="$")
         lines.append(f'<pre class="usage">{escape_html(usage_text)}</pre>')
         lines.append("</div>")
 
@@ -539,7 +538,7 @@ def _generate_html_docs(
                         lines.append(f'<div class="command-description">{escape_html(sub_desc_text)}</div>')
 
                 # Generate usage for subcommand
-                sub_usage = extract_usage(root, sub_command_path, sub_execution_path)
+                sub_usage = extract_usage(root, sub_command_path, sub_execution_path, usage_name)
                 if sub_usage:
                     if flatten_commands:
                         usage_heading_level = heading_level + 1
@@ -552,11 +551,10 @@ def _generate_html_docs(
                         sub_usage_text = sub_usage
                     else:
                         sub_usage_text = extract_text(sub_usage, None)
-                    sub_display_chain = usage_display_chain(sub_command_chain, usage_name)
-                    sub_command_words = 1 if subapp.usage is not None else 1 + len(sub_command_path)
-                    sub_usage_text = format_usage_line(
-                        sub_usage_text, sub_display_chain, prefix="$", command_words=sub_command_words
+                    sub_display_chain = (
+                        [] if subapp.usage is None else usage_display_chain(sub_command_chain, usage_name)
                     )
+                    sub_usage_text = format_usage_line(sub_usage_text, sub_display_chain, prefix="$")
                     lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")
 

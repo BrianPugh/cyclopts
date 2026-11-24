@@ -160,6 +160,7 @@ def _generate_toc(lines: list[str]) -> None:
 
 def generate_rst_docs(
     app: "App",
+    *,
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
@@ -370,7 +371,7 @@ def _generate_rst_docs(
         # nowhere else. See #923.
         suppressed_root = no_root_title and not command_chain
         if not suppressed_root or app.default_command is not None:
-            usage = extract_usage(root, command_path, execution_path)
+            usage = extract_usage(root, command_path, execution_path, usage_name)
             usage_text = None
             if usage:
                 if isinstance(usage, str):
@@ -378,17 +379,13 @@ def _generate_rst_docs(
                 else:
                     usage_text = extract_text(usage, None, preserve_markup=False)
 
-                # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
-                root_name = app_name if app.usage is None else None
-                display_chain = usage_display_chain(command_chain, usage_name, root_name)
-
-                # Format usage with the display chain when one is present
+                # A generated usage already names the command; a custom ``app.usage`` gets its
+                # first word replaced by the command chain.
+                display_chain = [] if app.usage is None else usage_display_chain(command_chain, usage_name)
                 if display_chain:
-                    # A generated usage names the command with the root's name and ``command_path``.
-                    command_words = 1 if app.usage is not None else 1 + len(command_path)
-                    parts = usage_text.split(None, command_words)
-                    if len(parts) > command_words:
-                        usage_text = f"{' '.join(display_chain)} {parts[-1]}"
+                    parts = usage_text.split(None, 1)
+                    if len(parts) > 1:
+                        usage_text = f"{' '.join(display_chain)} {parts[1]}"
                     else:
                         usage_text = " ".join(display_chain)
 

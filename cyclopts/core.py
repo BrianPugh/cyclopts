@@ -1311,23 +1311,27 @@ class App:
         """
         apps = []
 
-        # For the last app in execution path, include it and its meta
         if execution_path:
             last_app = execution_path[-1]
-            # Include all metas from walk_metas (includes the app itself)
+            frame = last_app.app_stack.stack[-1] if last_app.app_stack.stack else [last_app]
+            entry_app = frame[0]
+
+            # A meta app contributes only if it runs: it is on the execution path (e.g. a meta
+            # registered as a command), or it is the entry app's meta (the launcher). Command
+            # dispatch never runs the meta of an intermediate or final command app.
+            def runs(meta: "App") -> bool:
+                return meta._meta_parent is entry_app or any(meta is x for x in execution_path)
+
             for app in _walk_metas(last_app):
-                if app not in apps:
+                if (app is last_app or last_app is entry_app or runs(app)) and app not in apps:
                     apps.append(app)
 
-            # Include parent metas from the stack if they exist
-            if last_app.app_stack.stack:
-                for app in last_app.app_stack.stack[-1]:
-                    # Include the app's meta if it exists and isn't already in the list
-                    if app._meta and app._meta not in apps:
-                        # Check if last_app is a command from the meta app
-                        is_meta_command = last_app in app._meta._commands.values()
-                        if not is_meta_command:
-                            apps.append(app._meta)
+            for app in frame:
+                if app._meta and app._meta not in apps and runs(app._meta):
+                    # Check if last_app is a command from the meta app
+                    is_meta_command = last_app in app._meta._commands.values()
+                    if not is_meta_command:
+                        apps.append(app._meta)
 
             if last_app.app_stack.resolve("parse_mode") == "strict":
                 # Meta apps whose _meta_parent is the command itself are retained.
