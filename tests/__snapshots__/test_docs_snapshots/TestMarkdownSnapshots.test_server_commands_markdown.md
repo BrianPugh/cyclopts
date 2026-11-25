@@ -29,6 +29,13 @@ Demonstrates Pydantic model support for CLI parameters.
 * `--auth.refresh-enabled, --auth.no-refresh-enabled`: Enable token refresh. *[default: True]*
 * `--auth.allowed-origins STR..., --auth.empty-allowed-origins`: List of allowed CORS origins. *[default: ['*']]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli server stop
 
 ```console
@@ -43,6 +50,13 @@ Stop the server.
 * `--timeout INT`: Shutdown timeout in seconds. *[default: 30]*
 * `--force, -f, --no-force`: Force immediate shutdown. *[default: False]*
 
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
+
 ### complex-cli server restart
 
 ```console
@@ -55,3 +69,10 @@ Restart the server.
 
 * `ROLLING, --rolling, --no-rolling`: Perform rolling restart (zero downtime). *[default: False]*
 * `DELAY, --delay`: Delay between worker restarts in seconds. *[default: 5]*
+
+**Global Options**:
+
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
+* `--log-level CHOICE`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
