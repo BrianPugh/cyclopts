@@ -42,6 +42,67 @@ Much of Cyclopts's syntax is `Typer`_-inspired. Migrating from Typer should be p
      - In Cyclopts, Positional/Keyword arguments :ref:`are determined from the function signature. <Typer Argument vs Option>`
        Some of Typer's validation fields, like ``exists`` for :class:`~pathlib.Path` types are handled in Cyclopts :ref:`by explicit validators. <Parameter Validators>`
 
+Most ``typer.Option``/``typer.Argument`` keyword arguments have a shorter Cyclopts spelling, or are unnecessary entirely.
+The left column is the Typer habit; the right column is the idiomatic Cyclopts replacement.
+
+.. list-table:: Typer-to-Cyclopts Parameter Habits
+   :widths: 40 60
+   :header-rows: 1
+
+   * - Typer
+     - Cyclopts
+
+   * - ``Option(help="Number of workers.")``
+     - No :class:`.Parameter` needed. Document ``workers`` in the function's :ref:`docstring <Typer Docstring Parsing>`.
+       :attr:`.Parameter.help` exists as an override for when no docstring is available.
+
+   * - ``Option("--workers", "-w")``
+     - ``Parameter(alias="-w")``. :attr:`~.Parameter.alias` **adds** a name; the derived ``--workers`` is kept.
+       Use :attr:`~.Parameter.name` only to **replace** the derived name.
+
+   * - ``Option(envvar="WORKERS")``
+     - ``Parameter(env_var="WORKERS")``
+
+   * - ``Option(hidden=True)``
+     - ``Parameter(show=False)``
+
+   * - ``Option(rich_help_panel="Tuning")``
+     - ``Parameter(group="Tuning")``
+
+   * - ``Option(min=1, max=64)``
+     - ``Parameter(validator=validators.Number(gte=1, lte=64))``
+
+   * - ``Option(exists=True, dir_okay=False)`` on a :class:`~pathlib.Path`
+     - ``Parameter(validator=validators.Path(exists=True, dir_okay=False))``
+
+   * - ``Option(callback=check)``
+     - ``Parameter(validator=check)`` for validation; ``Parameter(converter=parse)`` for parsing. See :ref:`Parameter Validators`.
+
+   * - ``Option(parser=parse)``
+     - ``Parameter(converter=parse)``
+
+   * - ``Option(count=True)``
+     - ``Parameter(count=True)``
+
+   * - ``Option("--flag/--no-flag")``
+     - Nothing; ``--no-flag`` is generated for every :class:`bool`. Customize with :attr:`~.Parameter.negative`.
+
+   * - ``Option(is_flag=False)`` / ``Argument(...)`` to control positional vs keyword
+     - The function signature decides: parameters before ``/`` are positional-only, after ``*`` are keyword-only, otherwise both.
+       See :ref:`Typer Argument vs Option`.
+
+   * - :class:`~enum.Enum` for choices
+     - :obj:`~typing.Literal` is terser; :class:`~enum.Enum` also works.
+
+   * - ``typer.echo(...)``
+     - :func:`print`.
+
+   * - ``raise typer.Exit(code=1)``
+     - ``return 1`` (an :class:`int` return value becomes the exit code) or ``raise SystemExit(1)``.
+
+   * - ``Typer(rich_markup_mode="rich")``
+     - ``App(help_format="rich")``; the default is ``"restructuredtext"``. Markdown is also supported.
+
 Cyclopts and Typer mostly handle type-hints the same way, but there are a few notable exceptions:
 
 .. list-table:: Typer-to-Cyclopts Type-Hints
