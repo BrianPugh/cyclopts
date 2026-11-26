@@ -21,6 +21,7 @@ from cyclopts.help import (
     format_usage,
 )
 from cyclopts.help.formatters import DefaultFormatter, PlainFormatter
+from cyclopts.help.help import docstring_parse
 
 
 @pytest.fixture
@@ -2187,6 +2188,34 @@ def test_help_markdown(app, console, normalize_trailing_whitespace):
 
     # Rich sticks a bunch of trailing spaces on lines.
     assert normalize_trailing_whitespace(actual) == expected
+
+
+def test_help_docstring_examples_are_preserved():
+    parsed = docstring_parse(
+        dedent(
+            """\
+            Summary.
+
+            Long description.
+
+            Examples:
+                tool --input file.txt
+                tool --verbose
+            """
+        ),
+        "google",
+    )
+
+    assert parsed.long_description == dedent(
+        """\
+        Long description.
+
+        Examples:
+
+            tool --input file.txt
+            tool --verbose
+        """
+    ).rstrip()
 
 
 @pytest.mark.parametrize("help_format", ["markdown", "rst"])
