@@ -63,6 +63,24 @@ def docstring_parse(doc: str | None, format: str):
 
     res = docstring_parser.parse(cleaned_doc)
 
+    examples = [
+        meta
+        for meta in res.meta
+        if meta.args and meta.args[0] in {"example", "examples"} and meta.description
+    ]
+    if examples:
+        sections = []
+        for example in examples:
+            lines = example.description.splitlines()
+            indented = "\n".join("    " + line if line else "" for line in lines)
+            sections.append("Examples:\n\n" + indented)
+
+        examples_text = "\n\n".join(sections)
+        if res.long_description:
+            res.long_description += "\n\n" + examples_text
+        else:
+            res.long_description = examples_text
+
     # Ensure a short description exists if there's a long description
     assert not res.long_description or res.short_description
 
