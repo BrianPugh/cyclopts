@@ -8,7 +8,9 @@ from collections.abc import Reversible as AbcReversible
 from collections.abc import Set as AbcSet
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from enum import Enum, auto
+from fractions import Fraction
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, Union
 from unittest.mock import Mock
@@ -184,6 +186,37 @@ def test_coerce_overflow_cli(app, hint, value):
         app([f"--limit={value}"], print_error=False)
 
     assert exc.value.code == 2
+
+
+@pytest.mark.parametrize(("hint", "value"), [(Decimal, "abc"), (Decimal, "1/3"), (Decimal, ""), (Fraction, "3/0")])
+def test_coerce_arithmetic_error(hint, value):
+    # ``Decimal("abc")`` raises ``decimal.InvalidOperation`` and ``Fraction("3/0")`` raises ``ZeroDivisionError``,
+    # neither of which is a ``ValueError``.
+    with pytest.raises(CoercionError) as exc:
+        convert(hint, [value])
+
+    assert exc.value.target_type is hint
+    assert exc.value.token is not None
+    assert exc.value.token.value == value
+
+
+@pytest.mark.parametrize(("hint", "value"), [(Decimal, "abc"), (Fraction, "3/0")])
+def test_coerce_arithmetic_error_cli(app, hint, value):
+    @app.default
+    def main(*, price: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pytest.fail("An invalid value must not reach the command.")
+
+    with pytest.raises(SystemExit) as exc:
+        app([f"--price={value}"], print_error=False)
+
+    assert exc.value.code == 2
+
+
+@pytest.mark.parametrize(
+    ("hint", "value", "expected"), [(Decimal, "1.50", Decimal("1.50")), (Fraction, "3/6", Fraction(1, 2))]
+)
+def test_coerce_decimal_fraction(hint, value, expected):
+    assert convert(hint, [value]) == expected
 
 
 def test_custom_converter_overflow():
